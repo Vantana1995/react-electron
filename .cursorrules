@@ -1,0 +1,465 @@
+# Twitter Automation Platform - Model Context
+
+## Project Overview
+This is a subscription-based Twitter automation platform with crypto payments. The system consists of an Electron desktop application (frontend) and a Next.js API server (backend) that enables users to automate Twitter interactions through DOM manipulation scripts delivered securely from IPFS.
+
+## Architecture Overview
+
+### Frontend (Electron + JavaScript/TypeScript)
+**Main Responsibilities:**
+- Device fingerprinting and user authentication
+- Crypto payment processing via MetaMask/RainbowKit
+- Script execution in secure memory-only environment
+- Twitter session management via Chromium browser
+- Anti-debugging and security measures
+
+### Backend (Next.js + PostgreSQL)
+**Main Responsibilities:**
+- Device fingerprint validation and user management  
+- Subscription and payment verification
+- IPFS script delivery and module management
+- Real-time connection monitoring (30s ping intervals)
+- Blockchain event listening and database updates
+- User analytics and activity logging
+
+## Technology Stack
+
+### Frontend Technologies
+- **Electron** - Desktop application framework
+- **JavaScript/TypeScript** - Primary languages
+- **Puppeteer** - Browser automation (or native Electron DOM manipulation)
+- **Web3.js** - Blockchain interactions
+- **MetaMask/RainbowKit** - Wallet connections
+- **CSS** - Styling
+- **Puppeteer-extra** - Stealth plugins for anti-detection
+- **Ghost-cursor** - Human-like mouse movement simulation
+- **User-agents** - User agent rotation
+- **@web3-storage/w3up-client** - IPFS Web3.Storage integration
+- **Socket.io-client** - WebSocket client for real-time communication
+
+### Backend Technologies
+- **Next.js** - API server framework
+- **PostgreSQL** - Primary database
+- **Socket.io** - Real-time WebSocket connections
+- **Web3.js** - Smart contract interactions
+- **IPFS** - Decentralized script storage
+- **Redis** (optional) - Caching layer
+- **Crypto-js** - Secure hashing and encryption
+- **Farmhash** - Fast fingerprint hashing
+- **Bcryptjs** - Password hashing utilities
+- **UUID** - Unique identifier generation
+- **Joi** - Input validation
+- **Helmet** - Security headers
+- **Express-rate-limit** - API rate limiting
+- **Winston** - Logging system
+- **Node-cron** - Scheduled tasks
+- **Multer** - File upload handling
+
+## Project Structure
+
+```
+project-root/
+├── frontend/                    # Electron Application
+│   ├── src/
+│   │   ├── main/               # Main Electron process
+│   │   │   ├── main.js         # Application entry point
+│   │   │   ├── security/       # Anti-debugging measures
+│   │   │   └── ipc/           # Inter-process communication
+│   │   ├── renderer/          # Renderer processes
+│   │   │   ├── windows/       # Application windows
+│   │   │   ├── components/    # UI components
+│   │   │   ├── services/      # API communication
+│   │   │   └── utils/         # Helper functions
+│   │   ├── scripts/           # Script execution environment
+│   │   │   ├── executor/      # Memory-only script runner
+│   │   │   ├── twitter/       # Twitter-specific logic
+│   │   │   └── browser/       # Browser automation
+│   │   ├── auth/              # Authentication logic
+│   │   │   ├── fingerprint/   # Device fingerprinting
+│   │   │   ├── crypto/        # Wallet connections
+│   │   │   └── session/       # Session management
+│   │   └── data/              # User data management
+│   │       ├── config/        # Configuration files
+│   │       ├── uploads/       # JSON data uploads
+│   │       └── cache/         # Temporary storage
+│   ├── assets/                # Static resources
+│   ├── build/                 # Build configuration
+│   └── package.json
+├── backend/                    # Next.js API Server
+│   ├── pages/
+│   │   └── api/               # API endpoints
+│   │       ├── auth/          # Authentication endpoints
+│   │       │   ├── fingerprint.js
+│   │       │   ├── verify.js
+│   │       │   └── backup-emails.js
+│   │       ├── scripts/       # Script management
+│   │       │   ├── deliver.js
+│   │       │   ├── modules.js
+│   │       │   └── features/
+│   │       ├── payments/      # Payment processing
+│   │       │   ├── subscription.js
+│   │       │   ├── verify-payment.js
+│   │       │   └── webhook.js
+│   │       ├── analytics/     # User activity tracking
+│   │       │   ├── activity.js
+│   │       │   ├── usage.js
+│   │       │   └── metrics.js
+│   │       └── websocket/     # Real-time connections
+│   │           ├── keepalive.js
+│   │           └── monitor.js
+│   ├── services/              # Business logic services
+│   │   ├── fingerprint/       # Device fingerprinting
+│   │   │   ├── generator.js
+│   │   │   ├── validator.js
+│   │   │   └── backup.js
+│   │   ├── blockchain/        # Smart contract integration
+│   │   │   ├── listener.js
+│   │   │   ├── payments.js
+│   │   │   └── events.js
+│   │   ├── ipfs/              # IPFS management
+│   │   │   ├── uploader.js
+│   │   │   ├── fetcher.js
+│   │   │   └── modules/
+│   │   ├── cache/             # Caching system
+│   │   │   ├── manager.js
+│   │   │   ├── features.js
+│   │   │   └── cleanup.js
+│   │   └── analytics/         # Analytics processing
+│   │       ├── collector.js
+│   │       ├── processor.js
+│   │       └── insights.js
+│   ├── database/              # Database management
+│   │   ├── models/            # Database models
+│   │   │   ├── User.js
+│   │   │   ├── Subscription.js
+│   │   │   ├── Activity.js
+│   │   │   └── Feature.js
+│   │   ├── migrations/        # Database migrations
+│   │   ├── seeds/             # Seed data
+│   │   └── connection.js
+│   ├── utils/                 # Utility functions
+│   │   ├── crypto.js          # Encryption/hashing
+│   │   ├── validation.js      # Input validation
+│   │   ├── constants.js       # App constants
+│   │   └── helpers.js         # General helpers
+│   ├── config/                # Configuration
+│   │   ├── database.js
+│   │   ├── blockchain.js
+│   │   └── ipfs.js
+│   └── package.json
+├── smart-contracts/           # Blockchain contracts
+│   ├── contracts/
+│   ├── scripts/
+│   └── tests/
+├── docs/                      # Documentation
+│   ├── api/                   # API documentation
+│   ├── frontend/              # Frontend documentation
+│   ├── deployment/            # Deployment guides
+│   └── README.md
+└── scripts/                   # Deployment scripts
+    ├── deploy.sh
+    ├── setup.sh
+    └── migrate.sh
+```
+
+## Core Features & Business Logic
+
+### Authentication System
+- **Device Fingerprinting**: CPU, GPU, screen, timezone, IP-based unique hash
+- **Backup Recovery**: 5 email addresses for device recovery
+- **Security**: No traditional login/password system
+
+### Subscription Management
+- **Multiple Tiers**: Different subscription levels with varying features
+- **Crypto Payments**: Direct wallet payments via smart contracts
+- **Access Control**: Script delivery based on subscription status
+
+### Script Execution
+- **Memory-Only**: Scripts loaded and executed in RAM, deleted on app close
+- **IPFS Delivery**: Scripts stored on IPFS for decentralization
+- **Modular System**: Feature-based modules with independent caching
+
+### Security Measures
+- **Anti-Debugging**: Automatic app closure if debugging detected (0.5s delay)
+- **DevTools Block**: Prevent developer console access
+- **Keep-Alive**: 30s server pings, app closes if no response for 40s
+- **Code Protection**: Server-side script storage and delivery
+
+## Database Schema
+
+### Users Table
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    device_hash VARCHAR(255) UNIQUE NOT NULL,
+    backup_emails TEXT[], -- Array of 5 backup emails
+    created_at TIMESTAMP DEFAULT NOW(),
+    last_active TIMESTAMP,
+    device_info JSONB -- Device fingerprint data
+);
+```
+
+### Subscriptions Table
+```sql
+CREATE TABLE subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    subscription_type VARCHAR(100) NOT NULL,
+    blockchain_tx_hash VARCHAR(255) UNIQUE,
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    features_access TEXT[] -- Array of accessible features
+);
+```
+
+### Activity Logs Table
+```sql
+CREATE TABLE activity_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    action_type VARCHAR(100) NOT NULL,
+    feature_used VARCHAR(100),
+    duration INTEGER, -- Session duration in seconds
+    timestamp TIMESTAMP DEFAULT NOW(),
+    metadata JSONB -- Additional activity data
+);
+```
+
+### Features Table
+```sql
+CREATE TABLE features (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    ipfs_hash VARCHAR(255) NOT NULL,
+    required_subscription VARCHAR(100) NOT NULL,
+    version VARCHAR(20) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    cache_key VARCHAR(255) UNIQUE
+);
+```
+
+## Device Fingerprinting Components
+
+### Hardware Information
+- **CPU**: Cores count, architecture, model
+- **GPU**: Renderer, vendor, memory
+- **RAM**: Total available memory
+- **Storage**: Available disk space (if accessible)
+
+### System Information
+- **OS**: Platform, version, architecture
+- **Screen**: Resolution, color depth, DPI
+- **Timezone**: Current timezone offset
+- **Language**: System language preferences
+- **Network**: IP address, connection type
+
+### Browser/Electron Information
+- **User Agent**: Electron version, Chromium version
+- **WebGL**: Renderer capabilities
+- **Audio**: Audio context fingerprint
+- **Canvas**: Canvas rendering fingerprint
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/fingerprint` - Generate and validate device fingerprint
+- `POST /api/auth/verify` - Verify user subscription status
+- `POST /api/auth/backup-emails` - Manage backup email addresses
+- `GET /api/auth/recovery` - Device recovery via email verification
+
+### Script Management
+- `GET /api/scripts/deliver` - Deliver scripts based on subscription
+- `GET /api/scripts/modules` - List available feature modules
+- `POST /api/scripts/features/{featureId}` - Get specific feature script
+
+### Payment Processing
+- `POST /api/payments/subscription` - Process subscription payment
+- `GET /api/payments/verify-payment` - Verify blockchain transaction
+- `POST /api/payments/webhook` - Handle smart contract events
+
+### Analytics
+- `POST /api/analytics/activity` - Log user activity
+- `GET /api/analytics/usage` - Get usage statistics
+- `POST /api/analytics/metrics` - Track feature usage metrics
+
+### WebSocket Endpoints
+- `WS /api/websocket/keepalive` - Maintain connection for security
+- `WS /api/websocket/monitor` - Real-time app monitoring
+
+## Security Implementation
+
+### Frontend Security
+```javascript
+// Anti-debugging detection
+setInterval(() => {
+    const start = Date.now();
+    debugger;
+    if (Date.now() - start > 100) {
+        // Debugging detected, close app
+        setTimeout(() => app.quit(), 500);
+    }
+}, 5000);
+
+// Block DevTools
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
+        e.preventDefault();
+        app.quit();
+    }
+});
+```
+
+### Backend Security
+- Input validation on all endpoints
+- Rate limiting for API calls
+- HTTPS/WSS encryption for all communications
+- Device fingerprint validation on each request
+
+## Development Guidelines
+
+### Code Organization
+- **Separation of Concerns**: Each feature in separate modules
+- **Single Responsibility**: Functions should have one clear purpose
+- **Documentation**: Comprehensive README files for each module
+- **Error Handling**: Proper error handling and logging
+
+### Naming Conventions
+- **Files**: kebab-case for files and folders
+- **Functions**: camelCase for functions and variables
+- **Constants**: UPPER_SNAKE_CASE for constants
+- **Components**: PascalCase for React-like components
+
+### API Response Format
+```javascript
+{
+    success: boolean,
+    data?: any,
+    error?: {
+        code: string,
+        message: string,
+        details?: any
+    },
+    timestamp: string
+}
+```
+
+## Deployment Considerations
+
+### Environment Variables
+- `DATABASE_URL` - PostgreSQL connection string
+- `BLOCKCHAIN_RPC_URL` - EVM network RPC endpoint
+- `IPFS_API_URL` - IPFS node endpoint
+- `JWT_SECRET` - Token signing secret
+- `ENCRYPTION_KEY` - Data encryption key
+
+### Security & Performance
+- `FINGERPRINT_SALT` - Global salt for device fingerprinting
+- `RATE_LIMIT_WINDOW_MS` - Rate limiting time window (15 minutes)
+- `RATE_LIMIT_MAX_REQUESTS` - Maximum requests per window
+- `KEEPALIVE_INTERVAL` - WebSocket ping interval (30 seconds)
+- `SCRIPT_EXECUTION_TIMEOUT` - Maximum script execution time
+
+### IPFS Configuration
+- `WEB3_STORAGE_EMAIL` - Email for Web3.Storage authentication
+- `WEB3_STORAGE_DID` - Decentralized identifier for storage
+- `IPFS_GATEWAY_URL` - IPFS gateway for content retrieval
+
+### Puppeteer Settings
+- `PUPPETEER_HEADLESS` - Headless browser mode (true/false)
+- `PUPPETEER_TIMEOUT` - Page load timeout
+- `USER_AGENT_POOL` - Pool of user agents for rotation
+
+### Scalability
+- Horizontal scaling via load balancers
+- Database connection pooling
+- IPFS content caching
+- Feature-based cache isolation
+
+## Target Audience
+- **Crypto Twitter Users**: Active cryptocurrency community members
+- **Twitter Automation Seekers**: Users wanting to automate Twitter interactions
+- **Data Collectors**: Users needing Twitter data aggregation
+- **Community Managers**: Discord/Telegram channel operators
+
+This platform serves users who need secure, scalable Twitter automation with crypto-based subscriptions and decentralized script delivery.
+
+## Advanced Security & Performance
+
+### Puppeteer Stealth Configuration
+- Use puppeteer-extra with stealth plugins to avoid Twitter detection
+- Implement human-like behavior patterns with random delays
+- Cookie transfer from Electron to Puppeteer for seamless automation
+- Handle dynamic content loading and CAPTCHA challenges
+
+### Secure Hashing Implementation
+- Backend-only fingerprint generation using farmhash + SHA-256
+- Multi-layered hashing with device-specific salt
+- Secure validation without exposing hashing logic to client
+
+### Memory Management
+- Script execution in isolated memory environment
+- Automatic garbage collection on app closure
+- Secure cleanup of sensitive data from RAM
+
+### Real-time Monitoring
+- 30-second ping intervals via WebSocket
+- Automatic app termination if connection lost for 40+ seconds
+- Connection failure recovery mechanisms
+
+### IPFS Integration
+- Web3.Storage for decentralized script delivery
+- Email-based authentication for IPFS access
+- Content addressing for script integrity verification
+- Modular feature deployment via IPFS hashes
+
+### Anti-Detection Measures
+```javascript
+// Puppeteer stealth setup
+import puppeteer from 'puppeteer-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+import { createCursor } from 'ghost-cursor'
+
+puppeteer.use(StealthPlugin())
+
+const browser = await puppeteer.launch({
+  headless: false,
+  args: [
+    '--no-sandbox',
+    '--disable-blink-features=AutomationControlled',
+    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+  ]
+})
+```
+
+## Development & Testing Guidelines
+
+### Local Development Setup
+1. Install PostgreSQL and create database
+2. Set up environment variables
+3. Run database migrations
+4. Start Next.js development server
+5. Launch Electron application in development mode
+
+### Testing Requirements
+- Unit tests for fingerprinting logic
+- Integration tests for API endpoints
+- End-to-end tests for payment flow
+- Security tests for anti-debugging measures
+- Performance tests for database queries
+
+### Code Quality Standards
+- ESLint configuration for consistent code style
+- Prettier for automatic code formatting  
+- Husky pre-commit hooks for code validation
+- TypeScript strict mode enabled
+- 80%+ test coverage requirement
+
+### Deployment Pipeline
+- Automated testing on pull requests
+- Security vulnerability scanning
+- Database migration verification
+- Electron application signing and distribution
+- IPFS content deployment automation
+
+This platform prioritizes security, performance, and user privacy while delivering scalable Twitter automation capabilities.
