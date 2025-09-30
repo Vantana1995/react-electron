@@ -12,7 +12,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   onEdit,
   onDelete,
   onSelect,
-  onToggleActivation,
   isSelected,
 }) => {
   const formatDate = (timestamp: number) => {
@@ -82,19 +81,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
       <div className="profile-card-footer">
         <button
-          className={`activation-btn ${
-            profile.isActive ? "active" : "inactive"
-          }`}
-          onClick={() => onToggleActivation(profile.id)}
-          title={profile.isActive ? "Deactivate profile" : "Activate profile"}
-        >
-          {profile.isActive ? "🔴 Deactivate" : "🟢 Activate"}
-        </button>
-        <button
           className={`select-profile-btn ${isSelected ? "selected" : ""}`}
           onClick={() => onSelect(profile)}
-          disabled={isSelected || !profile.isActive}
-          title={!profile.isActive ? "Profile must be activated to select" : ""}
+          disabled={isSelected}
         >
           {isSelected ? "✅ Selected" : "Select Profile"}
         </button>

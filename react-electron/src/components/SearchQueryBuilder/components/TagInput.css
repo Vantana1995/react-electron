@@ -1,0 +1,135 @@
+/**
+ * TagInput Component Styles
+ */
+
+.tag-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.tag-input-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: white;
+  min-height: 42px;
+  align-items: center;
+  cursor: text;
+  transition: border-color 0.2s ease;
+}
+
+.tag-input-tags:focus-within {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.tag-input-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #007bff;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+.tag-input-tag:hover {
+  background: #0056b3;
+}
+
+.tag-input-remove {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 2px;
+  font-weight: bold;
+  transition: transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-input-remove:hover {
+  transform: scale(1.2);
+}
+
+.tag-input-field {
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 120px;
+  padding: 4px;
+  font-size: 0.9rem;
+  background: transparent;
+}
+
+.tag-input-field::placeholder {
+  color: #adb5bd;
+}
+
+.tag-input-count {
+  font-size: 0.75rem;
+  color: #6c757d;
+  text-align: right;
+  font-style: italic;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .tag-input-tags {
+    background: #495057;
+    border-color: #6c757d;
+  }
+
+  .tag-input-tag {
+    background: #0056b3;
+  }
+
+  .tag-input-tag:hover {
+    background: #004085;
+  }
+
+  .tag-input-field {
+    color: #fff;
+  }
+
+  .tag-input-field::placeholder {
+    color: #adb5bd;
+  }
+
+  .tag-input-count {
+    color: #adb5bd;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tag-input-tags {
+    padding: 6px;
+    min-height: 38px;
+  }
+
+  .tag-input-tag {
+    font-size: 0.8rem;
+    padding: 3px 6px;
+  }
+
+  .tag-input-field {
+    font-size: 0.85rem;
+    min-width: 100px;
+  }
+}

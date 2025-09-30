@@ -26,6 +26,7 @@ import {
 } from "./components/ActivityLog/ActivityLog";
 import { ScriptManager } from "./components/ScriptManager/ScriptManager";
 import { ProfileManager } from "./components/ProfileManager";
+import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryBuilder";
 import { timerService } from "./services/timerService";
 import "./App.css";
 
@@ -71,6 +72,10 @@ function App() {
   const [nftScriptMapping, setNftScriptMapping] = useState<
     Map<string, ScriptData>
   >(new Map());
+
+  // Search Query Builder state
+  const [navigationUrl, setNavigationUrl] = useState<string>("");
+  const [showSearchBuilder, setShowSearchBuilder] = useState<boolean>(false);
 
   // Expose currentNFT and currentScript to window object for component access
   useEffect(() => {
@@ -698,16 +703,45 @@ function App() {
     [addLog, appState.profiles.maxProfiles]
   );
 
+  /**
+   * Handle navigation URL change from Search Builder
+   */
+  const handleNavigationUrlChange = useCallback((url: string) => {
+    setNavigationUrl(url);
+    if (url) {
+      addLog(`🔍 Search URL set: ${url.substring(0, 60)}...`, "info");
+    }
+  }, [addLog]);
+
+  /**
+   * Handle opening Search Query Builder
+   */
+  const handleOpenSearchBuilder = useCallback(() => {
+    setShowSearchBuilder(true);
+    addLog("🔍 Opening Search Query Builder...", "info");
+  }, [addLog]);
+
+  /**
+   * Handle using search URL in script
+   */
+  const handleUseSearchUrl = useCallback((url: string) => {
+    setNavigationUrl(url);
+    setShowSearchBuilder(false);
+    addLog(`✅ Search URL applied for script execution`, "success");
+  }, [addLog]);
+
   return (
     <div className="app-container">
-      <div className="app-header">
-        <h1>🚀 Twitter Automation Platform</h1>
-        <p>
-          Secure crypto wallet authentication with Puppeteer script execution
-        </p>
-      </div>
+      {!showSearchBuilder ? (
+        <>
+          <div className="app-header">
+            <h1>🚀 Twitter Automation Platform</h1>
+            <p>
+              Secure crypto wallet authentication with Puppeteer script execution
+            </p>
+          </div>
 
-      <div className="app-main">
+          <div className="app-main">
         <div className="main-grid">
           {/* Wallet Section */}
           <div className="card">
@@ -728,6 +762,10 @@ function App() {
               profiles={appState.profiles.profiles}
               maxProfiles={appState.profiles.maxProfiles}
               onScriptExecute={handleScriptExecute}
+              onProfileActivate={handleProfileToggleActivation}
+              navigationUrl={navigationUrl}
+              onNavigationUrlChange={handleNavigationUrlChange}
+              onOpenSearchBuilder={handleOpenSearchBuilder}
             />
           </div>
         )}
@@ -759,7 +797,21 @@ function App() {
         <div className="log-section">
           <ActivityLog logs={logs} maxEntries={100} autoScroll={true} />
         </div>
-      </div>
+          </div>
+        </>
+      ) : (
+        <div className="search-builder-view">
+          <div className="search-builder-header">
+            <button
+              className="back-button"
+              onClick={() => setShowSearchBuilder(false)}
+            >
+              ← Back to Main
+            </button>
+          </div>
+          <SearchQueryBuilder onUseInScript={handleUseSearchUrl} />
+        </div>
+      )}
     </div>
   );
 }

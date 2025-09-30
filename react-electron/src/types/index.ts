@@ -553,7 +553,6 @@ export interface ProfileCardProps {
   onEdit: (profile: UserProfile) => void;
   onDelete: (profileId: string) => void;
   onSelect: (profile: UserProfile) => void;
-  onToggleActivation: (profileId: string) => void;
   isSelected: boolean;
   maxActiveProfiles: number;
 }

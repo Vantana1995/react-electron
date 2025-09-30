@@ -3,7 +3,7 @@
  * TypeScript version with Puppeteer script execution support
  */
 
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, shell, dialog } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import express, { Request, Response, NextFunction } from "express";
@@ -1029,23 +1029,27 @@ async function launchBrowserWithProfile() {
 }
 
 // ============================================
-// КОНФИГУРАЦИЯ СКРИПТА ИЗ CUSTOM DATA
+// КОНФИГУРАЦИЯ СКРИПТА ИЗ РЕАЛЬНЫХ НАСТРОЕК NFTDISPLAY
 // ============================================
 const config = {
   // URL для навигации (или дефолтный Twitter)
-  navigationUrl: customData.navigationUrl || "https://x.com",
+  navigationUrl: ${JSON.stringify(params.settings?.navigationUrl || "")} || "https://x.com",
 
   // Regex паттерн (или дефолтный)
-  regexPattern: customData.regexPattern || "\\\\b(crypto|web3|ticker|memcoin)\\\\b",
+  regexPattern: ${JSON.stringify(params.settings?.regexPattern || "")} || "\\b(crypto|web3|ticker|memecoin)\\b",
 
   // Шаблоны комментариев (или пустой массив)
-  commentTemplates: customData.commentTemplates || {},
+  commentTemplates: ${JSON.stringify(params.settings?.commentTemplates || [])},
+  regexTags: ${JSON.stringify(params.settings?.regexTags || [])},
+  saveImagesFolder: ${JSON.stringify(params.settings?.saveImagesFolder || "")},
+  delayBetweenActions: ${JSON.stringify(params.settings?.delayBetweenActions || 3000)},
 
   // Дополнительные параметры
   ...customData
 };
 
 console.log('⚙️ Script config:', config);
+console.log('🔍 Navigation URL from settings:', params.settings?.navigationUrl);
 
 // ============================================
 // ОСНОВНАЯ ФУНКЦИЯ ВЫПОЛНЕНИЯ
@@ -1338,6 +1342,32 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
   }
 });
 
+
+// Handle folder selection
+ipcMain.handle("select-folder", async () => {
+  try {
+    if (!win) {
+      return null;
+    }
+
+    const result = await dialog.showOpenDialog(win, {
+      properties: ["openDirectory"],
+      title: "Select folder to save images",
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    const selectedPath = result.filePaths[0];
+    console.log("📁 Folder selected:", selectedPath);
+
+    return selectedPath;
+  } catch (error) {
+    console.error("❌ Folder selection failed:", error);
+    return null;
+  }
+});
 
 // Handle app activation (macOS)
 app.on("activate", () => {

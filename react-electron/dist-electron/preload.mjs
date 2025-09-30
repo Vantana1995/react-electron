@@ -57,7 +57,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   closeBrowser: (browserId) => ipcRenderer.invoke("close-browser", browserId),
   executeBrowserScript: (params) => ipcRenderer.invoke("execute-browser-script", params),
   navigateBrowser: (params) => ipcRenderer.invoke("navigate-browser", params),
-  getBrowserStatus: (browserId) => ipcRenderer.invoke("get-browser-status", browserId)
+  getBrowserStatus: (browserId) => ipcRenderer.invoke("get-browser-status", browserId),
+  // File system operations
+  selectFolder: () => ipcRenderer.invoke("select-folder")
 });
 contextBridge.exposeInMainWorld("ipcRenderer", {
   on(...args) {

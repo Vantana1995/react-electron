@@ -61,10 +61,6 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
     onProfileSelect(profile);
   };
 
-  const handleToggleActivation = (profileId: string) => {
-    onProfileToggleActivation(profileId);
-  };
-
   // Calculate activation statistics
   const activeProfiles = profiles.filter(p => p.isActive);
   const activeCount = activeProfiles.length;
@@ -123,7 +119,6 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               onEdit={handleEditProfile}
               onDelete={handleDeleteProfile}
               onSelect={handleSelectProfile}
-              onToggleActivation={handleToggleActivation}
               isSelected={selectedProfile?.id === profile.id}
               maxActiveProfiles={maxProfiles}
             />

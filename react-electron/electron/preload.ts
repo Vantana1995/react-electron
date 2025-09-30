@@ -176,6 +176,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   }) => ipcRenderer.invoke("navigate-browser", params),
 
   getBrowserStatus: (browserId: string) => ipcRenderer.invoke("get-browser-status", browserId),
+
+  // File system operations
+  selectFolder: () => ipcRenderer.invoke("select-folder"),
 });
 
 // Legacy ipcRenderer API for compatibility (if needed)
