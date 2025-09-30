@@ -1,0 +1,204 @@
+/* ProfileCard Component Styles */
+
+.profile-card {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-card:hover {
+  border-color: #444;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.profile-card.selected {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.05);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.2);
+}
+
+.profile-card.selected::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #34d399, #10b981);
+}
+
+.profile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.profile-info h4 {
+  color: #fff;
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.profile-status {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.profile-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.edit-btn,
+.delete-btn {
+  background: none;
+  border: 1px solid #444;
+  color: #aaa;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+.edit-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.profile-card-content {
+  margin-bottom: 16px;
+}
+
+.profile-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+}
+
+.profile-detail:last-child {
+  margin-bottom: 0;
+}
+
+.profile-detail label {
+  color: #aaa;
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.profile-detail span {
+  color: #fff;
+  text-align: right;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.proxy-info {
+  font-size: 0.8rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cookies-info {
+  color: #60a5fa !important;
+}
+
+.date-info {
+  color: #9ca3af !important;
+  font-size: 0.8rem !important;
+}
+
+.profile-card-footer {
+  padding-top: 12px;
+  border-top: 1px solid #333;
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+}
+
+.activation-btn {
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.8rem;
+  border: 1px solid;
+}
+
+.activation-btn.active {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.activation-btn.active:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.activation-btn.inactive {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.activation-btn.inactive:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.select-profile-btn {
+  width: 100%;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  border: 1px solid #333;
+  background: #222;
+  color: #fff;
+}
+
+.select-profile-btn:hover:not(:disabled) {
+  background: #333;
+  border-color: #444;
+}
+
+.select-profile-btn.selected {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: #34d399;
+  color: #34d399;
+  cursor: default;
+}
+
+.select-profile-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+  background: #111;
+  color: #666;
+}

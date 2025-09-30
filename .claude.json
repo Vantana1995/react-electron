@@ -1,0 +1,87 @@
+{
+  "name": "Twitter Automation Platform",
+  "description": "Subscription-based Twitter automation with crypto payments and IPFS script delivery",
+  "version": "1.0.0",
+
+  "projectType": "monorepo",
+  "primaryLanguages": ["TypeScript", "JavaScript"],
+  "frameworks": [
+    "React",
+    "TypeScript",
+    "Electron",
+    "Next.js",
+    "Puppeteer",
+    "Web3.js"
+  ],
+
+  "architecture": {
+    "frontend": "React + TypeScript + Electron (Vite bundler) with Puppeteer automation",
+    "backend": "Next.js API server with PostgreSQL and WebSocket",
+    "blockchain": "Ethereum smart contracts for payments",
+    "storage": "IPFS for decentralized script delivery"
+  },
+
+  "currentPriority": {
+    "focus": "Script execution system",
+    "problem": "Scripts arrive from server but don't execute",
+    "goal": "Configure Puppeteer browsers with user settings in memory-only environment"
+  },
+
+  "codeStyle": {
+    "indentation": 2,
+    "quotes": "single",
+    "semicolons": true,
+    "trailingComma": "es5",
+    "typescript": {
+      "strict": true,
+      "noImplicitAny": true,
+      "interfaces": "PascalCase",
+      "types": "PascalCase"
+    },
+    "react": {
+      "components": "PascalCase",
+      "hooks": "camelCase with 'use' prefix",
+      "props": "camelCase"
+    }
+  },
+
+  "patterns": {
+    "fileNaming": "kebab-case",
+    "functions": "camelCase",
+    "classes": "PascalCase",
+    "constants": "UPPER_SNAKE_CASE"
+  },
+
+  "securityRequirements": [
+    "Memory-only script execution",
+    "Anti-debugging measures only for production, ar developing with debug",
+    "Device fingerprint validation",
+    "Encrypted communications",
+    "WebSocket monitoring"
+  ],
+
+  "technologies": {
+    "frontend": [
+      "React",
+      "TypeScript",
+      "Electron",
+      "Vite",
+      "vite-plugin-electron/simple",
+      "Puppeteer",
+      "puppeteer-extra",
+      "ghost-cursor",
+      "Web3.js",
+      "Socket.io-client"
+    ],
+    "backend": ["Next.js", "PostgreSQL", "Socket.io", "Web3.js", "IPFS"]
+  },
+
+  "excludeFromContext": [
+    "node_modules/",
+    "dist/",
+    "build/",
+    "*.log",
+    ".env*",
+    "coverage/"
+  ]
+}
