@@ -1,0 +1,158 @@
+{
+  "id": "twitter-gm-commenter",
+  "name": "Twitter GM Auto Commenter",
+  "description": "Автоматический поиск и комментирование GM/crypto твитов в Twitter с использованием настраиваемых шаблонов",
+  "version": "2.0.0",
+  "author": "Twitter Automation Platform",
+  "category": "twitter",
+  "tags": ["twitter", "automation", "comments", "engagement", "gm", "crypto"],
+  "requirements": {
+    "node_modules": [
+      "puppeteer",
+      "puppeteer-extra",
+      "puppeteer-extra-plugin-stealth"
+    ],
+    "permissions": ["browser", "screen", "network", "cookies"],
+    "profile_required": true,
+    "proxy_required": true
+  },
+  "entry_point": "index.js",
+  "config": {
+    "headless": true,
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "stealth_mode": true,
+    "profile_cookies": true,
+    "proxy_auth": true
+  },
+  "features": [
+    "Автоматический поиск твитов по regex паттерну",
+    "Умное комментирование с использованием шаблонов",
+    "Поддержка кастомных URL поиска Twitter",
+    "Фильтрация по длине твита (избегание длинных постов)",
+    "Отслеживание обработанных твитов (избегание дубликатов)",
+    "Случайные задержки для имитации человеческого поведения",
+    "Детекция и обработка ошибок (CAPTCHA, ограничения)",
+    "Stealth режим для обхода детекции ботов"
+  ],
+  "usage": {
+    "description": "Скрипт ищет твиты по заданному паттерну (crypto, web3, gm и т.д.) и автоматически оставляет комментарии. Все параметры настраиваются через customData JSON.",
+    "customData": {
+      "navigationUrl": {
+        "type": "string",
+        "required": false,
+        "default": "https://x.com/search?q=(web3%20OR%20crypto%20OR%20ticker)%20AND%20(GM%20or%20%22good%20morning%22%20OR%20%22shill%22)%20-god%20-bot%20(include%3Anativeretweets%20(filter%3Aself_threads%20OR%20-filter%3Anativeretweets%20-filter%3Aretweets%20-filter%3Aquote%20-filter%3Areplies))%20filter%3Ablue_verified%20lang%3Aen&src=typed_query&f=live",
+        "description": "URL Twitter поиска для нахождения целевых твитов"
+      },
+      "regexPattern": {
+        "type": "string",
+        "required": false,
+        "default": "\\b(crypto|web3|ticker|memecoin)\\b",
+        "description": "Regex паттерн для фильтрации твитов по содержимому"
+      },
+      "commentTemplates": {
+        "type": "object",
+        "required": false,
+        "default": {},
+        "description": "Объект с массивами шаблонов комментариев",
+        "example": {
+          "gm": [
+            "gmski fren, TGIF - #MORICOIN weekend vibes incoming",
+            "good morning legend, Friday feels and #MORICOIN weekend reels"
+          ]
+        }
+      },
+      "maxTweetsToProcess": {
+        "type": "number",
+        "required": false,
+        "default": 5,
+        "description": "Максимальное количество твитов для обработки за один запуск"
+      },
+      "delayBetweenActions": {
+        "type": "number",
+        "required": false,
+        "default": 3000,
+        "description": "Задержка между действиями в миллисекундах (мин 2000, макс задержка +20сек)"
+      },
+      "maxWordCount": {
+        "type": "number",
+        "required": false,
+        "default": 200,
+        "description": "Максимальное количество слов в твите (длинные твиты пропускаются)"
+      },
+      "processedTweets": {
+        "type": "array",
+        "required": false,
+        "default": [],
+        "description": "Массив URL уже обработанных твитов (для избегания дубликатов)"
+      }
+    }
+  },
+  "security": {
+    "sandbox": true,
+    "memory_limit": "1024MB",
+    "timeout": 300000,
+    "allowed_domains": ["twitter.com", "x.com"],
+    "rate_limiting": {
+      "enabled": true,
+      "max_actions_per_hour": 10,
+      "cooldown_on_error": 600000
+    }
+  },
+  "examples": {
+    "basic": {
+      "description": "Базовый поиск и просмотр твитов без комментирования",
+      "customData": {
+        "navigationUrl": "https://x.com",
+        "regexPattern": "\\b(crypto|web3)\\b",
+        "commentTemplates": {},
+        "maxTweetsToProcess": 10
+      }
+    },
+    "gm_commenter": {
+      "description": "Автоматическое комментирование GM твитов",
+      "customData": {
+        "navigationUrl": "https://x.com/search?q=gm%20filter%3Ablue_verified",
+        "regexPattern": "\\b(gm|good morning)\\b",
+        "commentTemplates": {
+          "gm": [
+            "GM! ☀️",
+            "Good morning fren! 🌅",
+            "gmski! Have a great day! 💪"
+          ]
+        },
+        "maxTweetsToProcess": 5,
+        "delayBetweenActions": 3000
+      }
+    },
+    "crypto_engagement": {
+      "description": "Комментирование crypto твитов с брендированием",
+      "customData": {
+        "navigationUrl": "https://x.com/search?q=(web3%20OR%20crypto)%20filter%3Ablue_verified%20lang%3Aen&f=live",
+        "regexPattern": "\\b(crypto|web3|ticker|memecoin|nft)\\b",
+        "commentTemplates": {
+          "gm": [
+            "gmski fren, TGIF - #MORICOIN weekend vibes incoming",
+            "good morning legend, Friday feels and #MORICOIN weekend reels",
+            "mate guMornin, thank god its Friday with #MORICOIN"
+          ]
+        },
+        "maxTweetsToProcess": 3,
+        "maxWordCount": 150,
+        "delayBetweenActions": 5000
+      }
+    }
+  },
+  "error_handling": {
+    "captcha_detected": "return error and stop execution",
+    "rate_limited": "return error with suggested retry time",
+    "page_not_found": "skip and continue to next tweet",
+    "network_error": "retry up to 3 times with exponential backoff"
+  },
+  "changelog": {
+    "2.0.0": "Полная переработка архитектуры - разделение на клиент/сервер, поддержка кастомной конфигурации через customData",
+    "1.0.0": "Первая версия с хардкодом настроек"
+  }
+}
