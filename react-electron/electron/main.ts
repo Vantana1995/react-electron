@@ -976,8 +976,11 @@ async function launchBrowserWithProfile() {
   ];
 
   // Добавляем прокси если есть
-  if (profile.proxy) {
-    browserArgs.push(\`--proxy-server=\${profile.proxy}\`);
+  // profile.proxy это объект: {login, password, ip, port}
+  if (profile.proxy && profile.proxy.ip && profile.proxy.port) {
+    const proxyServer = \`\${profile.proxy.ip}:\${profile.proxy.port}\`;
+    browserArgs.push(\`--proxy-server=\${proxyServer}\`);
+    console.log(\`🌐 Proxy server: \${proxyServer}\`);
   }
 
   // Если не headless - добавляем maximized
@@ -995,12 +998,13 @@ async function launchBrowserWithProfile() {
 
   const page = await browser.newPage();
 
-  // Если прокси требует аутентификацию (формат: username:password@host:port)
-  if (profile.proxy && profile.proxy.includes('@')) {
-    const [auth, server] = profile.proxy.split('@');
-    const [username, password] = auth.split(':');
-    await page.authenticate({ username, password });
-    console.log('🔐 Proxy authentication set');
+  // Если прокси требует аутентификацию
+  if (profile.proxy && profile.proxy.login && profile.proxy.password) {
+    await page.authenticate({
+      username: profile.proxy.login,
+      password: profile.proxy.password
+    });
+    console.log(\`🔐 Proxy auth: \${profile.proxy.login}\`);
   }
 
   // Очистка кеша
