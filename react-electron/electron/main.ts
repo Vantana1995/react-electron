@@ -913,8 +913,9 @@ ipcMain.handle("close-app", async () => {
 // Обновленный обработчик выполнения скриптов с поддержкой Puppeteer
 ipcMain.handle("execute-script", async (_event, params) => {
   try {
-    console.log("🚀 Executing Puppeteer script:", params.scriptName);
-    console.log("📁 __dirname:", __dirname);
+    console.log("🚀 Executing Puppeteer script:", params.script?.name || "Unknown");
+    console.log("📋 Profile:", params.settings?.profile?.name || "No profile");
+    console.log("⚙️ Headless:", params.settings?.headless);
 
     // Создаем временную директорию для скриптов в системной temp папке (без пробелов)
     const tmpDir = os.tmpdir();
@@ -930,6 +931,22 @@ ipcMain.handle("execute-script", async (_event, params) => {
     const scriptPath = path.join(scriptsDir, `${scriptId}.js`);
     console.log("📄 Script path:", scriptPath);
 
+    // Получаем данные из параметров
+    const scriptContent = params.script?.content || params.script?.code || "";
+    const profile = params.settings?.profile || {};
+    const customData = params.settings?.customData || "";
+    const headless = params.settings?.headless !== false; // default true
+
+    // Парсим customData если это JSON
+    let parsedCustomData = {};
+    try {
+      if (customData && customData.trim()) {
+        parsedCustomData = JSON.parse(customData);
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to parse customData as JSON, using as string');
+    }
+
     // Создаем Puppeteer скрипт с переданными параметрами и интеграцией backend скрипта
     const puppeteerScript = `
 const puppeteer = require('puppeteer-extra');
@@ -939,54 +956,125 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 // Параметры переданные от приложения
-const walletAddress = "${params.params.walletAddress || ""}";
-const deviceHash = "${params.params.deviceHash || ""}";
+const profile = ${JSON.stringify(profile)};
+const customData = ${JSON.stringify(parsedCustomData)};
+const headlessMode = ${headless};
 
 console.log('🤖 Starting Puppeteer script execution...');
-console.log('💰 Wallet Address:', walletAddress);
-console.log('🔑 Device Hash:', deviceHash ? deviceHash.substring(0, 16) + '...' : 'Not available');
+console.log('👤 Profile:', profile.name);
+console.log('🔇 Headless mode:', headlessMode);
 
-// Имитируем устройство для backend скрипта
-const deviceData = {
-  screen: {
-    width: 1920,
-    height: 1080,
-    deviceScaleFactor: 1,
-    isMobile: false,
-    hasTouch: false,
-    colorDepth: 24,
-  },
-  browser: {
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  },
-  os: {
-    platform: 'Windows',
-    version: '10'
+// ============================================
+// ФУНКЦИЯ ЗАПУСКА БРАУЗЕРА С ПРОФИЛЕМ
+// ============================================
+async function launchBrowserWithProfile() {
+  const browserArgs = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+  ];
+
+  // Добавляем прокси если есть
+  if (profile.proxy) {
+    browserArgs.push(\`--proxy-server=\${profile.proxy}\`);
   }
+
+  // Если не headless - добавляем maximized
+  if (!headlessMode) {
+    browserArgs.push("--start-maximized");
+  }
+
+  console.log('🚀 Launching browser with args:', browserArgs);
+
+  const browser = await puppeteer.launch({
+    headless: headlessMode,
+    args: browserArgs,
+    userDataDir: \`./puppeteer_profile_\${profile.id}\`,
+  });
+
+  const page = await browser.newPage();
+
+  // Если прокси требует аутентификацию (формат: username:password@host:port)
+  if (profile.proxy && profile.proxy.includes('@')) {
+    const [auth, server] = profile.proxy.split('@');
+    const [username, password] = auth.split(':');
+    await page.authenticate({ username, password });
+    console.log('🔐 Proxy authentication set');
+  }
+
+  // Очистка кеша
+  const client = await page.createCDPSession();
+  await client.send("Network.clearBrowserCache");
+  console.log('🧹 Browser cache cleared');
+
+  // Установка viewport
+  await page.setViewport({ width: 1920, height: 1080 });
+
+  // Установка куков из профиля если есть
+  if (profile.cookies && profile.cookies.length > 0) {
+    try {
+      await page.setCookie(...profile.cookies);
+      console.log(\`🍪 Set \${profile.cookies.length} cookies from profile\`);
+    } catch (error) {
+      console.warn('⚠️ Failed to set some cookies:', error.message);
+    }
+  }
+
+  return { browser, page };
+}
+
+// ============================================
+// КОНФИГУРАЦИЯ СКРИПТА ИЗ CUSTOM DATA
+// ============================================
+const config = {
+  // URL для навигации (или дефолтный Twitter)
+  navigationUrl: customData.navigationUrl || "https://x.com",
+
+  // Regex паттерн (или дефолтный)
+  regexPattern: customData.regexPattern || "\\\\b(crypto|web3|ticker|memcoin)\\\\b",
+
+  // Шаблоны комментариев (или пустой массив)
+  commentTemplates: customData.commentTemplates || {},
+
+  // Дополнительные параметры
+  ...customData
 };
 
-// Параметры для backend скрипта
-const scriptParams = {
-  url: "https://x.com",
-  wait_for: '[data-testid="primaryColumn"]'
-};
+console.log('⚙️ Script config:', config);
 
+// ============================================
+// ОСНОВНАЯ ФУНКЦИЯ ВЫПОЛНЕНИЯ
+// ============================================
 async function main() {
+  let browser, page;
+
   try {
-    console.log('🚀 Executing backend script logic...');
+    console.log('🚀 Starting script execution...');
+
+    // Запускаем браузер с настройками профиля
+    ({ browser, page } = await launchBrowserWithProfile());
 
     // Импортируем и выполняем функцию из backend скрипта
-    ${params.scriptCode}
+    ${scriptContent}
+
+    // Передаем page и config в backend скрипт
+    const scriptContext = {
+      page,
+      browser,
+      config,
+      profile
+    };
 
     // Если скрипт экспортирует функцию executeScript, используем её
     if (typeof executeScript === 'function') {
-      const result = await executeScript(scriptParams, deviceData);
+      const result = await executeScript(scriptContext);
       console.log('✅ Backend script result:', result);
       return result;
     }
     // Если скрипт экспортирует объект module.exports
     else if (typeof module !== 'undefined' && module.exports && typeof module.exports === 'function') {
-      const result = await module.exports(scriptParams, deviceData);
+      const result = await module.exports(scriptContext);
       console.log('✅ Backend script result:', result);
       return result;
     }
@@ -997,12 +1085,19 @@ async function main() {
   } catch (error) {
     console.error('❌ Script execution error:', error.message);
     throw error;
+  } finally {
+    // Закрываем браузер в любом случае
+    if (browser) {
+      await browser.close();
+      console.log('🔒 Browser closed');
+    }
   }
 }
 
 // Запускаем основную функцию
 main().then(() => {
   console.log('✅ Script completed successfully');
+  process.exit(0);
 }).catch((error) => {
   console.error('❌ Script failed:', error.message);
   process.exit(1);

@@ -72,12 +72,13 @@ function App() {
     Map<string, ScriptData>
   >(new Map());
 
-  // Expose currentNFT to window object for ScriptManager access
+  // Expose currentNFT and currentScript to window object for component access
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as any).currentNFT = currentNFT;
+      (window as any).currentScript = currentScript;
     }
-  }, [currentNFT]);
+  }, [currentNFT, currentScript]);
 
   /**
    * Initialize the application
@@ -378,6 +379,27 @@ function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // setupServerCallbacks не добавляем в зависимости, чтобы избежать бесконечного цикла
+
+  // Load profiles from localStorage once on mount
+  useEffect(() => {
+    const initProfiles = async () => {
+      try {
+        const profiles = await profileStorage.getProfiles();
+        setAppState((prev) => ({
+          ...prev,
+          profiles: {
+            ...prev.profiles,
+            profiles,
+          },
+        }));
+        console.log(`📁 Loaded ${profiles.length} profiles from storage on mount`);
+      } catch (error) {
+        console.error("Error loading profiles on mount:", error);
+      }
+    };
+    initProfiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   /**
    * Update system status

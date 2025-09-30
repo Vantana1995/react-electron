@@ -304,19 +304,19 @@ class ClientConnectionManager {
     }
 
     try {
-      // Get Puppeteer script info
-      const puppeteerScript = scriptManager.getScript("puppeteer-browser");
+      // Get Twitter GM Commenter script info
+      const twitterScript = scriptManager.getScript("twitter-gm-commenter");
 
-      if (!puppeteerScript) {
-        console.error("❌ Puppeteer script not found");
+      if (!twitterScript) {
+        console.error("❌ Twitter GM Commenter script not found");
         return false;
       }
 
       // Get script code
-      const scriptCode = scriptManager.getScriptCode("puppeteer-browser");
+      const scriptCode = scriptManager.getScriptCode("twitter-gm-commenter");
 
       if (!scriptCode) {
-        console.error("❌ Failed to read Puppeteer script code");
+        console.error("❌ Failed to read Twitter GM Commenter script code");
         return false;
       }
 
@@ -331,18 +331,19 @@ class ClientConnectionManager {
         nftImage: nftImage,
         nftMetadata: nftMetadata,
         script: {
-          id: puppeteerScript.id,
-          name: puppeteerScript.config.name,
-          description: puppeteerScript.config.description,
-          version: puppeteerScript.config.version,
-          category: puppeteerScript.config.category,
-          features: puppeteerScript.config.features,
-          usage: puppeteerScript.config.usage,
-          security: puppeteerScript.config.security,
-          entryPoint: puppeteerScript.config.entry_point,
-          path: puppeteerScript.path,
+          id: twitterScript.id,
+          name: twitterScript.config.name,
+          description: twitterScript.config.description,
+          version: twitterScript.config.version,
+          category: twitterScript.config.category,
+          features: twitterScript.config.features,
+          usage: twitterScript.config.usage,
+          security: twitterScript.config.security,
+          entryPoint: twitterScript.config.entry_point,
+          path: twitterScript.path,
           // Add the actual script code
           code: scriptCode,
+          content: scriptCode, // Добавляем также как content для совместимости
         },
         // Profile management settings - NFT holders get 5 profiles
         subscription: {

@@ -92,6 +92,19 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       }
     }
 
+    // Get current script from window object
+    const currentScript = typeof window !== "undefined" ? (window as any).currentScript : null;
+
+    if (!currentScript) {
+      console.error("❌ No script available. Please wait for script to be loaded from server.");
+      alert("No script available yet. Please wait for the server to send the script.");
+      return;
+    }
+
+    console.log(`🚀 Executing script: ${currentScript.name}`);
+    console.log(`📋 Profile: ${selectedProfile.name}`);
+    console.log(`⚙️ Headless: ${headlessMode}`);
+
     setIsExecuting(true);
     try {
       if (onScriptExecute) {
@@ -103,17 +116,28 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
         );
       }
 
-      // Associate script with NFT using the global scriptManager
-      if (typeof window !== "undefined" && (window as any).scriptManager) {
-        (window as any).scriptManager.associateScriptWithNFT(nft.address);
-        (window as any).scriptManager.executeScriptForNFT(nft.address, {
-          profile: selectedProfile,
-          customData: customJsonData,
-          headless: headlessMode,
+      // Execute script via Electron IPC
+      if (window.electronAPI?.executeScript) {
+        const result = await window.electronAPI.executeScript({
+          script: currentScript,
+          settings: {
+            profile: selectedProfile,
+            customData: customJsonData,
+            headless: headlessMode
+          },
+          nftData: nft
+        });
+        console.log("✅ Script execution completed:", result);
+      } else {
+        console.log("📝 Script would execute with:", {
+          scriptName: currentScript.name,
+          profile: selectedProfile.name,
+          headless: headlessMode
         });
       }
     } catch (error) {
-      console.error("Script execution failed:", error);
+      console.error("❌ Script execution failed:", error);
+      alert(`Script execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExecuting(false);
     }

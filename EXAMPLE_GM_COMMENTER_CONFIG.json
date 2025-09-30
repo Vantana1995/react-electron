@@ -1,0 +1,25 @@
+{
+  "navigationUrl": "https://x.com/search?q=(web3%20OR%20crypto%20OR%20ticker)%20AND%20(GM%20or%20%22good%20morning%22%20OR%20%22shill%22)%20-god%20-bot%20(include%3Anativeretweets%20(filter%3Aself_threads%20OR%20-filter%3Anativeretweets%20-filter%3Aretweets%20-filter%3Aquote%20-filter%3Areplies))%20filter%3Ablue_verified%20lang%3Aen&src=typed_query&f=live",
+
+  "regexPattern": "\\b(crypto|web3|ticker|memecoin)\\b",
+
+  "commentTemplates": {
+    "gm": [
+      "gmski fren, TGIF - #MORICOIN weekend vibes incoming",
+      "good morning legend, Friday feels and #MORICOIN weekend reels",
+      "mate guMornin, thank god its Friday with #MORICOIN",
+      "broski gm, end of week #MORICOIN grind complete",
+      "fren good morning, TGIF #MORICOIN energy activated",
+      "legend gmski, Friday #MORICOIN finish line in sight",
+      "mabo guMornin, weekend prep mode with #MORICOIN on",
+      "good morning mate, Friday #MORICOIN vibes only",
+      "broski ge em, thank god its #MORICOIN Friday",
+      "fren GoodMorning, week wrapped strong with #MORICOIN"
+    ]
+  },
+
+  "maxTweetsToProcess": 5,
+  "delayBetweenActions": 3000,
+  "maxWordCount": 200,
+  "processedTweets": []
+}
