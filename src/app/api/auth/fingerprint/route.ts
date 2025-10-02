@@ -44,6 +44,9 @@ interface FingerprintData extends Record<string, unknown> {
 
   // Wallet information (optional)
   walletAddress?: string | null;
+
+  // Client real IPv4 address (sent from client)
+  clientIPv4?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -71,8 +74,12 @@ export async function POST(request: NextRequest) {
       }`
     );
 
-    // Get client IP address
-    const clientIP = getClientIP(request);
+    // Get client IP address - prefer clientIPv4 from request body (real device IP)
+    const clientIP = fingerprintData.clientIPv4 || getClientIP(request);
+
+    console.log("🌐 Client IP for fingerprint:", clientIP);
+    console.log("  - From request body (clientIPv4):", fingerprintData.clientIPv4 || "not provided");
+    console.log("  - From request headers:", getClientIP(request));
 
     // Step 1: Generate hash from primary characteristics (cpu.model + gpu.renderer + os.architecture + webgl)
 
