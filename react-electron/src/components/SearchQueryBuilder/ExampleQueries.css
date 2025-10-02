@@ -5,21 +5,21 @@
 .example-queries {
   margin-top: 40px;
   padding: 20px;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
   border-radius: 12px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--border-primary);
 }
 
 .example-queries-title {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #212529;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .example-queries-subtitle {
   font-size: 0.95rem;
-  color: #6c757d;
+  color: var(--text-tertiary);
   margin: 0 0 25px 0;
 }
 
@@ -32,8 +32,8 @@
 
 /* Example Query Card */
 .example-query-card {
-  background: white;
-  border: 1px solid #dee2e6;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
   border-radius: 10px;
   padding: 18px;
   display: flex;
@@ -45,8 +45,8 @@
 
 .example-query-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-  border-color: #007bff;
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-focus);
 }
 
 .example-query-card-header {
@@ -58,25 +58,25 @@
 .example-query-card-title {
   font-size: 1rem;
   font-weight: 600;
-  color: #212529;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .example-query-card-description {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: var(--text-tertiary);
   line-height: 1.5;
   margin: 0;
 }
 
 .example-query-card-query {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   padding: 10px;
   font-family: "Courier New", Consolas, Monaco, monospace;
   font-size: 0.8rem;
-  color: #495057;
+  color: var(--text-secondary);
   line-height: 1.5;
   word-break: break-word;
   max-height: 80px;
@@ -97,25 +97,26 @@
 }
 
 .example-query-operator-tag {
-  background: #e7f3ff;
-  color: #0056b3;
+  background: var(--bg-hover);
+  color: var(--accent-info);
   font-size: 0.7rem;
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 12px;
   text-transform: lowercase;
+  border: 1px solid var(--accent-info);
 }
 
 .example-query-operator-more {
   font-size: 0.7rem;
-  color: #6c757d;
+  color: var(--text-tertiary);
   font-style: italic;
   padding: 3px 0;
 }
 
 .example-query-load-btn {
-  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-  color: white;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   border: none;
   border-radius: 6px;
   padding: 10px 16px;
@@ -128,13 +129,14 @@
 
 .example-query-load-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.1);
 }
 
 /* Tips Section */
 .example-queries-tips {
-  background: white;
-  border: 1px solid #dee2e6;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
   border-radius: 10px;
   padding: 20px;
 }
@@ -142,7 +144,7 @@
 .example-queries-tips h4 {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #212529;
+  color: var(--text-primary);
   margin: 0 0 15px 0;
 }
 
@@ -156,82 +158,13 @@
 
 .example-queries-tips li {
   font-size: 0.9rem;
-  color: #495057;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
 .example-queries-tips strong {
-  color: #007bff;
+  color: var(--accent-info);
   font-weight: 600;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .example-queries {
-    background: #2b3035;
-    border-color: #495057;
-  }
-
-  .example-queries-title {
-    color: #f8f9fa;
-  }
-
-  .example-queries-subtitle {
-    color: #adb5bd;
-  }
-
-  .example-query-card {
-    background: #343a40;
-    border-color: #495057;
-  }
-
-  .example-query-card:hover {
-    border-color: #66b3ff;
-  }
-
-  .example-query-card-title {
-    color: #f8f9fa;
-  }
-
-  .example-query-card-description {
-    color: #adb5bd;
-  }
-
-  .example-query-card-query {
-    background: #2b3035;
-    border-color: #495057;
-    color: #adb5bd;
-  }
-
-  .example-query-operator-tag {
-    background: #1e3a5f;
-    color: #66b3ff;
-  }
-
-  .example-query-operator-more {
-    color: #adb5bd;
-  }
-
-  .example-query-load-btn {
-    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
-  }
-
-  .example-queries-tips {
-    background: #343a40;
-    border-color: #495057;
-  }
-
-  .example-queries-tips h4 {
-    color: #f8f9fa;
-  }
-
-  .example-queries-tips li {
-    color: #adb5bd;
-  }
-
-  .example-queries-tips strong {
-    color: #66b3ff;
-  }
 }
 
 /* Responsive */

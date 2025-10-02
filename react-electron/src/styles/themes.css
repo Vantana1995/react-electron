@@ -1,0 +1,132 @@
+/**
+ * Theme Variables
+ * Light theme - soft cream colors (gentle on eyes)
+ * Dark theme - comfortable dark colors
+ */
+
+/* Light Theme - Soft Cream/Warm Colors */
+[data-theme="light"] {
+  /* Background Colors */
+  --bg-primary: #faf8f3;
+  --bg-secondary: #f5f1e8;
+  --bg-tertiary: #ebe4d7;
+  --bg-card: #ffffff;
+  --bg-hover: #f0ebe0;
+  --bg-active: #e8e0d0;
+
+  /* Text Colors */
+  --text-primary: #2d2a26;
+  --text-secondary: #5a5550;
+  --text-tertiary: #8a837a;
+  --text-muted: #b0a89d;
+  --text-inverse: #faf8f3;
+
+  /* Border Colors */
+  --border-primary: #d6cec0;
+  --border-secondary: #e5ded1;
+  --border-focus: #9b8f7e;
+
+  /* Accent Colors */
+  --accent-primary: #7c6f5d;
+  --accent-secondary: #a39485;
+  --accent-success: #6b8e5f;
+  --accent-warning: #d4a574;
+  --accent-error: #c96d6d;
+  --accent-info: #6b91b8;
+
+  /* Special Elements */
+  --shadow-sm: 0 1px 2px rgba(45, 42, 38, 0.05);
+  --shadow-md: 0 4px 6px rgba(45, 42, 38, 0.08);
+  --shadow-lg: 0 10px 15px rgba(45, 42, 38, 0.12);
+
+  /* Wallet/NFT Specific */
+  --wallet-bg: linear-gradient(135deg, #f5f1e8 0%, #ebe4d7 100%);
+  --nft-border: #d6cec0;
+  --nft-shadow: 0 8px 16px rgba(45, 42, 38, 0.1);
+
+  /* Button Colors */
+  --btn-primary-bg: #7c6f5d;
+  --btn-primary-hover: #6a5e4e;
+  --btn-primary-text: #faf8f3;
+  --btn-secondary-bg: #e5ded1;
+  --btn-secondary-hover: #d6cec0;
+  --btn-secondary-text: #2d2a26;
+
+  /* Input Colors */
+  --input-bg: #ffffff;
+  --input-border: #d6cec0;
+  --input-focus-border: #7c6f5d;
+  --input-text: #2d2a26;
+  --input-placeholder: #b0a89d;
+
+  /* Status Colors */
+  --status-online: #6b8e5f;
+  --status-offline: #c96d6d;
+  --status-pending: #d4a574;
+}
+
+/* Dark Theme - Comfortable Dark Colors */
+[data-theme="dark"] {
+  /* Background Colors */
+  --bg-primary: #1a1d23;
+  --bg-secondary: #22252b;
+  --bg-tertiary: #2a2d35;
+  --bg-card: #2d3139;
+  --bg-hover: #33373f;
+  --bg-active: #3a3e47;
+
+  /* Text Colors */
+  --text-primary: #e8e6e3;
+  --text-secondary: #c4c1bc;
+  --text-tertiary: #9a9590;
+  --text-muted: #6e6960;
+  --text-inverse: #1a1d23;
+
+  /* Border Colors */
+  --border-primary: #3d4149;
+  --border-secondary: #33373f;
+  --border-focus: #5a5f6a;
+
+  /* Accent Colors */
+  --accent-primary: #a39485;
+  --accent-secondary: #7c6f5d;
+  --accent-success: #7ea872;
+  --accent-warning: #e3b887;
+  --accent-error: #d88484;
+  --accent-info: #7fa7d1;
+
+  /* Special Elements */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+
+  /* Wallet/NFT Specific */
+  --wallet-bg: linear-gradient(135deg, #22252b 0%, #2a2d35 100%);
+  --nft-border: #3d4149;
+  --nft-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+
+  /* Button Colors */
+  --btn-primary-bg: #a39485;
+  --btn-primary-hover: #b5a695;
+  --btn-primary-text: #1a1d23;
+  --btn-secondary-bg: #33373f;
+  --btn-secondary-hover: #3d4149;
+  --btn-secondary-text: #e8e6e3;
+
+  /* Input Colors */
+  --input-bg: #2a2d35;
+  --input-border: #3d4149;
+  --input-focus-border: #a39485;
+  --input-text: #e8e6e3;
+  --input-placeholder: #6e6960;
+
+  /* Status Colors */
+  --status-online: #7ea872;
+  --status-offline: #d88484;
+  --status-pending: #e3b887;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

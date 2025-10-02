@@ -27,6 +27,7 @@ import {
 import { ScriptManager } from "./components/ScriptManager/ScriptManager";
 import { ProfileManager } from "./components/ProfileManager";
 import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryBuilder";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { timerService } from "./services/timerService";
 import "./App.css";
 
@@ -106,10 +107,51 @@ function App() {
         const deviceData = await collectDeviceInfo();
         addLog("✅ Device information collected successfully", "success");
 
-        // Send device data to main process for encryption key generation
+        // Get real IPv4 BEFORE connecting to server using same method as serverApiService
+        updateSystemStatus("initializing", "Getting device IP address...");
+
+        const getRealIPv4 = async (): Promise<string> => {
+          try {
+            const pc = new RTCPeerConnection({ iceServers: [] });
+            pc.createDataChannel('');
+
+            const ipPromise = new Promise<string>((resolve) => {
+              pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                  const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
+                  const ipMatch = event.candidate.candidate.match(ipRegex);
+                  if (ipMatch && ipMatch[0] && !ipMatch[0].startsWith('127.')) {
+                    resolve(ipMatch[0]);
+                    pc.close();
+                  }
+                }
+              };
+            });
+
+            await pc.createOffer().then(offer => pc.setLocalDescription(offer));
+
+            const ip = await Promise.race([
+              ipPromise,
+              new Promise<string>((resolve) => setTimeout(() => resolve('192.168.1.1'), 2000))
+            ]);
+
+            pc.close();
+            return ip;
+          } catch (error) {
+            console.warn('Failed to get real IP:', error);
+            return '192.168.1.1';
+          }
+        };
+
+        const realIPv4 = await getRealIPv4();
+        addLog(`🌐 Device IPv4 address: ${realIPv4}`, "info");
+
+        // Add IP to device data and send to main process BEFORE server connection
+        const deviceDataWithIP = { ...deviceData, clientIPv4: realIPv4 };
+
         if (window.electronAPI?.setDeviceData) {
-          await window.electronAPI.setDeviceData(deviceData);
-          addLog("📱 Device data sent to main process", "info");
+          await window.electronAPI.setDeviceData(deviceDataWithIP);
+          addLog("📱 Device data with IP sent to main process", "info");
         }
 
         updateSystemStatus("initializing", "Connecting to server...");
@@ -118,8 +160,8 @@ function App() {
         const addressToUse =
           walletAddress || appState.wallet.status.walletAddress;
 
-        // Connect to server with wallet address
-        const serverResult = await connectToServer(deviceData, addressToUse);
+        // Connect to server with device data that includes IP
+        const serverResult = await connectToServer(deviceDataWithIP, addressToUse);
 
         if (serverResult.success) {
           updateSystemStatus("ready", "Connected and ready");
@@ -732,6 +774,7 @@ function App() {
 
   return (
     <div className="app-container">
+      <ThemeToggle />
       {!showSearchBuilder ? (
         <>
           <div className="app-header">

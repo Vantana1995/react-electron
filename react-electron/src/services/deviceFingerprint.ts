@@ -12,11 +12,27 @@ export async function collectDeviceInfo(): Promise<DeviceData> {
   try {
     console.log("🔍 Collecting device information...");
 
+    // Get real system info from Electron main process (Node.js)
+    let realSystemInfo: any = null;
+    if (window.electronAPI?.getSystemInfo) {
+      try {
+        realSystemInfo = await window.electronAPI.getSystemInfo();
+        console.log("💻 Got real system info from Electron:", realSystemInfo);
+      } catch (error) {
+        console.warn("⚠️ Could not get system info from Electron:", error);
+      }
+    }
+
+    // Use real CPU info if available, otherwise fallback to browser data
+    const cpuModel = realSystemInfo?.cpu?.model || `CPU-${navigator.hardwareConcurrency || 0}cores`;
+    const cpuCores = realSystemInfo?.cpu?.cores || navigator.hardwareConcurrency || 0;
+    const cpuArch = realSystemInfo?.cpu?.architecture || (navigator as any).userAgentData?.platform || "unknown";
+
     const fingerprint: DeviceFingerprint = {
       cpu: {
-        cores: navigator.hardwareConcurrency || 0,
-        architecture: (navigator as any).userAgentData?.platform || "unknown",
-        model: (navigator as any).userAgentData?.platform || "unknown",
+        cores: cpuCores,
+        architecture: cpuArch,
+        model: cpuModel, // Real CPU model from Node.js os module
       },
       gpu: {
         renderer: "unknown",

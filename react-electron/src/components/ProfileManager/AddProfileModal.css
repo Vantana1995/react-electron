@@ -15,16 +15,16 @@
 }
 
 .add-profile-modal {
-  background: #1a1a1a;
+  background: var(--bg-card);
   border-radius: 16px;
-  border: 1px solid #333;
+  border: 1px solid var(--border-primary);
   width: 90%;
   max-width: 600px;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
@@ -32,12 +32,12 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #333;
-  background: #111;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
 }
 
 .modal-header h3 {
-  color: #fff;
+  color: var(--text-primary);
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
@@ -46,7 +46,7 @@
 .close-btn {
   background: none;
   border: none;
-  color: #aaa;
+  color: var(--text-tertiary);
   font-size: 1.5rem;
   cursor: pointer;
   width: 32px;
@@ -59,8 +59,8 @@
 }
 
 .close-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: var(--bg-hover);
+  color: var(--accent-error);
 }
 
 .close-btn:disabled {
@@ -80,7 +80,7 @@
 
 .form-group label {
   display: block;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 500;
   margin-bottom: 6px;
   font-size: 0.9rem;
@@ -89,11 +89,11 @@
 .form-group input,
 .form-group textarea {
   width: 100%;
-  background: #111;
-  border: 1px solid #333;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   padding: 10px 12px;
-  color: #fff;
+  color: var(--input-text);
   font-size: 0.9rem;
   transition: all 0.2s ease;
   font-family: inherit;
@@ -103,8 +103,8 @@
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--input-focus-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .form-group input:disabled,
@@ -122,15 +122,15 @@
 }
 
 .form-section {
-  background: #111;
-  border: 1px solid #333;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 20px;
 }
 
 .form-section h4 {
-  color: #fff;
+  color: var(--text-primary);
   margin: 0 0 16px 0;
   font-size: 1.1rem;
   font-weight: 600;
@@ -154,15 +154,15 @@
 }
 
 .cookies-status.success {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.2);
-  color: #22c55e;
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-success);
+  color: var(--accent-success);
 }
 
 .cookies-status.error {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-error);
+  color: var(--accent-error);
 }
 
 .cookies-status ul {
@@ -175,15 +175,15 @@
 }
 
 .form-errors {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-error);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 16px;
 }
 
 .form-errors h5 {
-  color: #ef4444;
+  color: var(--accent-error);
   margin: 0 0 8px 0;
   font-size: 0.9rem;
   font-weight: 600;
@@ -192,7 +192,7 @@
 .form-errors ul {
   margin: 0;
   padding: 0 0 0 16px;
-  color: #ef4444;
+  color: var(--accent-error);
   font-size: 0.8rem;
 }
 
@@ -205,8 +205,8 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid #333;
-  background: #111;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
 }
 
 .cancel-btn,
@@ -223,32 +223,33 @@
 
 .cancel-btn {
   background: none;
-  border-color: #333;
-  color: #aaa;
+  border-color: var(--border-primary);
+  color: var(--text-tertiary);
 }
 
 .cancel-btn:hover:not(:disabled) {
-  background: #222;
-  border-color: #444;
-  color: #fff;
+  background: var(--bg-hover);
+  border-color: var(--border-focus);
+  color: var(--text-primary);
 }
 
 .save-btn {
-  background: linear-gradient(135deg, #10b981, #059669);
-  border-color: #10b981;
-  color: white;
+  background: var(--accent-success);
+  border-color: var(--accent-success);
+  color: var(--text-inverse);
 }
 
 .save-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #059669, #047857);
+  background: var(--accent-success);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.1);
 }
 
 .save-btn:disabled {
-  background: #374151;
-  border-color: #374151;
-  color: #9ca3af;
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+  color: var(--text-tertiary);
   cursor: not-allowed;
   transform: none;
   box-shadow: none;

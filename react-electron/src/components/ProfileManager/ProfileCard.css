@@ -1,8 +1,8 @@
 /* ProfileCard Component Styles */
 
 .profile-card {
-  background: #111;
-  border: 1px solid #333;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   padding: 16px;
   transition: all 0.2s ease;
@@ -11,15 +11,15 @@
 }
 
 .profile-card:hover {
-  border-color: #444;
+  border-color: var(--border-focus);
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .profile-card.selected {
-  border-color: #34d399;
-  background: rgba(52, 211, 153, 0.05);
-  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.2);
+  border-color: var(--accent-success);
+  background: var(--bg-hover);
+  box-shadow: 0 0 0 1px var(--accent-success);
 }
 
 .profile-card.selected::before {
@@ -29,7 +29,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #34d399, #10b981);
+  background: var(--accent-success);
 }
 
 .profile-card-header {
@@ -40,7 +40,7 @@
 }
 
 .profile-info h4 {
-  color: #fff;
+  color: var(--text-primary);
   margin: 0 0 4px 0;
   font-size: 1.1rem;
   font-weight: 600;
@@ -50,8 +50,9 @@
   font-size: 0.75rem;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-success);
+  color: var(--accent-success);
 }
 
 .profile-actions {
@@ -62,8 +63,8 @@
 .edit-btn,
 .delete-btn {
   background: none;
-  border: 1px solid #444;
-  color: #aaa;
+  border: 1px solid var(--border-primary);
+  color: var(--text-tertiary);
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -76,15 +77,15 @@
 }
 
 .edit-btn:hover {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: #3b82f6;
-  color: #3b82f6;
+  background: var(--bg-hover);
+  border-color: var(--accent-info);
+  color: var(--accent-info);
 }
 
 .delete-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: #ef4444;
-  color: #ef4444;
+  background: var(--bg-hover);
+  border-color: var(--accent-error);
+  color: var(--accent-error);
 }
 
 .profile-card-content {
@@ -104,13 +105,13 @@
 }
 
 .profile-detail label {
-  color: #aaa;
+  color: var(--text-tertiary);
   font-weight: 500;
   min-width: 60px;
 }
 
 .profile-detail span {
-  color: #fff;
+  color: var(--text-primary);
   text-align: right;
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
@@ -124,17 +125,17 @@
 }
 
 .cookies-info {
-  color: #60a5fa !important;
+  color: var(--accent-info) !important;
 }
 
 .date-info {
-  color: #9ca3af !important;
+  color: var(--text-tertiary) !important;
   font-size: 0.8rem !important;
 }
 
 .profile-card-footer {
   padding-top: 12px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--border-primary);
   display: flex;
   gap: 8px;
   flex-direction: column;
@@ -152,23 +153,25 @@
 }
 
 .activation-btn.active {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: #ef4444;
-  color: #ef4444;
+  background: var(--bg-hover);
+  border-color: var(--accent-error);
+  color: var(--accent-error);
 }
 
 .activation-btn.active:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: var(--accent-error);
+  color: var(--text-inverse);
 }
 
 .activation-btn.inactive {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: #22c55e;
-  color: #22c55e;
+  background: var(--bg-hover);
+  border-color: var(--accent-success);
+  color: var(--accent-success);
 }
 
 .activation-btn.inactive:hover {
-  background: rgba(34, 197, 94, 0.2);
+  background: var(--accent-success);
+  color: var(--text-inverse);
 }
 
 .select-profile-btn {
@@ -179,26 +182,26 @@
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.875rem;
-  border: 1px solid #333;
-  background: #222;
-  color: #fff;
+  border: 1px solid var(--border-primary);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
 }
 
 .select-profile-btn:hover:not(:disabled) {
-  background: #333;
-  border-color: #444;
+  background: var(--btn-secondary-hover);
+  border-color: var(--border-focus);
 }
 
 .select-profile-btn.selected {
-  background: rgba(52, 211, 153, 0.1);
-  border-color: #34d399;
-  color: #34d399;
+  background: var(--bg-hover);
+  border-color: var(--accent-success);
+  color: var(--accent-success);
   cursor: default;
 }
 
 .select-profile-btn:disabled {
   cursor: default;
   opacity: 0.5;
-  background: #111;
-  color: #666;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
 }

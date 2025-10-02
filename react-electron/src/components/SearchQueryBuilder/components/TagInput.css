@@ -14,9 +14,9 @@
   flex-wrap: wrap;
   gap: 6px;
   padding: 8px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  background: white;
+  background: var(--input-bg);
   min-height: 42px;
   align-items: center;
   cursor: text;
@@ -24,17 +24,17 @@
 }
 
 .tag-input-tags:focus-within {
-  border-color: #007bff;
+  border-color: var(--input-focus-border);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  box-shadow: var(--shadow-sm);
 }
 
 .tag-input-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #007bff;
-  color: white;
+  background: var(--accent-info);
+  color: var(--text-inverse);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.85rem;
@@ -44,13 +44,14 @@
 }
 
 .tag-input-tag:hover {
-  background: #0056b3;
+  background: var(--accent-info);
+  filter: brightness(0.9);
 }
 
 .tag-input-remove {
   background: transparent;
   border: none;
-  color: white;
+  color: var(--text-inverse);
   font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
@@ -75,45 +76,18 @@
   padding: 4px;
   font-size: 0.9rem;
   background: transparent;
+  color: var(--input-text);
 }
 
 .tag-input-field::placeholder {
-  color: #adb5bd;
+  color: var(--input-placeholder);
 }
 
 .tag-input-count {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--text-tertiary);
   text-align: right;
   font-style: italic;
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .tag-input-tags {
-    background: #495057;
-    border-color: #6c757d;
-  }
-
-  .tag-input-tag {
-    background: #0056b3;
-  }
-
-  .tag-input-tag:hover {
-    background: #004085;
-  }
-
-  .tag-input-field {
-    color: #fff;
-  }
-
-  .tag-input-field::placeholder {
-    color: #adb5bd;
-  }
-
-  .tag-input-count {
-    color: #adb5bd;
-  }
 }
 
 /* Responsive */

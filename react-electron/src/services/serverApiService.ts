@@ -32,6 +32,44 @@ export class ServerApiService {
   }
 
   /**
+   * Get real device IPv4 address (not localhost)
+   */
+  private async getRealIPv4Address(): Promise<string> {
+    try {
+      // Try to get local network IP using WebRTC
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+
+      const ipPromise = new Promise<string>((resolve) => {
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
+            const ipMatch = event.candidate.candidate.match(ipRegex);
+            if (ipMatch && ipMatch[0] && !ipMatch[0].startsWith('127.')) {
+              resolve(ipMatch[0]);
+              pc.close();
+            }
+          }
+        };
+      });
+
+      await pc.createOffer().then(offer => pc.setLocalDescription(offer));
+
+      // Wait for IP with timeout
+      const ip = await Promise.race([
+        ipPromise,
+        new Promise<string>((resolve) => setTimeout(() => resolve('192.168.1.1'), 2000))
+      ]);
+
+      pc.close();
+      return ip;
+    } catch (error) {
+      console.warn('Failed to get real IP, using fallback:', error);
+      return '192.168.1.1'; // Fallback IP
+    }
+  }
+
+  /**
    * Connect to server and register device with wallet address
    */
   async connectToServer(
@@ -43,6 +81,7 @@ export class ServerApiService {
     sessionToken?: string;
     userId?: string;
     isRegistered?: boolean;
+    clientIPv4?: string;
     error?: string;
   }> {
     try {
@@ -52,6 +91,10 @@ export class ServerApiService {
       if (!deviceData.fingerprint) {
         throw new Error("Device data not available");
       }
+
+      // Get real device IP address
+      const realIPv4 = await this.getRealIPv4Address();
+      console.log("🌐 Real device IPv4:", realIPv4);
 
       const requestPayload = {
         // Send device data in the format backend expects
@@ -71,6 +114,8 @@ export class ServerApiService {
         webgl: deviceData.fingerprint.browser?.webgl,
         // Wallet information
         walletAddress: walletAddress,
+        // Real device IP address
+        clientIPv4: realIPv4,
       };
 
       console.log("🔍 Sending fingerprint request...");
@@ -173,6 +218,7 @@ export class ServerApiService {
         sessionToken: this.sessionToken || undefined,
         userId: this.userId || undefined,
         isRegistered: !data.isNewUser,
+        clientIPv4: realIPv4, // Return the IP that was used
       };
     } catch (error) {
       console.error("❌ Connection failed:", error);

@@ -393,15 +393,17 @@ class CallbackServer {
                       encryptionModule;
 
                     // Генерируем ключ устройства используя те же значения что и бэкенд
-                    // Backend использует: cpuModel from cpu.model, ipAddress: "::1" (localhost IPv6)
+                    // Backend теперь получает реальный IPv4 из clientIPv4 поля
                     const cpuModel = globalDeviceData?.fingerprint?.cpu?.model || "unknown";
-                    const ipAddress = "::1"; // localhost IPv6 - это IP которое получает backend
+
+                    // Получаем реальный IPv4 из локального хранилища (был отправлен при подключении)
+                    const realIPv4 = globalDeviceData?.clientIPv4 || "192.168.1.1";
 
                     console.log("🔑 FRONTEND ENCRYPTION KEY GENERATION:");
                     console.log("- Using CPU model:", cpuModel);
-                    console.log("- Using IP address:", ipAddress);
+                    console.log("- Using IP address (IPv4):", realIPv4);
 
-                    const deviceKey = generateDeviceKey(cpuModel, ipAddress);
+                    const deviceKey = generateDeviceKey(cpuModel, realIPv4);
                     const deviceKeyHex = Buffer.isBuffer(deviceKey) ? deviceKey.toString('hex') : deviceKey;
                     console.log("🔑 Generated device key (hex):", deviceKeyHex.substring(0, 16) + "...");
                     console.log("🔑 Full device key for comparison:", deviceKeyHex);
@@ -769,6 +771,49 @@ app.on("before-quit", () => {
 let globalDeviceData: any = null;
 
 // IPC handlers
+
+// Get real system info from Node.js (CPU, memory, platform, etc.)
+ipcMain.handle("get-system-info", async () => {
+  try {
+    const cpus = os.cpus();
+    const cpuModel = cpus[0]?.model || "Unknown CPU";
+    const cpuCores = cpus.length;
+    const totalMemory = os.totalmem();
+    const platform = os.platform();
+    const release = os.release();
+    const arch = os.arch();
+
+    const systemInfo = {
+      cpu: {
+        model: cpuModel,
+        cores: cpuCores,
+        architecture: arch
+      },
+      memory: {
+        total: totalMemory
+      },
+      os: {
+        platform: platform,
+        release: release,
+        architecture: arch
+      }
+    };
+
+    console.log("💻 Real system info:", systemInfo);
+
+    return {
+      success: true,
+      ...systemInfo
+    };
+  } catch (error) {
+    console.error("Failed to get system info:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+});
+
 ipcMain.handle("set-device-data", async (_event, deviceData) => {
   globalDeviceData = deviceData;
   console.log("📱 Device data received from renderer:", {

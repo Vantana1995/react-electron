@@ -9,6 +9,7 @@ import { ipcRenderer, contextBridge } from "electron";
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld("electronAPI", {
   // Device data
+  getSystemInfo: () => ipcRenderer.invoke("get-system-info"),
   setDeviceData: (deviceData: any) => ipcRenderer.invoke("set-device-data", deviceData),
 
   // Wallet authentication
