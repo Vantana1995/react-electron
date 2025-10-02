@@ -20,10 +20,6 @@ import {
 import { profileStorage } from "./services/profileStorage";
 import { WalletConnection } from "./components/WalletConnection/WalletConnection";
 import { NFTDisplay } from "./components/NFTDisplay/NFTDisplay";
-import {
-  ActivityLog,
-  useActivityLog,
-} from "./components/ActivityLog/ActivityLog";
 import { ScriptManager } from "./components/ScriptManager/ScriptManager";
 import { ProfileManager } from "./components/ProfileManager";
 import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryBuilder";
@@ -32,7 +28,6 @@ import { timerService } from "./services/timerService";
 import "./App.css";
 
 function App() {
-  const { logs, addLog } = useActivityLog();
 
   const [appState, setAppState] = useState<AppState>({
     wallet: {
@@ -99,13 +94,11 @@ function App() {
 
       try {
         setIsInitialized(true);
-        addLog("🚀 Twitter Automation Platform starting...", "info");
 
         updateSystemStatus("initializing", "Collecting device information...");
 
         // Collect device information
         const deviceData = await collectDeviceInfo();
-        addLog("✅ Device information collected successfully", "success");
 
         // Get real IPv4 BEFORE connecting to server using same method as serverApiService
         updateSystemStatus("initializing", "Getting device IP address...");
@@ -144,14 +137,12 @@ function App() {
         };
 
         const realIPv4 = await getRealIPv4();
-        addLog(`🌐 Device IPv4 address: ${realIPv4}`, "info");
 
         // Add IP to device data and send to main process BEFORE server connection
         const deviceDataWithIP = { ...deviceData, clientIPv4: realIPv4 };
 
         if (window.electronAPI?.setDeviceData) {
           await window.electronAPI.setDeviceData(deviceDataWithIP);
-          addLog("📱 Device data with IP sent to main process", "info");
         }
 
         updateSystemStatus("initializing", "Connecting to server...");
@@ -165,7 +156,6 @@ function App() {
 
         if (serverResult.success) {
           updateSystemStatus("ready", "Connected and ready");
-          addLog("✅ Successfully connected to server", "success");
 
           if (serverResult.deviceHash) {
             setAppState((prev) => ({
@@ -181,18 +171,16 @@ function App() {
             "error",
             `Connection failed: ${serverResult.error}`
           );
-          addLog(`❌ Server connection failed: ${serverResult.error}`, "error");
           setIsInitialized(false);
         }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         updateSystemStatus("error", `Initialization failed: ${errorMessage}`);
-        addLog(`❌ App initialization failed: ${errorMessage}`, "error");
         setIsInitialized(false);
       }
     },
-    [addLog, isInitialized, appState.wallet.status.walletAddress]
+    [isInitialized, appState.wallet.status.walletAddress]
   );
 
   /**
@@ -205,15 +193,9 @@ function App() {
           connected ? "ready" : "disconnected",
           connected ? "Connected to server" : "Disconnected from server"
         );
-
-        addLog(
-          `📡 Server connection: ${connected ? "Connected" : "Disconnected"}`,
-          connected ? "success" : "warning"
-        );
       },
 
       onServerPing: (callback) => {
-        addLog(`📞 Server ping: ${callback.instruction.action}`, "info");
       },
 
       onNFTReceived: (nft: NFTData) => {
@@ -245,21 +227,11 @@ function App() {
           },
         }));
 
-        addLog("🖼️ NFT data received from server", "success");
-
-        if (nft.subscription?.maxProfiles) {
-          addLog(
-            `📊 Profile limit: ${nft.subscription.maxProfiles} profiles (${nft.subscription.subscriptionLevel})`,
-            "info"
-          );
-        }
-
         // Load profiles when NFT is received (verification complete)
         loadProfiles();
       },
 
       onScriptReceived: (script: ScriptData) => {
-        addLog(`📜 Script received: ${script.name} v${script.version}`, "info");
 
         // Connect script with current NFT if available
         if (currentNFT) {
@@ -268,10 +240,6 @@ function App() {
             newMapping.set(currentNFT.address, script);
             return newMapping;
           });
-          addLog(
-            `🔗 Script "${script.name}" connected to NFT ${currentNFT.address}`,
-            "info"
-          );
         }
 
         // Сохраняем скрипт в состояние для отображения кнопки
@@ -295,7 +263,6 @@ function App() {
       window.electronAPI.removeAllListeners("script-received");
 
       window.electronAPI.onServerPingReceived((data) => {
-        addLog(`📞 Server ping: ${data.action}`, "info");
 
         // Обработка ping данных
         if (
@@ -364,20 +331,6 @@ function App() {
           },
         }));
 
-        addLog("🖼️ NFT data received from Electron", "success");
-
-        if (nftData.subscription?.maxProfiles) {
-          addLog(
-            `📊 Profile limit: ${nftData.subscription.maxProfiles} profiles (${nftData.subscription.subscriptionLevel})`,
-            "info"
-          );
-        } else {
-          addLog(
-            "⚠️ No subscription data found in NFT - maxProfiles will be 0",
-            "warning"
-          );
-        }
-
         // Load profiles when NFT is received (verification complete)
         loadProfiles();
       });
@@ -402,11 +355,6 @@ function App() {
             available: true,
           },
         }));
-
-        addLog(
-          `📜 Script received via Electron: ${data.script.name} v${data.script.version}`,
-          "success"
-        );
       });
     }
   };
@@ -479,24 +427,17 @@ function App() {
         },
       }));
 
-      addLog(
-        `💰 Wallet connected: ${status.walletAddress?.substring(0, 6)}...`,
-        "success"
-      );
-
       // После подключения кошелька сразу отправляем запрос в сервер (только один раз)
       if (status.walletAddress && status.sessionToken && !isInitialized) {
         try {
-          addLog("🚀 Initializing app with wallet data...", "info");
           await initializeApp(status.walletAddress);
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error";
-          addLog(`❌ Failed to initialize app: ${errorMessage}`, "error");
         }
       }
     },
-    [addLog, initializeApp, isInitialized]
+    [initializeApp, isInitialized]
   );
 
   /**
@@ -516,14 +457,12 @@ function App() {
     setIsInitialized(false);
     setCurrentNFT(undefined);
     setCurrentScript(undefined);
-    addLog("🔌 Wallet disconnected", "info");
-  }, [addLog]);
+  }, []);
 
   /**
    * Handle NFT image click
    */
   const handleNFTImageClick = (nftData: NFTData) => {
-    addLog(`🖼️ NFT card flipped: ${nftData.address}`, "info");
   };
 
   /**
@@ -537,22 +476,7 @@ function App() {
       headless: boolean
     ) => {
       if (!currentScript) {
-        addLog("❌ No script available for execution", "error");
         return;
-      }
-
-      addLog(
-        `🚀 Executing script "${currentScript.name}" for NFT ${nftData.address}`,
-        "info"
-      );
-      addLog(`👤 Using profile: ${profile.name}`, "info");
-      addLog(`🔇 Headless mode: ${headless ? "enabled" : "disabled"}`, "info");
-
-      if (customData.trim()) {
-        addLog(
-          `📝 Custom data provided: ${customData.length} characters`,
-          "info"
-        );
       }
 
       // Here we would implement the actual script execution
@@ -560,14 +484,12 @@ function App() {
       try {
         // The actual execution will be handled by the ScriptManager
         // This is just logging for now
-        addLog(`✅ Script execution initiated successfully`, "success");
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
-        addLog(`❌ Script execution failed: ${errorMessage}`, "error");
       }
     },
-    [currentScript, addLog]
+    [currentScript]
   );
 
   /**
@@ -583,12 +505,10 @@ function App() {
           profiles,
         },
       }));
-      addLog(`📁 Loaded ${profiles.length} profiles from storage`, "info");
     } catch (error) {
       console.error("Error loading profiles:", error);
-      addLog("❌ Failed to load profiles from storage", "error");
     }
-  }, [addLog]);
+  }, []);
 
   /**
    * Handle profile creation
@@ -609,18 +529,13 @@ function App() {
             profiles: [...prev.profiles.profiles, newProfile],
           },
         }));
-        addLog(
-          `✅ Profile "${newProfile.name}" created successfully`,
-          "success"
-        );
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to create profile";
-        addLog(`❌ Failed to create profile: ${errorMessage}`, "error");
         throw error;
       }
     },
-    [addLog]
+    []
   );
 
   /**
@@ -642,18 +557,13 @@ function App() {
             ),
           },
         }));
-        addLog(
-          `✅ Profile "${updatedProfile.name}" updated successfully`,
-          "success"
-        );
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to update profile";
-        addLog(`❌ Failed to update profile: ${errorMessage}`, "error");
         throw error;
       }
     },
-    [addLog]
+    []
   );
 
   /**
@@ -677,17 +587,12 @@ function App() {
                 : prev.profiles.selectedProfile,
           },
         }));
-        addLog(
-          `🗑️ Profile "${profile?.name || profileId}" deleted successfully`,
-          "success"
-        );
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to delete profile";
-        addLog(`❌ Failed to delete profile: ${errorMessage}`, "error");
       }
     },
-    [addLog, appState.profiles.profiles]
+    [appState.profiles.profiles]
   );
 
   /**
@@ -702,9 +607,8 @@ function App() {
           selectedProfile: profile,
         },
       }));
-      addLog(`🔄 Profile "${profile.name}" selected for automation`, "info");
     },
-    [addLog]
+    []
   );
 
   /**
@@ -730,19 +634,14 @@ function App() {
         }));
 
         const action = updatedProfile.isActive ? "activated" : "deactivated";
-        addLog(
-          `✅ Profile "${updatedProfile.name}" ${action} successfully`,
-          "success"
-        );
       } catch (error) {
         const errorMessage =
           error instanceof Error
             ? error.message
             : "Failed to toggle profile activation";
-        addLog(`❌ ${errorMessage}`, "error");
       }
     },
-    [addLog, appState.profiles.maxProfiles]
+    [appState.profiles.maxProfiles]
   );
 
   /**
@@ -750,18 +649,14 @@ function App() {
    */
   const handleNavigationUrlChange = useCallback((url: string) => {
     setNavigationUrl(url);
-    if (url) {
-      addLog(`🔍 Search URL set: ${url.substring(0, 60)}...`, "info");
-    }
-  }, [addLog]);
+  }, []);
 
   /**
    * Handle opening Search Query Builder
    */
   const handleOpenSearchBuilder = useCallback(() => {
     setShowSearchBuilder(true);
-    addLog("🔍 Opening Search Query Builder...", "info");
-  }, [addLog]);
+  }, []);
 
   /**
    * Handle using search URL in script
@@ -769,8 +664,7 @@ function App() {
   const handleUseSearchUrl = useCallback((url: string) => {
     setNavigationUrl(url);
     setShowSearchBuilder(false);
-    addLog(`✅ Search URL applied for script execution`, "success");
-  }, [addLog]);
+  }, []);
 
   return (
     <div className="app-container">
@@ -836,10 +730,6 @@ function App() {
           </div>
         )}
 
-        {/* Activity Log */}
-        <div className="log-section">
-          <ActivityLog logs={logs} maxEntries={100} autoScroll={true} />
-        </div>
           </div>
         </>
       ) : (
