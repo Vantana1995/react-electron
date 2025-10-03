@@ -143,7 +143,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   onScriptStopped: (
-    callback: (data: { scriptId: string; timestamp: number }) => void
+    callback: (data: { scriptId: string; timestamp: number; reason?: string }) => void
   ) => {
     ipcRenderer.on("script-stopped", (_event, data) => callback(data));
   },

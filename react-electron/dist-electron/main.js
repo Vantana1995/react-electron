@@ -1,7 +1,7 @@
 import "electron";
 import "node:url";
 import "node:path";
-import { M, R, V } from "./main-DE_aD4Wz.js";
+import { M, R, V } from "./main-BBozVlZF.js";
 import "child_process";
 import "fs";
 import "os";

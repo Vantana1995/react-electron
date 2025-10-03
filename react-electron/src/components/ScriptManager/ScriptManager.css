@@ -5,7 +5,7 @@
 
 .script-manager {
   width: 100%;
-  max-width: 1200px;
+  /* Убрали max-width для адаптивности */
   margin: 0 auto;
   padding: 20px;
   background: var(--accent-info);

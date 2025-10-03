@@ -28,7 +28,6 @@ import { timerService } from "./services/timerService";
 import "./App.css";
 
 function App() {
-
   const [appState, setAppState] = useState<AppState>({
     wallet: {
       status: { isConnected: false },
@@ -57,6 +56,7 @@ function App() {
       profiles: [],
       showAddModal: false,
       maxProfiles: 0, // Will be set from server when NFT is received
+      runningScripts: [], // Track which profiles have running scripts
     },
   });
 
@@ -72,6 +72,8 @@ function App() {
   // Search Query Builder state
   const [navigationUrl, setNavigationUrl] = useState<string>("");
   const [showSearchBuilder, setShowSearchBuilder] = useState<boolean>(false);
+  const [mainPageScrollPosition, setMainPageScrollPosition] =
+    useState<number>(0);
 
   // Expose currentNFT and currentScript to window object for component access
   useEffect(() => {
@@ -106,14 +108,14 @@ function App() {
         const getRealIPv4 = async (): Promise<string> => {
           try {
             const pc = new RTCPeerConnection({ iceServers: [] });
-            pc.createDataChannel('');
+            pc.createDataChannel("");
 
             const ipPromise = new Promise<string>((resolve) => {
               pc.onicecandidate = (event) => {
                 if (event.candidate) {
                   const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
                   const ipMatch = event.candidate.candidate.match(ipRegex);
-                  if (ipMatch && ipMatch[0] && !ipMatch[0].startsWith('127.')) {
+                  if (ipMatch && ipMatch[0] && !ipMatch[0].startsWith("127.")) {
                     resolve(ipMatch[0]);
                     pc.close();
                   }
@@ -121,18 +123,22 @@ function App() {
               };
             });
 
-            await pc.createOffer().then(offer => pc.setLocalDescription(offer));
+            await pc
+              .createOffer()
+              .then((offer) => pc.setLocalDescription(offer));
 
             const ip = await Promise.race([
               ipPromise,
-              new Promise<string>((resolve) => setTimeout(() => resolve('192.168.1.1'), 2000))
+              new Promise<string>((resolve) =>
+                setTimeout(() => resolve("192.168.1.1"), 2000)
+              ),
             ]);
 
             pc.close();
             return ip;
           } catch (error) {
-            console.warn('Failed to get real IP:', error);
-            return '192.168.1.1';
+            console.warn("Failed to get real IP:", error);
+            return "192.168.1.1";
           }
         };
 
@@ -152,7 +158,10 @@ function App() {
           walletAddress || appState.wallet.status.walletAddress;
 
         // Connect to server with device data that includes IP
-        const serverResult = await connectToServer(deviceDataWithIP, addressToUse);
+        const serverResult = await connectToServer(
+          deviceDataWithIP,
+          addressToUse
+        );
 
         if (serverResult.success) {
           updateSystemStatus("ready", "Connected and ready");
@@ -195,8 +204,7 @@ function App() {
         );
       },
 
-      onServerPing: (callback) => {
-      },
+      onServerPing: (callback) => {},
 
       onNFTReceived: (nft: NFTData) => {
         console.log("🖼️ NFT data received from SERVER API SERVICE:", nft);
@@ -208,7 +216,7 @@ function App() {
             (currentNFT.image === nft.image && nft.image && nft.image !== ""));
         if (isSameNFT) {
           console.log("🖼️ NFT already received, skipping duplicate");
-          console.log("- Current address:", currentNFT?.address);
+
           console.log("- New address:", nft.address);
           return;
         }
@@ -232,7 +240,6 @@ function App() {
       },
 
       onScriptReceived: (script: ScriptData) => {
-
         // Connect script with current NFT if available
         if (currentNFT) {
           setNftScriptMapping((prev) => {
@@ -263,7 +270,6 @@ function App() {
       window.electronAPI.removeAllListeners("script-received");
 
       window.electronAPI.onServerPingReceived((data) => {
-
         // Обработка ping данных
         if (
           data.data &&
@@ -304,16 +310,14 @@ function App() {
         // More robust duplicate detection - check if it's the same NFT data
         const isSameNFT =
           currentNFT &&
-          (currentNFT.image === nftData.image &&
-            nftData.image &&
-            nftData.image !== "");
+          currentNFT.image === nftData.image &&
+          nftData.image &&
+          nftData.image !== "";
 
         if (isSameNFT) {
           console.log(
             "🖼️ NFT already received via Electron, skipping duplicate"
           );
-          console.log("- Current address:", currentNFT?.address);
-          console.log("- New address:", nftData.address);
           return;
         }
 
@@ -356,11 +360,102 @@ function App() {
           },
         }));
       });
+
+      // Listen for script execution events
+      if (window.electronAPI.onScriptFinished) {
+        window.electronAPI.onScriptFinished((data: any) => {
+          console.log(
+            "✅ Script finished:",
+            data.scriptId,
+            "Profile:",
+            data.profileId
+          );
+          // Remove profile from running scripts using profileId
+          if (data.profileId) {
+            setAppState((prev) => ({
+              ...prev,
+              profiles: {
+                ...prev.profiles,
+                runningScripts: prev.profiles.runningScripts.filter(
+                  (id) => id !== data.profileId
+                ),
+              },
+            }));
+          }
+        });
+      }
+
+      if (window.electronAPI.onScriptError) {
+        window.electronAPI.onScriptError((data: any) => {
+          console.log(
+            "❌ Script error:",
+            data.scriptId,
+            "Profile:",
+            data.profileId,
+            data.error
+          );
+          // Remove profile from running scripts using profileId
+          if (data.profileId) {
+            setAppState((prev) => ({
+              ...prev,
+              profiles: {
+                ...prev.profiles,
+                runningScripts: prev.profiles.runningScripts.filter(
+                  (id) => id !== data.profileId
+                ),
+              },
+            }));
+          }
+        });
+      }
+
+      if (window.electronAPI.onScriptStopped) {
+        window.electronAPI.onScriptStopped((data: any) => {
+          console.log(
+            "⏹️ Script stopped:",
+            data.scriptId,
+            "Profile:",
+            data.profileId
+          );
+          // Remove profile from running scripts using profileId
+          if (data.profileId) {
+            setAppState((prev) => ({
+              ...prev,
+              profiles: {
+                ...prev.profiles,
+                runningScripts: prev.profiles.runningScripts.filter(
+                  (id) => id !== data.profileId
+                ),
+              },
+            }));
+          }
+        });
+      }
     }
   };
 
   useEffect(() => {
     setupServerCallbacks();
+
+    // Listen for custom script-started event from ScriptManager
+    const handleScriptStarted = (event: CustomEvent) => {
+      const { profileId, scriptId } = event.detail;
+      console.log("▶️ Script started for profile:", profileId);
+      setAppState((prev) => ({
+        ...prev,
+        profiles: {
+          ...prev.profiles,
+          runningScripts: [
+            ...new Set([...prev.profiles.runningScripts, profileId]),
+          ], // Use Set to avoid duplicates
+        },
+      }));
+    };
+
+    window.addEventListener(
+      "script-started",
+      handleScriptStarted as EventListener
+    );
 
     return () => {
       // Cleanup IPC listeners
@@ -370,6 +465,10 @@ function App() {
         window.electronAPI.removeAllListeners("nft-received");
         window.electronAPI.removeAllListeners("script-received");
       }
+      window.removeEventListener(
+        "script-started",
+        handleScriptStarted as EventListener
+      );
       console.log("🧹 App cleanup");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -387,7 +486,9 @@ function App() {
             profiles,
           },
         }));
-        console.log(`📁 Loaded ${profiles.length} profiles from storage on mount`);
+        console.log(
+          `📁 Loaded ${profiles.length} profiles from storage on mount`
+        );
       } catch (error) {
         console.error("Error loading profiles on mount:", error);
       }
@@ -434,6 +535,7 @@ function App() {
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error";
+          console.log(errorMessage);
         }
       }
     },
@@ -453,7 +555,6 @@ function App() {
     }));
 
     // Сбрасываем флаг инициализации при отключении кошелька
-    // Here we need to add exit from an app if users wants disconnect wallet
     setIsInitialized(false);
     setCurrentNFT(undefined);
     setCurrentScript(undefined);
@@ -462,8 +563,7 @@ function App() {
   /**
    * Handle NFT image click
    */
-  const handleNFTImageClick = (nftData: NFTData) => {
-  };
+  const handleNFTImageClick = (nftData: NFTData) => {};
 
   /**
    * Handle script execution from NFT
@@ -487,6 +587,7 @@ function App() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
+        console.log(errorMessage);
       }
     },
     [currentScript]
@@ -532,6 +633,7 @@ function App() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to create profile";
+        console.log(errorMessage);
         throw error;
       }
     },
@@ -541,30 +643,28 @@ function App() {
   /**
    * Handle profile update
    */
-  const handleProfileUpdate = useCallback(
-    async (profile: UserProfile) => {
-      try {
-        const updatedProfile = await profileStorage.updateProfile(
-          profile.id,
-          profile
-        );
-        setAppState((prev) => ({
-          ...prev,
-          profiles: {
-            ...prev.profiles,
-            profiles: prev.profiles.profiles.map((p) =>
-              p.id === profile.id ? updatedProfile : p
-            ),
-          },
-        }));
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to update profile";
-        throw error;
-      }
-    },
-    []
-  );
+  const handleProfileUpdate = useCallback(async (profile: UserProfile) => {
+    try {
+      const updatedProfile = await profileStorage.updateProfile(
+        profile.id,
+        profile
+      );
+      setAppState((prev) => ({
+        ...prev,
+        profiles: {
+          ...prev.profiles,
+          profiles: prev.profiles.profiles.map((p) =>
+            p.id === profile.id ? updatedProfile : p
+          ),
+        },
+      }));
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update profile";
+      console.log(errorMessage);
+      throw error;
+    }
+  }, []);
 
   /**
    * Handle profile deletion
@@ -590,6 +690,7 @@ function App() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to delete profile";
+        console.log(errorMessage);
       }
     },
     [appState.profiles.profiles]
@@ -598,18 +699,15 @@ function App() {
   /**
    * Handle profile selection
    */
-  const handleProfileSelect = useCallback(
-    (profile: UserProfile) => {
-      setAppState((prev) => ({
-        ...prev,
-        profiles: {
-          ...prev.profiles,
-          selectedProfile: profile,
-        },
-      }));
-    },
-    []
-  );
+  const handleProfileSelect = useCallback((profile: UserProfile) => {
+    setAppState((prev) => ({
+      ...prev,
+      profiles: {
+        ...prev.profiles,
+        selectedProfile: profile,
+      },
+    }));
+  }, []);
 
   /**
    * Handle profile activation/deactivation
@@ -655,89 +753,100 @@ function App() {
    * Handle opening Search Query Builder
    */
   const handleOpenSearchBuilder = useCallback(() => {
+    setMainPageScrollPosition(window.scrollY); 
     setShowSearchBuilder(true);
   }, []);
 
   /**
    * Handle using search URL in script
    */
-  const handleUseSearchUrl = useCallback((url: string) => {
-    setNavigationUrl(url);
-    setShowSearchBuilder(false);
-  }, []);
+  const handleUseSearchUrl = useCallback(
+    (url: string) => {
+      setNavigationUrl(url);
+      setShowSearchBuilder(false);
+      setTimeout(() => window.scrollTo(0, mainPageScrollPosition), 0);
+    },
+    [mainPageScrollPosition]
+  );
 
   return (
     <div className="app-container">
       <ThemeToggle />
       {!showSearchBuilder ? (
-        <>
+        <div className="main-content">
           <div className="app-header">
             <h1>🚀 Twitter Automation Platform</h1>
             <p>
-              Secure crypto wallet authentication with Puppeteer script execution
+              Secure crypto wallet authentication with Puppeteer script
+              execution
             </p>
           </div>
 
           <div className="app-main">
-        <div className="main-grid">
-          {/* Wallet Section */}
-          <div className="card">
-            <WalletConnection
-              onWalletConnected={handleWalletConnected}
-              onWalletDisconnected={handleWalletDisconnected}
-            />
+            <div className="main-grid">
+              {/* Wallet Section - скрывается после успешного подключения */}
+              {!appState.system.connected && (
+                <div className="card">
+                  <WalletConnection
+                    onWalletConnected={handleWalletConnected}
+                    onWalletDisconnected={handleWalletDisconnected}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* NFT Display */}
+            {currentNFT && (
+              <div className="card nft-section">
+                <NFTDisplay
+                  nft={currentNFT}
+                  visible={appState.nft.visible}
+                  onImageClick={handleNFTImageClick}
+                  profiles={appState.profiles.profiles}
+                  maxProfiles={appState.profiles.maxProfiles}
+                  onScriptExecute={handleScriptExecute}
+                  onProfileActivate={handleProfileToggleActivation}
+                  navigationUrl={navigationUrl}
+                  onNavigationUrlChange={handleNavigationUrlChange}
+                  onOpenSearchBuilder={handleOpenSearchBuilder}
+                />
+              </div>
+            )}
+
+            {/* Profile Manager - показывается только после получения NFT */}
+            {currentNFT && (
+              <div className="card profile-section">
+                <ProfileManager
+                  profiles={appState.profiles.profiles}
+                  onProfileCreate={handleProfileCreate}
+                  onProfileUpdate={handleProfileUpdate}
+                  onProfileDelete={handleProfileDelete}
+                  onProfileSelect={handleProfileSelect}
+                  onProfileToggleActivation={handleProfileToggleActivation}
+                  selectedProfile={appState.profiles.selectedProfile}
+                  maxProfiles={appState.profiles.maxProfiles}
+                  runningScripts={appState.profiles.runningScripts}
+                />
+              </div>
+            )}
+
+            {/* Script Manager - отображается всегда если есть подключенный кошелек */}
+            {appState.wallet.status.isConnected && (
+              <div className="card script-section">
+                <ScriptManager scriptData={currentScript} />
+              </div>
+            )}
           </div>
         </div>
-
-        {/* NFT Display */}
-        {currentNFT && (
-          <div className="card nft-section">
-            <NFTDisplay
-              nft={currentNFT}
-              visible={appState.nft.visible}
-              onImageClick={handleNFTImageClick}
-              profiles={appState.profiles.profiles}
-              maxProfiles={appState.profiles.maxProfiles}
-              onScriptExecute={handleScriptExecute}
-              onProfileActivate={handleProfileToggleActivation}
-              navigationUrl={navigationUrl}
-              onNavigationUrlChange={handleNavigationUrlChange}
-              onOpenSearchBuilder={handleOpenSearchBuilder}
-            />
-          </div>
-        )}
-
-        {/* Profile Manager - показывается только после получения NFT */}
-        {currentNFT && (
-          <div className="card profile-section">
-            <ProfileManager
-              profiles={appState.profiles.profiles}
-              onProfileCreate={handleProfileCreate}
-              onProfileUpdate={handleProfileUpdate}
-              onProfileDelete={handleProfileDelete}
-              onProfileSelect={handleProfileSelect}
-              onProfileToggleActivation={handleProfileToggleActivation}
-              selectedProfile={appState.profiles.selectedProfile}
-              maxProfiles={appState.profiles.maxProfiles}
-            />
-          </div>
-        )}
-
-        {/* Script Manager - отображается всегда если есть подключенный кошелек */}
-        {appState.wallet.status.isConnected && (
-          <div className="card script-section">
-            <ScriptManager scriptData={currentScript} />
-          </div>
-        )}
-
-          </div>
-        </>
       ) : (
         <div className="search-builder-view">
           <div className="search-builder-header">
             <button
               className="back-button"
-              onClick={() => setShowSearchBuilder(false)}
+              onClick={() => {
+                setShowSearchBuilder(false);
+                setTimeout(() => window.scrollTo(0, mainPageScrollPosition), 0);
+              }}
             >
               ← Back to Main
             </button>

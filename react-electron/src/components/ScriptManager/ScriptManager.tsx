@@ -117,10 +117,16 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({
       if (window.electronAPI?.executeScript) {
         const result = await window.electronAPI.executeScript({
           script: scriptData,
-          settings: profileSettings,
-          nftAddress: nftAddress
+          settings: profileSettings
         });
-        console.log('✅ Script execution completed:', result);
+        console.log('✅ Script execution result:', result);
+
+        // Notify parent about script start via custom event
+        if (result.success && profileSettings?.profileId) {
+          window.dispatchEvent(new CustomEvent('script-started', {
+            detail: { profileId: profileSettings.profileId, scriptId: scriptData.id }
+          }));
+        }
       } else {
         console.log('📝 Script would execute with:', {
           scriptName: scriptData.name,

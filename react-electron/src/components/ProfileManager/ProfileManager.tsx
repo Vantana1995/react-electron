@@ -18,7 +18,8 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
   onProfileSelect,
   onProfileToggleActivation,
   selectedProfile,
-  maxProfiles
+  maxProfiles,
+  runningScripts = []
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<UserProfile | undefined>();
@@ -61,9 +62,8 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
     onProfileSelect(profile);
   };
 
-  // Calculate activation statistics
-  const activeProfiles = profiles.filter(p => p.isActive);
-  const activeCount = activeProfiles.length;
+  // Calculate running scripts statistics
+  const runningCount = runningScripts.length;
 
   return (
     <div className="profile-manager">
@@ -77,7 +77,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             {profiles.length} profiles created
           </span>
           <span className="active-count">
-            {activeCount}/{maxProfiles} active
+            {runningCount}/{maxProfiles} running
           </span>
           {selectedProfile && (
             <span className="selected-profile">
@@ -94,9 +94,9 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
         >
           + Add Profile
         </button>
-        {activeCount >= maxProfiles && (
+        {runningCount >= maxProfiles && (
           <span className="activation-limit-info">
-            Activation limit reached ({activeCount}/{maxProfiles})
+            Running limit reached ({runningCount}/{maxProfiles})
           </span>
         )}
       </div>

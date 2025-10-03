@@ -66,9 +66,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1400px;
+  /* Убрали max-width для полной адаптивности */
   margin: 0 auto;
   width: 100%;
+  padding: 0 20px; /* Небольшие отступы от краев */
 }
 
 /* Grid layout */
@@ -449,6 +450,12 @@ textarea:focus {
   width: 100%;
   min-height: 100vh;
   background-color: var(--bg-primary);
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Main content animation */
+.main-content {
+  animation: fadeIn 0.4s ease-out;
 }
 
 .search-builder-header {

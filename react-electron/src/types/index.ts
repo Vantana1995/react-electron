@@ -178,7 +178,6 @@ export interface ScriptEvent {
 // ===== NFT & SUBSCRIPTION =====
 
 export interface NFTData {
-  address: string;
   image: string;
   metadata?: {
     name?: string;
@@ -359,7 +358,7 @@ export interface ElectronAPI {
     }) => void
   ) => void;
   onScriptStopped: (
-    callback: (data: { scriptId: string; timestamp: number }) => void
+    callback: (data: { scriptId: string; timestamp: number; reason?: string }) => void
   ) => void;
 }
 
@@ -539,6 +538,7 @@ export interface ProfileState {
   selectedProfile?: UserProfile;
   showAddModal: boolean;
   maxProfiles: number;
+  runningScripts: string[]; // Array of profile IDs that have running scripts
 }
 
 export interface AddProfileModalProps {
@@ -566,6 +566,7 @@ export interface ProfileManagerProps {
   onProfileToggleActivation: (profileId: string) => void;
   selectedProfile?: UserProfile;
   maxProfiles: number;
+  runningScripts?: string[]; // Array of profile IDs with running scripts
 }
 
 export const PROFILE_STORAGE_KEY = "twitter_automation_profiles";

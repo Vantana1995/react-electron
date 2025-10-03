@@ -127,7 +127,7 @@ interface ElectronAPI {
   ) => void;
 
   onScriptStopped?: (
-    callback: (data: { scriptId: string; timestamp: number }) => void
+    callback: (data: { scriptId: string; timestamp: number; reason?: string }) => void
   ) => void;
 
   removeAllListeners?: (channel: string) => void;

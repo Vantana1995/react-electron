@@ -11,6 +11,33 @@ node_modules
 dist
 dist-ssr
 *.local
+nul
+
+# Puppeteer profiles (generated at runtime)
+puppeteer_profile*
+
+# Browser cache and temp files
+**/Cache/
+**/Code Cache/
+**/GPUCache/
+**/Service Worker/
+**/DawnGraphiteCache/
+**/DawnWebGPUCache/
+**/IndexedDB/
+**/Local Storage/
+**/Session Storage/
+**/Network/Cookies*
+**/BrowserMetrics/
+
+# Chromium/Electron cache files
+*.pma
+*.sqldb
+DIPS
+TransportSecurity
+**/Favicons
+**/History
+**/Preferences
+**/Secure Preferences
 
 # Editor directories and files
 .vscode/*

@@ -11,38 +11,13 @@ export interface SearchQueryState {
   notWords: string[];
   hashtags: string[];
   cashtags: string[];
-  emoji: string;
-  proximity: string;
 
   // Account
   from: string[];
   to: string[];
-  mentions: string[];
-  retweetsOf: string[];
   conversationId: string;
-  bio: string;
-  bioName: string;
-  bioLocation: string;
-
-  // Engagement
-  minReplies: number | null;
-  minFaves: number | null;
-  minRetweets: number | null;
-  minQuotes: number | null;
-
-  // Date/Time
-  since: string;
-  until: string;
-  sinceTime: string;
-  untilTime: string;
 
   // Content Filters
-  hasImages: boolean;
-  hasVideos: boolean;
-  hasMedia: boolean;
-  hasLinks: boolean;
-  url: string;
-  hasPolls: boolean;
   isVerified: boolean;
   isRetweet: boolean;
   isQuote: boolean;
@@ -51,21 +26,6 @@ export interface SearchQueryState {
   safeSearch: boolean;
   excludeRetweets: boolean;
   excludeReplies: boolean;
-
-  // Location
-  near: string;
-  within: string;
-  geocode: string;
-  place: string;
-  placeCountry: string;
-  pointRadius: string;
-  boundingBox: string;
-
-  // Advanced
-  language: string;
-  source: string;
-  entity: string;
-  context: string;
 }
 
 /**
@@ -79,30 +39,9 @@ export function createEmptyQuery(): SearchQueryState {
     notWords: [],
     hashtags: [],
     cashtags: [],
-    emoji: "",
-    proximity: "",
     from: [],
     to: [],
-    mentions: [],
-    retweetsOf: [],
     conversationId: "",
-    bio: "",
-    bioName: "",
-    bioLocation: "",
-    minReplies: null,
-    minFaves: null,
-    minRetweets: null,
-    minQuotes: null,
-    since: "",
-    until: "",
-    sinceTime: "",
-    untilTime: "",
-    hasImages: false,
-    hasVideos: false,
-    hasMedia: false,
-    hasLinks: false,
-    url: "",
-    hasPolls: false,
     isVerified: false,
     isRetweet: false,
     isQuote: false,
@@ -111,17 +50,6 @@ export function createEmptyQuery(): SearchQueryState {
     safeSearch: false,
     excludeRetweets: false,
     excludeReplies: false,
-    near: "",
-    within: "",
-    geocode: "",
-    place: "",
-    placeCountry: "",
-    pointRadius: "",
-    boundingBox: "",
-    language: "",
-    source: "",
-    entity: "",
-    context: "",
   };
 }
 
@@ -176,16 +104,6 @@ export function buildSearchQuery(query: SearchQueryState): string {
     });
   }
 
-  // Emoji
-  if (query.emoji.trim()) {
-    parts.push(query.emoji.trim());
-  }
-
-  // Proximity search
-  if (query.proximity.trim()) {
-    parts.push(query.proximity.trim());
-  }
-
   // === ACCOUNT OPERATORS ===
 
   // From accounts
@@ -207,102 +125,12 @@ export function buildSearchQuery(query: SearchQueryState): string {
     });
   }
 
-  // Mentions
-  if (query.mentions.length > 0) {
-    query.mentions.forEach((user) => {
-      const mention = user.startsWith("@") ? user : `@${user}`;
-      parts.push(mention);
-    });
-  }
-
-  // Retweets of
-  if (query.retweetsOf.length > 0) {
-    query.retweetsOf.forEach((user) => {
-      parts.push(`retweets_of:${removeAtSymbol(user)}`);
-    });
-  }
-
   // Conversation ID
   if (query.conversationId.trim()) {
     parts.push(`conversation_id:${query.conversationId.trim()}`);
   }
 
-  // Bio search
-  if (query.bio.trim()) {
-    parts.push(`bio:"${query.bio.trim()}"`);
-  }
-
-  // Bio name
-  if (query.bioName.trim()) {
-    parts.push(`bio_name:${query.bioName.trim()}`);
-  }
-
-  // Bio location
-  if (query.bioLocation.trim()) {
-    parts.push(`bio_location:"${query.bioLocation.trim()}"`);
-  }
-
-  // === ENGAGEMENT OPERATORS ===
-
-  if (query.minReplies !== null && query.minReplies > 0) {
-    parts.push(`min_replies:${query.minReplies}`);
-  }
-
-  if (query.minFaves !== null && query.minFaves > 0) {
-    parts.push(`min_faves:${query.minFaves}`);
-  }
-
-  if (query.minRetweets !== null && query.minRetweets > 0) {
-    parts.push(`min_retweets:${query.minRetweets}`);
-  }
-
-  if (query.minQuotes !== null && query.minQuotes > 0) {
-    parts.push(`min_quotes:${query.minQuotes}`);
-  }
-
-  // === DATE/TIME OPERATORS ===
-
-  if (query.since) {
-    parts.push(`since:${query.since}`);
-  }
-
-  if (query.until) {
-    parts.push(`until:${query.until}`);
-  }
-
-  if (query.sinceTime) {
-    parts.push(`since_time:${query.sinceTime}`);
-  }
-
-  if (query.untilTime) {
-    parts.push(`until_time:${query.untilTime}`);
-  }
-
   // === CONTENT FILTERS ===
-
-  if (query.hasImages) {
-    parts.push("filter:images");
-  }
-
-  if (query.hasVideos) {
-    parts.push("filter:videos");
-  }
-
-  if (query.hasMedia) {
-    parts.push("filter:media");
-  }
-
-  if (query.hasLinks) {
-    parts.push("filter:links");
-  }
-
-  if (query.url.trim()) {
-    parts.push(`url:"${query.url.trim()}"`);
-  }
-
-  if (query.hasPolls) {
-    parts.push("filter:polls");
-  }
 
   if (query.isVerified) {
     parts.push("filter:verified");
@@ -334,54 +162,6 @@ export function buildSearchQuery(query: SearchQueryState): string {
 
   if (query.excludeReplies) {
     parts.push("-filter:replies");
-  }
-
-  // === LOCATION OPERATORS ===
-
-  if (query.near.trim()) {
-    parts.push(`near:"${query.near.trim()}"`);
-  }
-
-  if (query.within.trim()) {
-    parts.push(`within:${query.within.trim()}`);
-  }
-
-  if (query.geocode.trim()) {
-    parts.push(`geocode:${query.geocode.trim()}`);
-  }
-
-  if (query.place.trim()) {
-    parts.push(`place:${query.place.trim()}`);
-  }
-
-  if (query.placeCountry) {
-    parts.push(`place_country:${query.placeCountry}`);
-  }
-
-  if (query.pointRadius.trim()) {
-    parts.push(`point_radius:${query.pointRadius.trim()}`);
-  }
-
-  if (query.boundingBox.trim()) {
-    parts.push(`bounding_box:${query.boundingBox.trim()}`);
-  }
-
-  // === ADVANCED OPERATORS ===
-
-  if (query.language) {
-    parts.push(`lang:${query.language}`);
-  }
-
-  if (query.source) {
-    parts.push(`source:${query.source}`);
-  }
-
-  if (query.entity.trim()) {
-    parts.push(`entity:"${query.entity.trim()}"`);
-  }
-
-  if (query.context.trim()) {
-    parts.push(`context:${query.context.trim()}`);
   }
 
   // Join all parts with spaces
@@ -442,11 +222,17 @@ export function validateQuery(query: string): {
     warnings.push("Using both images and videos filter - consider using filter:media instead");
   }
 
-  if (query.includes("filter:retweets") && query.includes("-filter:retweets")) {
+  // Проверяем наличие filter:retweets БЕЗ минуса перед ним
+  const hasIncludeRetweets = /(?:^|\s)filter:retweets(?:\s|$)/.test(query);
+  const hasExcludeRetweets = query.includes("-filter:retweets");
+  if (hasIncludeRetweets && hasExcludeRetweets) {
     errors.push("Conflicting filters: cannot both include and exclude retweets");
   }
 
-  if (query.includes("filter:replies") && query.includes("-filter:replies")) {
+  // Проверяем наличие filter:replies БЕЗ минуса перед ним
+  const hasIncludeReplies = /(?:^|\s)filter:replies(?:\s|$)/.test(query);
+  const hasExcludeReplies = query.includes("-filter:replies");
+  if (hasIncludeReplies && hasExcludeReplies) {
     errors.push("Conflicting filters: cannot both include and exclude replies");
   }
 
@@ -491,16 +277,15 @@ export function getQueryComplexity(query: SearchQueryState): {
   if (query.cashtags.length > 0) count++;
   if (query.from.length > 0) count++;
   if (query.to.length > 0) count++;
-  if (query.mentions.length > 0) count++;
-  if (query.minReplies !== null) count++;
-  if (query.minFaves !== null) count++;
-  if (query.minRetweets !== null) count++;
-  if (query.since) count++;
-  if (query.until) count++;
-  if (query.hasImages) count++;
-  if (query.hasVideos) count++;
-  if (query.language) count++;
-  // ... count other operators
+  if (query.conversationId) count++;
+  if (query.isVerified) count++;
+  if (query.isRetweet) count++;
+  if (query.isQuote) count++;
+  if (query.isReply) count++;
+  if (query.hasEngagement) count++;
+  if (query.safeSearch) count++;
+  if (query.excludeRetweets) count++;
+  if (query.excludeReplies) count++;
 
   const complexity: "simple" | "moderate" | "complex" =
     count <= 3 ? "simple" : count <= 6 ? "moderate" : "complex";
@@ -532,11 +317,6 @@ export function parseSearchURL(url: string): Partial<SearchQueryState> | null {
     const fromMatches = queryParam.match(/from:(\w+)/g);
     if (fromMatches) {
       state.from = fromMatches.map((m) => m.replace("from:", ""));
-    }
-
-    const sinceMatch = queryParam.match(/since:(\d{4}-\d{2}-\d{2})/);
-    if (sinceMatch) {
-      state.since = sinceMatch[1];
     }
 
     // More parsing logic would go here...

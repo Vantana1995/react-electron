@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { SearchOperator, SEARCH_OPERATORS, OPERATOR_CATEGORIES, EXAMPLE_QUERIES } from "./SearchOperators";
+import { SearchOperator, SEARCH_OPERATORS, OPERATOR_CATEGORIES } from "./SearchOperators";
 import { SearchQueryState, createEmptyQuery, buildSearchQuery, generateSearchURL, validateQuery } from "./utils/queryBuilder";
 import { TagInput } from "./components/TagInput";
 import { QueryPreview } from "./QueryPreview";
@@ -42,10 +42,25 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
 
   // Update query field
   const updateQuery = (field: keyof SearchQueryState, value: any) => {
-    setQuery((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setQuery((prev) => {
+      const newQuery = { ...prev, [field]: value };
+
+      // Mutual exclusion logic for retweets
+      if (field === 'isRetweet' && value === true) {
+        newQuery.excludeRetweets = false;
+      } else if (field === 'excludeRetweets' && value === true) {
+        newQuery.isRetweet = false;
+      }
+
+      // Mutual exclusion logic for replies
+      if (field === 'isReply' && value === true) {
+        newQuery.excludeReplies = false;
+      } else if (field === 'excludeReplies' && value === true) {
+        newQuery.isReply = false;
+      }
+
+      return newQuery;
+    });
   };
 
   // Handle example query load
@@ -158,8 +173,8 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
           >
             <option value="">Any</option>
             {operator.options?.map((option) => (
-              <option key={option} value={option}>
-                {option}
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>

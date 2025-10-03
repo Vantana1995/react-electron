@@ -10,7 +10,7 @@ import express, { Request, Response, NextFunction } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { AddressInfo } from "net";
 import { Server } from "http";
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +46,7 @@ interface ActiveScript {
   process: import("child_process").ChildProcess;
   startTime: number;
   status: "running" | "completed" | "error";
+  profileId?: string; // ID профиля для связи скрипта с профилем
 }
 
 const activeScripts = new Map<string, ActiveScript>();
@@ -694,10 +695,10 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 
-  // Open DevTools in development
-  if (process.env.NODE_ENV === "development") {
-    win.webContents.openDevTools();
-  }
+  // DevTools disabled for security
+  // if (process.env.NODE_ENV === "development") {
+  //   win.webContents.openDevTools();
+  // }
 
   // Handle window closed
   win.on("closed", () => {
@@ -1005,9 +1006,9 @@ const profile = ${JSON.stringify(profile)};
 const customData = ${JSON.stringify(parsedCustomData)};
 const headlessMode = ${headless};
 
-console.log('🤖 Starting Puppeteer script execution...');
-console.log('👤 Profile:', profile.name);
-console.log('🔇 Headless mode:', headlessMode);
+console.log('[SCRIPT] Starting Puppeteer script execution...');
+console.log('[SCRIPT] Profile:', profile.name);
+console.log('[SCRIPT] Headless mode:', headlessMode);
 
 // ============================================
 // ФУНКЦИЯ ЗАПУСКА БРАУЗЕРА С ПРОФИЛЕМ
@@ -1025,7 +1026,7 @@ async function launchBrowserWithProfile() {
   if (profile.proxy && profile.proxy.ip && profile.proxy.port) {
     const proxyServer = \`\${profile.proxy.ip}:\${profile.proxy.port}\`;
     browserArgs.push(\`--proxy-server=\${proxyServer}\`);
-    console.log(\`🌐 Proxy server: \${proxyServer}\`);
+    console.log(\`[PROXY] Proxy server: \${proxyServer}\`);
   }
 
   // Если не headless - добавляем maximized
@@ -1033,7 +1034,7 @@ async function launchBrowserWithProfile() {
     browserArgs.push("--start-maximized");
   }
 
-  console.log('🚀 Launching browser with args:', browserArgs);
+  console.log('[BROWSER] Launching browser with args:', browserArgs);
 
   const browser = await puppeteer.launch({
     headless: headlessMode,
@@ -1049,13 +1050,13 @@ async function launchBrowserWithProfile() {
       username: profile.proxy.login,
       password: profile.proxy.password
     });
-    console.log(\`🔐 Proxy auth: \${profile.proxy.login}\`);
+    console.log(\`[AUTH] Proxy auth: \${profile.proxy.login}\`);
   }
 
   // Очистка кеша
   const client = await page.createCDPSession();
   await client.send("Network.clearBrowserCache");
-  console.log('🧹 Browser cache cleared');
+  console.log('[CACHE] Browser cache cleared');
 
   // Установка viewport
   await page.setViewport({ width: 1920, height: 1080 });
@@ -1064,9 +1065,9 @@ async function launchBrowserWithProfile() {
   if (profile.cookies && profile.cookies.length > 0) {
     try {
       await page.setCookie(...profile.cookies);
-      console.log(\`🍪 Set \${profile.cookies.length} cookies from profile\`);
+      console.log(\`[COOKIES] Set \${profile.cookies.length} cookies from profile\`);
     } catch (error) {
-      console.warn('⚠️ Failed to set some cookies:', error.message);
+      console.warn('[COOKIES] Failed to set some cookies:', error.message);
     }
   }
 
@@ -1093,8 +1094,7 @@ const config = {
   ...customData
 };
 
-console.log('⚙️ Script config:', config);
-console.log('🔍 Navigation URL from settings:', params.settings?.navigationUrl);
+console.log('[CONFIG] Script config:', JSON.stringify(config, null, 2));
 
 // ============================================
 // ОСНОВНАЯ ФУНКЦИЯ ВЫПОЛНЕНИЯ
@@ -1103,10 +1103,20 @@ async function main() {
   let browser, page;
 
   try {
-    console.log('🚀 Starting script execution...');
+    console.log('[MAIN] Starting script execution...');
 
     // Запускаем браузер с настройками профиля
     ({ browser, page } = await launchBrowserWithProfile());
+
+    // Сохраняем инстанс браузера для graceful shutdown
+    browserInstance = browser;
+
+    // Отслеживаем закрытие браузера пользователем
+    browser.on('disconnected', () => {
+      console.log('[BROWSER] Browser was closed by user');
+      process.send && process.send({ type: 'browser-closed', scriptId: '${scriptId}' });
+      process.exit(0);
+    });
 
     // Импортируем и выполняем функцию из backend скрипта
     ${scriptContent}
@@ -1122,49 +1132,81 @@ async function main() {
     // Если скрипт экспортирует функцию executeScript, используем её
     if (typeof executeScript === 'function') {
       const result = await executeScript(scriptContext);
-      console.log('✅ Backend script result:', result);
+      console.log('[SUCCESS] Backend script result:', result);
       return result;
     }
     // Если скрипт экспортирует объект module.exports
     else if (typeof module !== 'undefined' && module.exports && typeof module.exports === 'function') {
       const result = await module.exports(scriptContext);
-      console.log('✅ Backend script result:', result);
+      console.log('[SUCCESS] Backend script result:', result);
       return result;
     }
     else {
-      console.log('⚠️ Script does not export expected function, running as standalone');
+      console.log('[WARNING] Script does not export expected function, running as standalone');
     }
 
   } catch (error) {
-    console.error('❌ Script execution error:', error.message);
+    console.error('[ERROR] Script execution error:', error.message);
     throw error;
   } finally {
     // Закрываем браузер в любом случае
     if (browser) {
       await browser.close();
-      console.log('🔒 Browser closed');
+      console.log('[CLEANUP] Browser closed');
+      browserInstance = null;
     }
   }
 }
 
+// Graceful shutdown handler
+let browserInstance = null;
+
+// Функция для безопасного закрытия браузера
+async function cleanup() {
+  console.log('[CLEANUP] Shutting down gracefully...');
+  if (browserInstance) {
+    try {
+      await browserInstance.close();
+      console.log('[CLEANUP] Browser closed successfully');
+    } catch (error) {
+      console.error('[CLEANUP] Error closing browser:', error.message);
+    }
+  }
+}
+
+// Обработка сигналов остановки
+process.on('SIGTERM', async () => {
+  console.log('[SIGNAL] Received SIGTERM, shutting down...');
+  await cleanup();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('[SIGNAL] Received SIGINT, shutting down...');
+  await cleanup();
+  process.exit(0);
+});
+
 // Запускаем основную функцию
 main().then(() => {
-  console.log('✅ Script completed successfully');
+  console.log('[SUCCESS] Script completed successfully');
   process.exit(0);
 }).catch((error) => {
-  console.error('❌ Script failed:', error.message);
+  console.error('[ERROR] Script failed:', error.message);
   process.exit(1);
 });
     `;
 
-    // Записываем скрипт в файл
-    fs.writeFileSync(scriptPath, puppeteerScript);
+    // Записываем скрипт в файл с явным указанием кодировки UTF-8
+    fs.writeFileSync(scriptPath, puppeteerScript, { encoding: 'utf-8' });
 
     // Выполняем скрипт через child_process
+    const profileId = params.settings?.profileId || params.settings?.profile?.id;
     const result = await executePuppeteerScript(
       scriptPath,
       scriptId,
-      params.scriptName
+      params.scriptName,
+      profileId
     );
 
     // Удаляем временный файл через 30 секунд (даем время скрипту запуститься)
@@ -1193,7 +1235,8 @@ main().then(() => {
 function executePuppeteerScript(
   scriptPath: string,
   scriptId: string,
-  scriptName: string
+  scriptName: string,
+  profileId?: string
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
@@ -1212,7 +1255,7 @@ function executePuppeteerScript(
             path.join(__dirname, "..", "..", "node_modules"), // root node_modules
           ].join(process.platform === "win32" ? ";" : ":"),
         },
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe", "ipc"], // Добавляем IPC канал
         shell: process.platform === "win32",
       });
 
@@ -1226,9 +1269,48 @@ function executePuppeteerScript(
         process: child,
         startTime: Date.now(),
         status: "running",
+        profileId: profileId, // Сохраняем ID профиля
       };
 
       activeScripts.set(scriptId, scriptInfo);
+
+      // Обработчик сообщений от дочернего процесса (например, browser-closed)
+      child.on("message", (message: any) => {
+        if (message.type === 'browser-closed') {
+          console.log(`🔴 Browser closed manually for script ${scriptId}`);
+
+          const script = activeScripts.get(scriptId);
+          if (script) {
+            script.status = "completed";
+            activeScripts.set(scriptId, script);
+          }
+
+          // Уведомляем renderer о закрытии браузера (как при остановке скрипта)
+          if (win) {
+            win.webContents.send("script-stopped", {
+              scriptId,
+              profileId: script.profileId,
+              reason: "browser-closed",
+              timestamp: Date.now(),
+            });
+
+            win.webContents.send("script-finished", {
+              scriptId,
+              profileId: script.profileId,
+              exitCode: 0,
+              success: true,
+              output: "Browser was closed by user",
+              error: "",
+              timestamp: Date.now(),
+            });
+          }
+
+          // Удаляем из активных скриптов
+          setTimeout(() => {
+            activeScripts.delete(scriptId);
+          }, 1000);
+        }
+      });
 
       child.stdout.on("data", (data) => {
         const text = data.toString();
@@ -1273,8 +1355,10 @@ function executePuppeteerScript(
 
         // Уведомляем renderer о завершении
         if (win) {
+          const script = activeScripts.get(scriptId);
           win.webContents.send("script-finished", {
             scriptId,
+            profileId: script?.profileId,
             exitCode: code,
             success: code === 0,
             output: output,
@@ -1300,8 +1384,10 @@ function executePuppeteerScript(
         console.error(`❌ Script process error: ${err.message}`);
 
         if (win) {
+          const script = activeScripts.get(scriptId);
           win.webContents.send("script-error", {
             scriptId,
+            profileId: script?.profileId,
             error: err.message,
             timestamp: Date.now(),
           });
@@ -1356,23 +1442,46 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
     }
 
     if (script.process && !script.process.killed) {
-      script.process.kill("SIGTERM");
+      console.log(`🛑 Stopping script ${script.name} (PID: ${script.process.pid})...`);
 
-      // Даем 5 секунд на graceful shutdown, потом принудительно убиваем
-      setTimeout(() => {
-        if (script.process && !script.process.killed) {
+      // В Windows нужно убить все дочерние процессы
+      if (process.platform === "win32") {
+        try {
+          // Используем taskkill для убийства всего дерева процессов
+          execSync(`taskkill /pid ${script.process.pid} /T /F`, { windowsHide: true });
+          console.log(`✅ Killed process tree for PID ${script.process.pid}`);
+        } catch (killError) {
+          console.error(`⚠️ taskkill failed, using fallback method:`, killError);
           script.process.kill("SIGKILL");
         }
-      }, 5000);
+      } else {
+        // В Unix/Mac используем стандартный kill
+        script.process.kill("SIGTERM");
+
+        // Даем 3 секунды на graceful shutdown, потом принудительно убиваем
+        setTimeout(() => {
+          if (script.process && !script.process.killed) {
+            script.process.kill("SIGKILL");
+          }
+        }, 3000);
+      }
 
       script.status = "completed";
       activeScripts.set(scriptId, script);
 
       console.log(`🛑 Script ${script.name} stopped`);
 
+      // Удаляем из списка активных скриптов
+      setTimeout(() => {
+        activeScripts.delete(scriptId);
+        console.log(`🧹 Cleaned up script ${scriptId} from active scripts`);
+      }, 1000);
+
       if (win) {
+        const script = activeScripts.get(scriptId);
         win.webContents.send("script-stopped", {
           scriptId,
+          profileId: script?.profileId,
           timestamp: Date.now(),
         });
       }
