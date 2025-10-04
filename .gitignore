@@ -2,3 +2,10 @@ node_modules/
 .env
 dist/
 build/
+
+# Electron build files
+react-electron/dist-electron/
+
+# Temporary/system files
+backend/nul
+*.log
