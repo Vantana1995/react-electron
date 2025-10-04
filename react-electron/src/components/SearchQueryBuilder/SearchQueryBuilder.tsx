@@ -4,21 +4,18 @@
  */
 
 import React, { useState } from "react";
+import { SearchQueryBuilderProps } from "../../types";
 import { SearchOperator, SEARCH_OPERATORS, OPERATOR_CATEGORIES } from "./SearchOperators";
 import { SearchQueryState, createEmptyQuery, buildSearchQuery, generateSearchURL, validateQuery } from "./utils/queryBuilder";
 import { TagInput } from "./components/TagInput";
+import { OrGroupsInput } from "./components/OrGroupsInput";
 import { QueryPreview } from "./QueryPreview";
 import { ExampleQueries } from "./ExampleQueries";
 import "./SearchQueryBuilder.css";
 
-interface SearchQueryBuilderProps {
-  onUseInScript?: (url: string) => void;
-  initialUrl?: string;
-}
-
 export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
   onUseInScript,
-  initialUrl,
+  profileContext,
 }) => {
   const [query, setQuery] = useState<SearchQueryState>(createEmptyQuery());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["basic"]));
@@ -109,6 +106,14 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
     const fieldName = operator.id as keyof SearchQueryState;
 
     switch (operator.inputType) {
+      case "orGroups":
+        return (
+          <OrGroupsInput
+            orGroups={query.orGroups || []}
+            onChange={(orGroups) => updateQuery("orGroups", orGroups)}
+          />
+        );
+
       case "tags":
         return (
           <TagInput
@@ -136,7 +141,7 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
             type="number"
             className="sqb-input"
             placeholder={operator.placeholder}
-            value={query[fieldName] as number || ""}
+            value={(query[fieldName] as number | null) ?? ""}
             onChange={(e) => updateQuery(fieldName, e.target.value ? parseInt(e.target.value) : null)}
             min={0}
           />
@@ -237,9 +242,11 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
   return (
     <div className="search-query-builder">
       <div className="sqb-header">
-        <h2>🔍 Twitter/X Advanced Search Builder</h2>
+        <h2>🔍 {profileContext ? `Build Query for Profile: ${profileContext.profileName}` : 'Twitter/X Advanced Search Builder'}</h2>
         <p className="sqb-subtitle">
-          Build complex search queries visually - no syntax knowledge required
+          {profileContext
+            ? `Configure search query for profile "${profileContext.profileName}"`
+            : 'Build complex search queries visually - no syntax knowledge required'}
         </p>
         {queryString.trim().length === 0 && (
           <div className="sqb-empty-hint">

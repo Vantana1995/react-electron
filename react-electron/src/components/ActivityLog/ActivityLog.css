@@ -236,7 +236,7 @@
 /* Print styles */
 @media print {
   .activity-log {
-    background: white;
+    background: var(--bg-card);
     color: black;
     box-shadow: none;
   }
@@ -247,7 +247,7 @@
   }
 
   .log-container {
-    background: white;
+    background: var(--bg-card);
     max-height: none;
     overflow: visible;
   }

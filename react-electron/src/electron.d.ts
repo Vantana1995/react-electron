@@ -41,6 +41,9 @@ interface ElectronAPI {
   getActiveScripts: () => Promise<any>;
   stopScript: (scriptId: string) => Promise<any>;
 
+  // Profile history management
+  clearProfileHistory: (profileId: string, saveImagesFolder: string) => Promise<{ success: boolean; message: string }>;
+
   // Event listeners
   onWalletConnected?: (
     callback: (data: { address: string; sessionToken?: string }) => void

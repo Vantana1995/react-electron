@@ -1523,6 +1523,28 @@ ipcMain.handle("select-folder", async () => {
   }
 });
 
+// Handle clearing profile history (delete processed tweets JSON file)
+ipcMain.handle("clear-profile-history", async (_event, profileId: string, saveImagesFolder: string) => {
+  try {
+    if (!saveImagesFolder || !profileId) {
+      return { success: false, message: "Missing profileId or saveImagesFolder" };
+    }
+
+    const tweetsFile = path.join(saveImagesFolder, `processed_tweets_${profileId}.json`);
+
+    if (fs.existsSync(tweetsFile)) {
+      fs.unlinkSync(tweetsFile);
+      console.log(`✅ Deleted processed tweets file: ${tweetsFile}`);
+      return { success: true, message: "History cleared successfully" };
+    }
+
+    return { success: true, message: "No history file found" };
+  } catch (error) {
+    console.error("❌ Error clearing profile history:", error);
+    return { success: false, message: (error as Error).message };
+  }
+});
+
 // Handle app activation (macOS)
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {

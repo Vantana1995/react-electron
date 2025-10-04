@@ -12,7 +12,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   onEdit,
   onDelete,
   onSelect,
-  isSelected,
+  onBuildQuery,
+  onClearHistory,
 }) => {
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString();
@@ -23,15 +24,19 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   };
 
   return (
-    <div className={`profile-card ${isSelected ? "selected" : ""}`}>
+    <div className="profile-card">
       <div className="profile-card-header">
         <div className="profile-info">
           <h4 className="profile-name">{profile.name}</h4>
-          <span className="profile-status">
-            {profile.isActive ? "🟢 Active" : "🔴 Inactive"}
-          </span>
         </div>
         <div className="profile-actions">
+          <button
+            className="build-query-btn"
+            onClick={() => onBuildQuery?.(profile)}
+            title="Build Search Query"
+          >
+            🔍
+          </button>
           <button
             className="edit-btn"
             onClick={() => onEdit(profile)}
@@ -66,6 +71,17 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </span>
         </div>
 
+        {profile.navigationUrl && (
+          <div className="profile-detail">
+            <label>Search Query:</label>
+            <span className="url-info" title={profile.navigationUrl}>
+              {profile.navigationUrl.length > 50
+                ? `${profile.navigationUrl.substring(0, 50)}...`
+                : profile.navigationUrl}
+            </span>
+          </div>
+        )}
+
         <div className="profile-detail">
           <label>Created:</label>
           <span className="date-info">{formatDate(profile.createdAt)}</span>
@@ -81,11 +97,17 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
       <div className="profile-card-footer">
         <button
-          className={`select-profile-btn ${isSelected ? "selected" : ""}`}
+          className="select-profile-btn"
           onClick={() => onSelect(profile)}
-          disabled={isSelected}
         >
-          {isSelected ? "✅ Selected" : "Select Profile"}
+          Select Profile
+        </button>
+        <button
+          className="clear-history-btn"
+          onClick={() => onClearHistory?.(profile)}
+          title="Clear processed tweets history"
+        >
+          🗑️ Clear History
         </button>
       </div>
     </div>

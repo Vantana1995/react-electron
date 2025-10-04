@@ -180,6 +180,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // File system operations
   selectFolder: () => ipcRenderer.invoke("select-folder"),
+
+  // Profile history management
+  clearProfileHistory: (profileId: string, saveImagesFolder: string) =>
+    ipcRenderer.invoke("clear-profile-history", profileId, saveImagesFolder),
 });
 
 // Legacy ipcRenderer API for compatibility (if needed)

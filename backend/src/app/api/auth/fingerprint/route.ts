@@ -116,6 +116,30 @@ export async function POST(request: NextRequest) {
       // User not found, register new user
       console.log("📝 Registering new user...");
 
+      // Check if wallet address is already registered on another device
+      if (fingerprintData.walletAddress) {
+        const walletCheckResult = await db.query(
+          `SELECT id, device_fingerprint FROM users WHERE wallet_address = $1`,
+          [fingerprintData.walletAddress]
+        );
+
+        if (walletCheckResult.rows.length > 0) {
+          const existingUser = walletCheckResult.rows[0];
+          console.log(
+            `⚠️ Wallet ${fingerprintData.walletAddress} already registered on device ${existingUser.device_fingerprint}`
+          );
+          return ApiResponseBuilder.error(
+            "WALLET_ALREADY_REGISTERED",
+            "This wallet address is already registered on another device. Each wallet can only be used on one device.",
+            {
+              walletAddress: fingerprintData.walletAddress,
+              existingUserId: existingUser.id,
+            },
+            409
+          );
+        }
+      }
+
       const insertResult = await db.query(
         `INSERT INTO users (
           device_fingerprint,
@@ -150,37 +174,67 @@ export async function POST(request: NextRequest) {
       isNewUser = true;
       console.log(`✅ New user registered with ID: ${user.id}`);
     } else {
-      // User exists, update last active and wallet address
+      // User exists, update last active only (wallet_address is cached and never updated)
       user = result.rows[0];
 
+      // Update last active timestamp only
       await db.query(
-        `UPDATE users SET last_active = NOW(), wallet_address = $1 WHERE id = $2`,
-        [fingerprintData.walletAddress || null, user.id]
+        `UPDATE users SET last_active = NOW() WHERE id = $1`,
+        [user.id]
       );
 
       console.log(`✅ Existing user found with ID: ${user.id}`);
-      if (fingerprintData.walletAddress) {
+
+      // Compare cached wallet with requested wallet
+      const cachedWallet = user.wallet_address;
+      const requestedWallet = fingerprintData.walletAddress;
+
+      if (cachedWallet && requestedWallet && cachedWallet !== requestedWallet) {
+        // Different wallet - reject connection
         console.log(
-          `💰 Wallet address updated: ${fingerprintData.walletAddress}`
+          `❌ Wallet mismatch detected!\n` +
+          `  Cached:    ${cachedWallet}\n` +
+          `  Requested: ${requestedWallet}\n` +
+          `  Connection rejected - wallet addresses do not match`
         );
+        return ApiResponseBuilder.error(
+          "WALLET_MISMATCH",
+          "This device is registered with a different wallet address. Please use the original wallet or contact support.",
+          {
+            cachedWallet,
+            requestedWallet,
+          },
+          403
+        );
+      } else if (cachedWallet && requestedWallet && cachedWallet === requestedWallet) {
+        console.log(`✅ Wallet verified: ${cachedWallet}`);
+      } else if (cachedWallet && !requestedWallet) {
+        console.log(`💾 Using cached wallet: ${cachedWallet}`);
+      } else if (!cachedWallet && requestedWallet) {
+        console.log(`🆕 First wallet connection: ${requestedWallet}`);
       }
     }
 
-    // Check Legion NFT ownership and get metadata if wallet address is provided
+    // Check Legion NFT ownership and get metadata
+    // Determine which wallet to check based on user state
     let hasLegionNFTResult = false;
     let nftImage = "";
     let nftMetadata = null;
 
-    if (fingerprintData.walletAddress) {
+    // For new users: use requested wallet
+    // For existing users: use cached wallet (already verified it matches requested wallet above)
+    const walletToCheck = isNewUser
+      ? fingerprintData.walletAddress
+      : (user.wallet_address || fingerprintData.walletAddress);
+
+    if (walletToCheck) {
       try {
-        hasLegionNFTResult = await hasLegionNFT(fingerprintData.walletAddress);
-        console.log(`💰 Legion NFT check result: ${hasLegionNFTResult}`);
+        hasLegionNFTResult = await hasLegionNFT(walletToCheck);
+        console.log(`💰 Legion NFT check for wallet ${walletToCheck}: ${hasLegionNFTResult}`);
 
         if (hasLegionNFTResult) {
           // Get NFT metadata and image
-          const nftData = await getLegionNFTMetadata(
-            fingerprintData.walletAddress
-          );
+          const nftData = await getLegionNFTMetadata(walletToCheck);
           if (nftData) {
             nftImage = nftData.image;
             nftMetadata = nftData.metadata;

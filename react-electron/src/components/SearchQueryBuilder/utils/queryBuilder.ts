@@ -3,51 +3,22 @@
  * Core logic for building Twitter/X search queries
  */
 
-export interface SearchQueryState {
-  // Basic
-  keywords: string[];
-  exactPhrases: string[];
-  orWords: string[];
-  notWords: string[];
-  hashtags: string[];
-  cashtags: string[];
-
-  // Account
-  from: string[];
-  to: string[];
-  conversationId: string;
-
-  // Content Filters
-  isVerified: boolean;
-  isRetweet: boolean;
-  isQuote: boolean;
-  isReply: boolean;
-  hasEngagement: boolean;
-  safeSearch: boolean;
-  excludeRetweets: boolean;
-  excludeReplies: boolean;
-}
+import { SearchQueryState } from "../../../types";
 
 /**
  * Initialize empty query state
  */
 export function createEmptyQuery(): SearchQueryState {
   return {
-    keywords: [],
+    orGroups: [],
     exactPhrases: [],
-    orWords: [],
     notWords: [],
-    hashtags: [],
-    cashtags: [],
     from: [],
     to: [],
-    conversationId: "",
     isVerified: false,
     isRetweet: false,
     isQuote: false,
     isReply: false,
-    hasEngagement: false,
-    safeSearch: false,
     excludeRetweets: false,
     excludeReplies: false,
   };
@@ -61,11 +32,23 @@ export function buildSearchQuery(query: SearchQueryState): string {
 
   // === BASIC OPERATORS ===
 
-  // Keywords (AND logic - all must match)
-  if (query.keywords.length > 0) {
-    query.keywords.forEach((keyword) => {
-      parts.push(keyword);
+  // OR Groups (each group uses OR internally, AND between groups)
+  if (query.orGroups && query.orGroups.length > 0) {
+    const groupParts: string[] = [];
+    query.orGroups.forEach((group) => {
+      if (group.length === 1) {
+        // Single word - add with quotes
+        groupParts.push(`"${group[0]}"`);
+      } else if (group.length > 1) {
+        // Multiple words - OR within group
+        const groupPart = `(${group.map((word) => `"${word}"`).join(" OR ")})`;
+        groupParts.push(groupPart);
+      }
     });
+    // Join groups with explicit AND
+    if (groupParts.length > 0) {
+      parts.push(groupParts.join(" AND "));
+    }
   }
 
   // Exact phrases
@@ -75,32 +58,10 @@ export function buildSearchQuery(query: SearchQueryState): string {
     });
   }
 
-  // OR words (any must match)
-  if (query.orWords.length > 0) {
-    const orPart = `(${query.orWords.join(" OR ")})`;
-    parts.push(orPart);
-  }
-
   // NOT words (exclude)
   if (query.notWords.length > 0) {
     query.notWords.forEach((word) => {
       parts.push(`-${word}`);
-    });
-  }
-
-  // Hashtags
-  if (query.hashtags.length > 0) {
-    query.hashtags.forEach((tag) => {
-      const hashtag = tag.startsWith("#") ? tag : `#${tag}`;
-      parts.push(hashtag);
-    });
-  }
-
-  // Cashtags
-  if (query.cashtags.length > 0) {
-    query.cashtags.forEach((tag) => {
-      const cashtag = tag.startsWith("$") ? tag : `$${tag}`;
-      parts.push(cashtag);
     });
   }
 
@@ -125,15 +86,10 @@ export function buildSearchQuery(query: SearchQueryState): string {
     });
   }
 
-  // Conversation ID
-  if (query.conversationId.trim()) {
-    parts.push(`conversation_id:${query.conversationId.trim()}`);
-  }
-
   // === CONTENT FILTERS ===
 
   if (query.isVerified) {
-    parts.push("filter:verified");
+    parts.push("filter:blue_verified");
   }
 
   if (query.isRetweet) {
@@ -146,14 +102,6 @@ export function buildSearchQuery(query: SearchQueryState): string {
 
   if (query.isReply) {
     parts.push("filter:replies");
-  }
-
-  if (query.hasEngagement) {
-    parts.push("filter:has_engagement");
-  }
-
-  if (query.safeSearch) {
-    parts.push("filter:safe");
   }
 
   if (query.excludeRetweets) {
@@ -222,14 +170,12 @@ export function validateQuery(query: string): {
     warnings.push("Using both images and videos filter - consider using filter:media instead");
   }
 
-  // Проверяем наличие filter:retweets БЕЗ минуса перед ним
   const hasIncludeRetweets = /(?:^|\s)filter:retweets(?:\s|$)/.test(query);
   const hasExcludeRetweets = query.includes("-filter:retweets");
   if (hasIncludeRetweets && hasExcludeRetweets) {
     errors.push("Conflicting filters: cannot both include and exclude retweets");
   }
 
-  // Проверяем наличие filter:replies БЕЗ минуса перед ним
   const hasIncludeReplies = /(?:^|\s)filter:replies(?:\s|$)/.test(query);
   const hasExcludeReplies = query.includes("-filter:replies");
   if (hasIncludeReplies && hasExcludeReplies) {
@@ -269,21 +215,15 @@ export function getQueryComplexity(query: SearchQueryState): {
   let count = 0;
 
   // Count active operators
-  if (query.keywords.length > 0) count++;
+  if (query.orGroups && query.orGroups.length > 0) count++;
   if (query.exactPhrases.length > 0) count++;
-  if (query.orWords.length > 0) count++;
   if (query.notWords.length > 0) count++;
-  if (query.hashtags.length > 0) count++;
-  if (query.cashtags.length > 0) count++;
   if (query.from.length > 0) count++;
   if (query.to.length > 0) count++;
-  if (query.conversationId) count++;
   if (query.isVerified) count++;
   if (query.isRetweet) count++;
   if (query.isQuote) count++;
   if (query.isReply) count++;
-  if (query.hasEngagement) count++;
-  if (query.safeSearch) count++;
   if (query.excludeRetweets) count++;
   if (query.excludeReplies) count++;
 
@@ -298,33 +238,6 @@ export function getQueryComplexity(query: SearchQueryState): {
  */
 function removeAtSymbol(username: string): string {
   return username.startsWith("@") ? username.substring(1) : username;
-}
-
-/**
- * Parse existing search URL back to query state (optional utility)
- */
-export function parseSearchURL(url: string): Partial<SearchQueryState> | null {
-  try {
-    const urlObj = new URL(url);
-    const queryParam = urlObj.searchParams.get("q");
-
-    if (!queryParam) return null;
-
-    // This is a simplified parser - full implementation would be complex
-    const state: Partial<SearchQueryState> = {};
-
-    // Parse basic patterns
-    const fromMatches = queryParam.match(/from:(\w+)/g);
-    if (fromMatches) {
-      state.from = fromMatches.map((m) => m.replace("from:", ""));
-    }
-
-    // More parsing logic would go here...
-
-    return state;
-  } catch (error) {
-    return null;
-  }
 }
 
 /**

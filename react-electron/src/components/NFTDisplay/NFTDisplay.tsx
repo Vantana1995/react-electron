@@ -72,8 +72,8 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(
     savedState?.selectedProfile ?? null
   );
-  const [customJsonData, setCustomJsonData] = useState<string>(savedState?.customJsonData ?? "");
   const [headlessMode, setHeadlessMode] = useState<boolean>(savedState?.headlessMode ?? true);
+  const [notOlderThanHours, setNotOlderThanHours] = useState<number>(savedState?.notOlderThanHours ?? 24);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [scriptLogs, setScriptLogs] = useState<string[]>([]);
   const [runningScriptId, setRunningScriptId] = useState<string | null>(null);
@@ -85,8 +85,9 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   );
   const [regexInput, setRegexInput] = useState<string>("");
   const [commentTemplates, setCommentTemplates] = useState<string>(savedState?.commentTemplates ?? "");
-  const [delayBetweenActions, setDelayBetweenActions] = useState<number>(savedState?.delayBetweenActions ?? 3000);
+  const [delayBetweenActions, setDelayBetweenActions] = useState<number>(savedState?.delayBetweenActions ?? 3);
   const [saveImagesFolder, setSaveImagesFolder] = useState<string>(savedState?.saveImagesFolder ?? "");
+  const [navigationUrl, setNavigationUrl] = useState<string>(savedState?.navigationUrl ?? "");
 
   // Множественные запущенные скрипты
   interface RunningScript {
@@ -113,19 +114,27 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     console.log("🔍 NFTDisplay maxProfiles value:", maxProfiles);
   }, [maxProfiles, profiles]);
 
+  // Синхронизируем внешний navigationUrl с внутренним состоянием
+  useEffect(() => {
+    if (externalNavigationUrl && externalNavigationUrl !== navigationUrl) {
+      setNavigationUrl(externalNavigationUrl);
+    }
+  }, [externalNavigationUrl]);
+
   // Сохраняем состояние при изменении
   useEffect(() => {
     saveState({
       isExpanded,
       selectedProfile,
-      customJsonData,
       headlessMode,
+      notOlderThanHours,
       regexTags,
       commentTemplates,
       delayBetweenActions,
-      saveImagesFolder
+      saveImagesFolder,
+      navigationUrl
     });
-  }, [isExpanded, selectedProfile, customJsonData, headlessMode, regexTags, commentTemplates, delayBetweenActions, saveImagesFolder]);
+  }, [isExpanded, selectedProfile, headlessMode, notOlderThanHours, regexTags, commentTemplates, delayBetweenActions, saveImagesFolder, navigationUrl]);
 
   // Синхронизируем выбранный профиль с актуальным списком
   useEffect(() => {
@@ -212,12 +221,25 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       return;
     }
 
-    // Validate custom JSON data if provided
-    if (customJsonData.trim()) {
+    // Validate comment templates JSON array if provided
+    if (commentTemplates.trim()) {
       try {
-        JSON.parse(customJsonData);
+        // Clean trailing commas (common in JS but invalid in JSON)
+        const cleanedTemplates = commentTemplates.replace(/,\s*([\]}])/g, '$1');
+
+        const parsed = JSON.parse(cleanedTemplates);
+        if (!Array.isArray(parsed)) {
+          alert("Comment Templates must be a JSON array (e.g., [\"template1\", \"template2\"])");
+          return;
+        }
+        // Check that all elements are strings
+        if (!parsed.every(item => typeof item === 'string')) {
+          alert("All items in Comment Templates array must be strings");
+          return;
+        }
       } catch (error) {
-        alert("Invalid JSON format in custom data field");
+        console.error('JSON parse error:', error);
+        alert(`Invalid JSON format in Comment Templates field.\n\nError: ${(error as Error).message}\n\nMake sure:\n- Array starts with [ and ends with ]\n- Each string is in double quotes ""`);
         return;
       }
     }
@@ -258,26 +280,42 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
         await onScriptExecute(
           nft,
           selectedProfile,
-          customJsonData,
+          commentTemplates,
           headlessMode
         );
       }
 
       // Execute script via Electron IPC
       if (window.electronAPI?.executeScript) {
+        // Parse comment templates JSON array
+        let commentTemplatesArray: string[] = [];
+        if (commentTemplates.trim()) {
+          try {
+            // Clean trailing commas (same as validation)
+            const cleanedTemplates = commentTemplates.replace(/,\s*([\]}])/g, '$1');
+            const parsed = JSON.parse(cleanedTemplates);
+            if (Array.isArray(parsed)) {
+              commentTemplatesArray = parsed;
+            }
+          } catch (error) {
+            console.error('Failed to parse comment templates JSON:', error);
+            // Already validated above, but just in case
+          }
+        }
+
         const result = await window.electronAPI.executeScript({
           script: currentScript,
           settings: {
             profileId: selectedProfile.id, // Add profileId for tracking
             profile: selectedProfile,
-            customData: customJsonData,
             headless: headlessMode,
+            notOlderThanHours: notOlderThanHours,
             regexPattern: regexTags.join('|'),
             regexTags: regexTags,
             saveImagesFolder: saveImagesFolder,
-            navigationUrl: externalNavigationUrl,
-            commentTemplates: commentTemplates.split('\n').filter(t => t.trim()),
-            delayBetweenActions: delayBetweenActions
+            navigationUrl: navigationUrl || externalNavigationUrl,
+            commentTemplates: commentTemplatesArray,
+            delayBetweenActions: delayBetweenActions * 1000 // Convert seconds to milliseconds
           },
           nftData: nft
         });
@@ -480,6 +518,28 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
                     </label>
                   </div>
 
+                  {/* Content Age Filter */}
+                  <div className="control-section">
+                    <label>⏱️ Content Age (hours):</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="168"
+                      value={notOlderThanHours}
+                      onChange={(e) => setNotOlderThanHours(parseInt(e.target.value) || 24)}
+                      placeholder="24"
+                      title="Interact with content not older than N hours (1-168)"
+                      style={{
+                        width: '80px',
+                        padding: '4px 8px',
+                        marginLeft: '8px'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.9em', marginLeft: '8px', opacity: 0.7 }}>
+                      (1-168 hours)
+                    </span>
+                  </div>
+
                   {/* Regex Tags */}
                   <div className="control-section">
                     <label>🔍 Keywords:</label>
@@ -536,14 +596,17 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
                   {/* Navigation URL */}
                   <div className="control-section">
                     <label>🌐 Navigation URL:</label>
-                    {externalNavigationUrl ? (
+                    {(navigationUrl || externalNavigationUrl) ? (
                       <div className="url-display-container">
                         <div className="url-display">
-                          {externalNavigationUrl}
+                          {navigationUrl || externalNavigationUrl}
                         </div>
                         <button
                           className="clear-url-button"
-                          onClick={() => onNavigationUrlChange?.("")}
+                          onClick={() => {
+                            setNavigationUrl("");
+                            onNavigationUrlChange?.("");
+                          }}
                           type="button"
                         >
                           ✕
@@ -562,15 +625,15 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
 
                   {/* Delay */}
                   <div className="control-section">
-                    <label>⏱️ Delay (ms):</label>
+                    <label>⏱️ Delay (seconds):</label>
                     <input
                       type="number"
-                      min="1000"
-                      max="60000"
-                      step="500"
+                      min="1"
+                      max="60"
+                      step="1"
                       value={delayBetweenActions}
                       onChange={(e) =>
-                        setDelayBetweenActions(parseInt(e.target.value) || 1000)
+                        setDelayBetweenActions(parseInt(e.target.value) || 3)
                       }
                       className="number-input"
                     />
@@ -624,33 +687,21 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
                   <h4>💬 Response Templates (JSON)</h4>
 
                   <div className="control-section">
-                    <label>Comment Templates:</label>
+                    <label>Comment Templates (JSON Array):</label>
                     <textarea
-                      placeholder='Great project!\nLooking forward to this!\nAmazing work!'
+                      placeholder={`[
+  "gmski fren, TGIF - #MORICOIN weekend vibes incoming",
+  "good morning legend, Friday feels and #MORICOIN weekend reels",
+  "mate guMornin, thank god its Friday with #MORICOIN",
+  "broski gm, end of week #MORICOIN grind complete"
+]`}
                       value={commentTemplates}
                       onChange={(e) => setCommentTemplates(e.target.value)}
-                      rows={8}
-                      className="templates-textarea"
-                    />
-                    <small className="input-hint">
-                      One per line. Random selection.
-                    </small>
-                  </div>
-
-                  <div className="control-section">
-                    <label>📝 Custom JSON Data:</label>
-                    <textarea
-                      placeholder='{
-  "customSetting": "value",
-  "anotherSetting": true
-}'
-                      value={customJsonData}
-                      onChange={(e) => setCustomJsonData(e.target.value)}
-                      rows={10}
+                      rows={15}
                       className="json-textarea"
                     />
                     <small className="input-hint">
-                      Optional script configuration
+                      JSON array format: ["template1", "template2", ...]. Random selection.
                     </small>
                   </div>
                 </div>

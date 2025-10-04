@@ -146,6 +146,17 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
       errors.push("Profile name already exists");
     }
 
+    // Check for duplicate proxy address (excluding current profile if editing)
+    const proxyAddress = `${formData.proxy.ip}:${formData.proxy.port}`;
+    const proxyExists = existingProfiles.some(p => {
+      const existingProxyAddress = `${p.proxy.ip}:${p.proxy.port}`;
+      return existingProxyAddress === proxyAddress &&
+        (!editingProfile || p.id !== editingProfile.id);
+    });
+    if (proxyExists) {
+      errors.push("Proxy address (IP:Port) already exists");
+    }
+
     // Validate proxy data
     if (!formData.proxy.login.trim()) {
       errors.push("Proxy login is required");
@@ -164,14 +175,14 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
       errors.push("Valid proxy port (1-65535) is required");
     }
 
-    // Validate cookies
-    if (!formData.cookiesJson.trim()) {
-      errors.push("Cookie data is required");
-    } else if (cookieErrors.length > 0) {
-      errors.push("Fix cookie format errors before saving");
-    } else if (parsedCookies.length === 0) {
-      errors.push("At least one valid cookie is required");
-    }
+    // Validate cookies (temporarily disabled - can start without cookies)
+    // if (!formData.cookiesJson.trim()) {
+    //   errors.push("Cookie data is required");
+    // } else if (cookieErrors.length > 0) {
+    //   errors.push("Fix cookie format errors before saving");
+    // } else if (parsedCookies.length === 0) {
+    //   errors.push("At least one valid cookie is required");
+    // }
 
     setFormErrors(errors);
     return errors.length === 0;

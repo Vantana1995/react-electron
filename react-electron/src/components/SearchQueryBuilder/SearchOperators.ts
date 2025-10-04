@@ -8,6 +8,17 @@ export type OperatorCategory =
   | "account"
   | "content";
 
+export type InputType =
+  | "text"
+  | "tags"
+  | "number"
+  | "date"
+  | "time"
+  | "checkbox"
+  | "select"
+  | "boolean"
+  | "orGroups";
+
 export interface SearchOperator {
   id: string;
   name: string;
@@ -15,7 +26,7 @@ export interface SearchOperator {
   syntax: string;
   description: string;
   example: string;
-  inputType: "text" | "tags" | "number" | "date" | "time" | "checkbox" | "select" | "boolean";
+  inputType: InputType;
   placeholder?: string;
   options?: Array<{ label: string; value: string }>;
   tooltip?: string;
@@ -24,37 +35,26 @@ export interface SearchOperator {
 export const SEARCH_OPERATORS: SearchOperator[] = [
   // ==================== BASIC OPERATORS ====================
   {
-    id: "keywords",
-    name: "Keywords",
+    id: "orGroups",
+    name: "Keywords (OR Groups with AND)",
     category: "basic",
-    syntax: "",
-    description: "Search for keywords in post body",
-    example: "crypto blockchain",
-    inputType: "tags",
-    placeholder: "Enter keywords...",
-    tooltip: "Matches any of these keywords in the post text",
+    syntax: '("word1" OR "word2") ("word3" OR "word4")',
+    description: "Create OR groups that work with AND logic between them",
+    example: '("GM" OR "gm") (web3 OR crypto)',
+    inputType: "orGroups",
+    placeholder: "Create OR groups...",
+    tooltip: "Each group uses OR logic internally, groups are combined with AND",
   },
   {
-    id: "exactPhrase",
-    name: "Exact Phrase",
+    id: "exactPhrases",
+    name: "Exact Phrases",
     category: "basic",
     syntax: '"..."',
-    description: "Match exact phrase",
+    description: "Match exact phrases",
     example: '"crypto wallet"',
     inputType: "tags",
     placeholder: "Enter exact phrases...",
     tooltip: "Wrap phrases in quotes to match them exactly",
-  },
-  {
-    id: "orWords",
-    name: "ANY of these words (OR)",
-    category: "basic",
-    syntax: "(word1 OR word2)",
-    description: "Match any of these words",
-    example: "(bitcoin OR ethereum OR solana)",
-    inputType: "tags",
-    placeholder: "Add words for OR condition...",
-    tooltip: "Posts must contain at least one of these words",
   },
   {
     id: "notWords",
@@ -66,28 +66,6 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     inputType: "tags",
     placeholder: "Words to exclude...",
     tooltip: "Posts will NOT contain any of these words",
-  },
-  {
-    id: "hashtags",
-    name: "Hashtags",
-    category: "basic",
-    syntax: "#hashtag",
-    description: "Search for specific hashtags",
-    example: "#bitcoin #crypto",
-    inputType: "tags",
-    placeholder: "Enter hashtags (with or without #)...",
-    tooltip: "Match posts with these hashtags",
-  },
-  {
-    id: "cashtags",
-    name: "Cashtags",
-    category: "basic",
-    syntax: "$cashtag",
-    description: "Search for stock/crypto ticker symbols",
-    example: "$TSLA $BTC",
-    inputType: "tags",
-    placeholder: "Enter cashtags (with or without $)...",
-    tooltip: "Match posts mentioning these ticker symbols",
   },
 
   // ==================== ACCOUNT OPERATORS ====================
@@ -113,28 +91,17 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     placeholder: "Enter usernames...",
     tooltip: "Match replies directed to these accounts",
   },
-  {
-    id: "conversationId",
-    name: "Conversation ID",
-    category: "account",
-    syntax: "conversation_id:",
-    description: "Posts in same conversation thread",
-    example: "conversation_id:1334987486343299072",
-    inputType: "text",
-    placeholder: "Enter conversation ID...",
-    tooltip: "Match posts in a specific conversation thread",
-  },
 
   // ==================== CONTENT FILTERS ====================
   {
     id: "isVerified",
     name: "Verified Users Only",
     category: "content",
-    syntax: "filter:verified",
-    description: "Posts from verified accounts",
-    example: "filter:verified",
+    syntax: "filter:blue_verified",
+    description: "Posts from blue verified accounts",
+    example: "filter:blue_verified",
     inputType: "checkbox",
-    tooltip: "Only show posts from verified accounts",
+    tooltip: "Only show posts from blue verified accounts",
   },
   {
     id: "isRetweet",
@@ -165,26 +132,6 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     example: "filter:replies",
     inputType: "checkbox",
     tooltip: "Only show replies",
-  },
-  {
-    id: "hasEngagement",
-    name: "Has Engagement",
-    category: "content",
-    syntax: "filter:has_engagement",
-    description: "Posts with any engagement",
-    example: "filter:has_engagement",
-    inputType: "checkbox",
-    tooltip: "Only show posts with likes, retweets, or replies",
-  },
-  {
-    id: "safeSearch",
-    name: "Safe Search",
-    category: "content",
-    syntax: "filter:safe",
-    description: "Filter sensitive content",
-    example: "filter:safe",
-    inputType: "checkbox",
-    tooltip: "Filter out potentially sensitive content",
   },
   {
     id: "excludeRetweets",

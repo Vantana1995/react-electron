@@ -60,7 +60,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   navigateBrowser: (params) => ipcRenderer.invoke("navigate-browser", params),
   getBrowserStatus: (browserId) => ipcRenderer.invoke("get-browser-status", browserId),
   // File system operations
-  selectFolder: () => ipcRenderer.invoke("select-folder")
+  selectFolder: () => ipcRenderer.invoke("select-folder"),
+  // Profile history management
+  clearProfileHistory: (profileId, saveImagesFolder) => ipcRenderer.invoke("clear-profile-history", profileId, saveImagesFolder)
 });
 contextBridge.exposeInMainWorld("ipcRenderer", {
   on(...args) {

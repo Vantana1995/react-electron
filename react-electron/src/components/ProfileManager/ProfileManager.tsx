@@ -16,10 +16,10 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
   onProfileUpdate,
   onProfileDelete,
   onProfileSelect,
-  onProfileToggleActivation,
   selectedProfile,
   maxProfiles,
-  runningScripts = []
+  onBuildQuery,
+  onClearHistory,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<UserProfile | undefined>();
@@ -32,6 +32,16 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
   const handleEditProfile = (profile: UserProfile) => {
     setEditingProfile(profile);
     setShowAddModal(true);
+  };
+
+  const handleBuildQuery = (profile: UserProfile) => {
+    onBuildQuery?.(profile);
+  };
+
+  const handleClearHistory = (profile: UserProfile) => {
+    if (window.confirm(`Clear processed tweets history for profile "${profile.name}"? This will allow the script to process previously seen tweets again.`)) {
+      onClearHistory?.(profile);
+    }
   };
 
   const handleSaveProfile = (profileData: Omit<UserProfile, "id" | "createdAt" | "updatedAt" | "isActive">) => {
@@ -62,22 +72,16 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
     onProfileSelect(profile);
   };
 
-  // Calculate running scripts statistics
-  const runningCount = runningScripts.length;
-
   return (
     <div className="profile-manager">
       <div className="profile-manager-header">
         <h3>🔐 Profile Management</h3>
         <p className="profile-manager-subtitle">
-          Create unlimited profiles, activate up to {maxProfiles} for automation
+          Manage your profiles and configure search queries
         </p>
         <div className="profile-manager-stats">
           <span className="profile-count">
-            {profiles.length} profiles created
-          </span>
-          <span className="active-count">
-            {runningCount}/{maxProfiles} running
+            {profiles.length} profile{profiles.length !== 1 ? 's' : ''} created
           </span>
           {selectedProfile && (
             <span className="selected-profile">
@@ -94,11 +98,6 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
         >
           + Add Profile
         </button>
-        {runningCount >= maxProfiles && (
-          <span className="activation-limit-info">
-            Running limit reached ({runningCount}/{maxProfiles})
-          </span>
-        )}
       </div>
 
       <div className="profiles-grid">
@@ -119,8 +118,8 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               onEdit={handleEditProfile}
               onDelete={handleDeleteProfile}
               onSelect={handleSelectProfile}
-              isSelected={selectedProfile?.id === profile.id}
-              maxActiveProfiles={maxProfiles}
+              onBuildQuery={handleBuildQuery}
+              onClearHistory={handleClearHistory}
             />
           ))
         )}

@@ -5,6 +5,7 @@ import { verifySessionToken } from "@/utils/crypto";
 import { getDBConnection } from "@/config/database";
 import { UserModel } from "@/database/models/User";
 import { blockchainService } from "@/services/blockchain";
+import { NFTCacheManager } from "@/utils/nft-cache";
 
 /**
  * Confirm connection after all verifications are complete
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
 
     const db = getDBConnection();
     const userModel = new UserModel(db);
+    const nftCacheManager = new NFTCacheManager(db);
 
     // Find user by device hash
     const user = await userModel.findByDeviceHash(deviceHash);
@@ -60,22 +62,29 @@ export async function POST(request: NextRequest) {
 
     let subscriptionType = "free";
     let nftVerified = false;
+    let nftCount = 0;
+    let isCachedResult = false;
+    let verifiedAt: Date | null = null;
 
-    // If wallet address provided, check NFT ownership and create subscription
+    // If wallet address provided, check NFT ownership using smart caching
     if (walletAddress) {
-      await db.query(
-        "UPDATE users SET wallet_address = $1 WHERE device_hash = $2",
-        [walletAddress, deviceHash]
-      );
+      // Update user's wallet address
+      await userModel.updateWalletAddress(user.id, walletAddress);
 
       try {
-        // Check NFT ownership using blockchain service
-        const nftResult = await blockchainService.checkLegionNFTOwnership(
-          walletAddress
+        // Use NFT cache manager for smart verification
+        const nftResult = await nftCacheManager.verifyNFTWithCache(
+          user.id,
+          walletAddress,
+          false // Don't force refresh, use cache if valid
         );
 
+        nftVerified = nftResult.hasNFT;
+        nftCount = nftResult.nftCount;
+        isCachedResult = nftResult.isCached;
+        verifiedAt = nftResult.verifiedAt;
+
         if (nftResult.hasNFT) {
-          nftVerified = true;
           subscriptionType = "lifetime_legion";
 
           // Create or update subscription
@@ -87,7 +96,7 @@ export async function POST(request: NextRequest) {
           if (existingSubscription.rows.length > 0) {
             // Update existing subscription
             await db.query(
-              `UPDATE subscriptions SET 
+              `UPDATE subscriptions SET
                wallet_address = $1,
                nft_contract = $2,
                network_name = $3,
@@ -95,26 +104,26 @@ export async function POST(request: NextRequest) {
                WHERE user_id = $4 AND subscription_type = $5`,
               [
                 walletAddress,
-                nftResult.contractAddress,
+                nftResult.nftContract,
                 nftResult.networkName,
                 user.id,
                 "lifetime_legion",
               ]
             );
             console.log(
-              `✅ Updated existing Legion NFT subscription for user ${user.id}`
+              `✅ Updated existing Legion NFT subscription for user ${user.id} (cached: ${isCachedResult})`
             );
           } else {
             // Create new lifetime subscription
             await db.query(
               `INSERT INTO subscriptions (
-                user_id, 
-                subscription_type, 
-                wallet_address, 
-                nft_contract, 
-                network_name, 
-                start_date, 
-                end_date, 
+                user_id,
+                subscription_type,
+                wallet_address,
+                nft_contract,
+                network_name,
+                start_date,
+                end_date,
                 is_active,
                 features_access,
                 last_verified
@@ -123,7 +132,7 @@ export async function POST(request: NextRequest) {
                 user.id,
                 "lifetime_legion",
                 walletAddress,
-                nftResult.contractAddress,
+                nftResult.nftContract,
                 nftResult.networkName,
                 JSON.stringify([
                   "all_features",
@@ -133,7 +142,7 @@ export async function POST(request: NextRequest) {
               ]
             );
             console.log(
-              `🎉 Created new Legion NFT lifetime subscription for user ${user.id}`
+              `🎉 Created new Legion NFT lifetime subscription for user ${user.id} (cached: ${isCachedResult})`
             );
           }
         }
@@ -146,7 +155,7 @@ export async function POST(request: NextRequest) {
     console.log(
       `✅ Connection confirmed for user ${user.id}, wallet: ${
         walletAddress || "none"
-      }, subscription: ${subscriptionType}`
+      }, subscription: ${subscriptionType}, NFT cached: ${isCachedResult}`
     );
 
     return ApiResponseBuilder.success({
@@ -158,6 +167,13 @@ export async function POST(request: NextRequest) {
       walletAddress: walletAddress || null,
       subscriptionType,
       nftVerified,
+      nftDetails: walletAddress
+        ? {
+            count: nftCount,
+            isCached: isCachedResult,
+            verifiedAt: verifiedAt,
+          }
+        : null,
       message: "Connection confirmed successfully",
       // Start monitoring after confirmation
       monitoring: {

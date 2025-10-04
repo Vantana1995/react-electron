@@ -428,7 +428,7 @@
 .stop-text {
   font-size: 2.5rem;
   font-weight: 900;
-  color: #fff;
+  color: var(--text-inverse);
   text-shadow: 0 0 10px rgba(255, 68, 68, 0.8),
                0 0 20px rgba(255, 68, 68, 0.6),
                0 0 30px rgba(255, 68, 68, 0.4);
@@ -438,7 +438,7 @@
 
 .stop-subtitle {
   font-size: 0.9rem;
-  color: #fff;
+  color: var(--text-inverse);
   margin-top: 8px;
   font-weight: 600;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);

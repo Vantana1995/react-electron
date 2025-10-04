@@ -4,17 +4,8 @@
  */
 
 import React, { useState, useRef, KeyboardEvent } from "react";
+import { TagInputProps } from "../../../types";
 import "./TagInput.css";
-
-interface TagInputProps {
-  tags: string[];
-  onChange: (tags: string[]) => void;
-  placeholder?: string;
-  prefix?: string; // e.g., "@" for mentions, "#" for hashtags
-  maxTags?: number;
-  allowDuplicates?: boolean;
-  className?: string;
-}
 
 export const TagInput: React.FC<TagInputProps> = ({
   tags,
@@ -86,7 +77,7 @@ export const TagInput: React.FC<TagInputProps> = ({
               type="button"
               aria-label="Remove tag"
             >
-              ×
+              x
             </button>
           </span>
         ))}

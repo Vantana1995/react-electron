@@ -4,25 +4,18 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ScriptManagerProps} from "../../types";
+import { ScriptManagerProps, ScriptNFTMapping } from "../../types";
 import "./ScriptManager.css";
-
-interface ScriptNFTMapping {
-  scriptId: string;
-  nftAddress: string;
-  associatedAt: number;
-}
 
 export const ScriptManager: React.FC<ScriptManagerProps> = ({
   scriptData,
 }) => {
   const [scriptNFTMappings, setScriptNFTMappings] = useState<ScriptNFTMapping[]>([]);
-  const [currentNFTAddress, setCurrentNFTAddress] = useState<string | null>(null);
 
   // Get current NFT from window object (set by main App component)
   const getCurrentNFT = useCallback(() => {
     if (typeof window !== 'undefined') {
-      return (window as any).currentNFT;
+      return (window as typeof window & { currentNFT?: { image: string; metadata?: unknown; timestamp?: number; subscription?: unknown } }).currentNFT;
     }
     return null;
   }, []);
@@ -30,42 +23,41 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({
   // Auto-associate script with current NFT when scriptData changes
   useEffect(() => {
     const currentNFT = getCurrentNFT();
-    if (scriptData && currentNFT?.address) {
-      const nftAddress = currentNFT.address;
-      setCurrentNFTAddress(nftAddress);
+    if (scriptData && currentNFT?.image) {
+      const nftImage = currentNFT.image;
 
       const mapping: ScriptNFTMapping = {
         scriptId: scriptData.id,
-        nftAddress,
+        image: nftImage,
         associatedAt: Date.now()
       };
 
       setScriptNFTMappings(prev => {
-        // Remove existing mapping for this NFT
-        const filtered = prev.filter(m => m.nftAddress !== nftAddress);
+        // Remove existing mapping for this NFT image
+        const filtered = prev.filter(m => m.image !== nftImage);
         const newMappings = [...filtered, mapping];
-        console.log(`🔗 Auto-associated script "${scriptData.name}" with NFT ${nftAddress}`);
+        console.log(`🔗 Auto-associated script "${scriptData.name}" with NFT image ${nftImage}`);
         console.log('📋 Current mappings:', newMappings);
         return newMappings;
       });
     }
   }, [scriptData, getCurrentNFT]);
 
-  // Associate script with NFT address (manual method)
-  const associateScriptWithNFT = useCallback((nftAddress: string) => {
+  // Associate script with NFT image (manual method)
+  const associateScriptWithNFT = useCallback((nftImage: string) => {
     if (!scriptData) return;
 
     const mapping: ScriptNFTMapping = {
       scriptId: scriptData.id,
-      nftAddress,
+      image: nftImage,
       associatedAt: Date.now()
     };
 
     setScriptNFTMappings(prev => {
-      // Remove existing mapping for this NFT
-      const filtered = prev.filter(m => m.nftAddress !== nftAddress);
+      // Remove existing mapping for this NFT image
+      const filtered = prev.filter(m => m.image !== nftImage);
       const newMappings = [...filtered, mapping];
-      console.log(`🔗 Manual association: Script ${scriptData.name} with NFT ${nftAddress}`);
+      console.log(`🔗 Manual association: Script ${scriptData.name} with NFT image ${nftImage}`);
       return newMappings;
     });
   }, [scriptData]);
@@ -76,36 +68,36 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({
   }, [scriptNFTMappings]);
 
   // Execute script for specific NFT
-  const executeScriptForNFT = useCallback(async (nftAddress: string, profileSettings?: any) => {
+  const executeScriptForNFT = useCallback(async (nftImage: string, profileSettings?: { proxyAddress?: string; [key: string]: unknown }) => {
     if (!scriptData) {
       console.error('❌ No script data available for execution');
       return;
     }
 
     console.log('🔍 Looking for mapping...', {
-      nftAddress,
+      nftImage,
       mappingsCount: scriptNFTMappings.length,
       mappings: scriptNFTMappings
     });
 
-    const mapping = scriptNFTMappings.find(m => m.nftAddress === nftAddress);
+    const mapping = scriptNFTMappings.find(m => m.image === nftImage);
     if (!mapping) {
-      console.error(`❌ No script mapping found for NFT ${nftAddress}`);
+      console.error(`❌ No script mapping found for NFT image ${nftImage}`);
       console.error('Available mappings:', scriptNFTMappings);
 
       // Try to auto-associate if we have the current NFT
       const currentNFT = getCurrentNFT();
-      if (currentNFT?.address === nftAddress) {
+      if (currentNFT?.image === nftImage) {
         console.log('🔄 Attempting auto-association...');
-        associateScriptWithNFT(nftAddress);
+        associateScriptWithNFT(nftImage);
         // Wait for state update and retry
-        setTimeout(() => executeScriptForNFT(nftAddress, profileSettings), 100);
+        setTimeout(() => executeScriptForNFT(nftImage, profileSettings), 100);
         return;
       }
       return;
     }
 
-    console.log(`🚀 Executing script ${scriptData.name} for NFT ${nftAddress}`);
+    console.log(`🚀 Executing script ${scriptData.name} for NFT image ${nftImage}`);
     console.log(`⚙️ Profile settings:`, profileSettings);
     console.log(`📜 Script content length:`, scriptData.content?.length || 0);
 
@@ -122,15 +114,15 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({
         console.log('✅ Script execution result:', result);
 
         // Notify parent about script start via custom event
-        if (result.success && profileSettings?.profileId) {
+        if (result.success && profileSettings?.proxyAddress) {
           window.dispatchEvent(new CustomEvent('script-started', {
-            detail: { profileId: profileSettings.profileId, scriptId: scriptData.id }
+            detail: { proxyAddress: profileSettings.proxyAddress, scriptId: scriptData.id }
           }));
         }
       } else {
         console.log('📝 Script would execute with:', {
           scriptName: scriptData.name,
-          nftAddress,
+          nftImage,
           profileSettings
         });
       }
@@ -142,7 +134,13 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({
   // Expose functions for parent components to use
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).scriptManager = {
+      (window as typeof window & {
+        scriptManager?: {
+          associateScriptWithNFT: (nftImage: string) => void;
+          executeScriptForNFT: (nftImage: string, profileSettings?: { proxyAddress?: string; [key: string]: unknown }) => Promise<void>;
+          getAssociatedNFT: (scriptId: string) => ScriptNFTMapping | undefined;
+        }
+      }).scriptManager = {
         associateScriptWithNFT,
         executeScriptForNFT,
         getAssociatedNFT
@@ -168,11 +166,11 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({
                 <div className="mapping-list">
                   {scriptNFTMappings.map((mapping, index) => (
                     <div key={index} className="mapping-item">
-                      <p><strong>NFT:</strong> {mapping.nftAddress.substring(0, 10)}...</p>
+                      <p><strong>NFT Image:</strong> {mapping.image.substring(0, 30)}...</p>
                       <p><strong>Associated:</strong> {new Date(mapping.associatedAt).toLocaleTimeString()}</p>
                       <button
                         className="execute-script-btn"
-                        onClick={() => executeScriptForNFT(mapping.nftAddress)}
+                        onClick={() => executeScriptForNFT(mapping.image)}
                         style={{
                           marginTop: '8px',
                           padding: '4px 8px',

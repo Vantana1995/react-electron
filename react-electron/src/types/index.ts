@@ -348,6 +348,7 @@ export interface ElectronAPI {
       output: string;
       error: string;
       timestamp: number;
+      proxyAddress?: string;
     }) => void
   ) => void;
   onScriptError: (
@@ -355,10 +356,11 @@ export interface ElectronAPI {
       scriptId: string;
       error: string;
       timestamp: number;
+      proxyAddress?: string;
     }) => void
   ) => void;
   onScriptStopped: (
-    callback: (data: { scriptId: string; timestamp: number; reason?: string }) => void
+    callback: (data: { scriptId: string; timestamp: number; reason?: string; proxyAddress?: string }) => void
   ) => void;
 }
 
@@ -393,6 +395,49 @@ export interface ScriptManagerProps {
   onScriptStart?: (scriptId: string) => void;
   onScriptStop?: (scriptId: string) => void;
   onScriptOutput?: (output: ScriptOutput) => void;
+}
+
+export interface ScriptNFTMapping {
+  scriptId: string;
+  image: string;
+  associatedAt: number;
+}
+
+export interface SearchQueryBuilderProps {
+  onUseInScript?: (url: string) => void;
+  profileContext?: {
+    profileName: string;
+    existingUrl?: string;
+  };
+}
+
+export interface SearchQueryState {
+  // Basic
+  orGroups: string[][]; // Array of OR groups with AND logic between them
+  exactPhrases: string[];
+  notWords: string[];
+
+  // Account
+  from: string[];
+  to: string[];
+
+  // Content Filters
+  isVerified: boolean;
+  isRetweet: boolean;
+  isQuote: boolean;
+  isReply: boolean;
+  excludeRetweets: boolean;
+  excludeReplies: boolean;
+}
+
+export interface TagInputProps {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+  prefix?: string;
+  maxTags?: number;
+  allowDuplicates?: boolean;
+  className?: string;
 }
 
 // ===== API ENDPOINTS =====
@@ -528,6 +573,7 @@ export interface UserProfile {
   name: string;
   proxy: ProfileProxy;
   cookies: ProfileCookie[];
+  navigationUrl?: string; // Search query URL configured for this profile
   createdAt: number;
   updatedAt: number;
   isActive: boolean;
@@ -553,8 +599,8 @@ export interface ProfileCardProps {
   onEdit: (profile: UserProfile) => void;
   onDelete: (profileId: string) => void;
   onSelect: (profile: UserProfile) => void;
-  isSelected: boolean;
-  maxActiveProfiles: number;
+  onBuildQuery?: (profile: UserProfile) => void;
+  onClearHistory?: (profile: UserProfile) => void;
 }
 
 export interface ProfileManagerProps {
@@ -563,10 +609,10 @@ export interface ProfileManagerProps {
   onProfileUpdate: (profile: UserProfile) => void;
   onProfileDelete: (profileId: string) => void;
   onProfileSelect: (profile: UserProfile) => void;
-  onProfileToggleActivation: (profileId: string) => void;
   selectedProfile?: UserProfile;
   maxProfiles: number;
-  runningScripts?: string[]; // Array of profile IDs with running scripts
+  onBuildQuery?: (profile: UserProfile) => void;
+  onClearHistory?: (profile: UserProfile) => void;
 }
 
 export const PROFILE_STORAGE_KEY = "twitter_automation_profiles";
