@@ -1,6 +1,6 @@
 /**
  * GET /api/scripts/[scriptId]
- * Получить информацию о конкретном скрипте
+ * Get information about a specific script
  */
 
 import { NextRequest, NextResponse } from "next/server";

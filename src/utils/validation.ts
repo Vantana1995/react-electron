@@ -147,6 +147,31 @@ export function validatePagination(
   };
 }
 
+// Validate script settings compatibility with notOlderThan
+export function validateScriptSettings(settings: {
+  notOlderThanHours?: number;
+  [key: string]: unknown;
+}): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (settings.notOlderThanHours !== undefined) {
+    const hours = Number(settings.notOlderThanHours);
+
+    if (isNaN(hours)) {
+      errors.push("notOlderThanHours must be a number");
+    } else if (hours < 1 || hours > 168) {
+      errors.push("notOlderThanHours must be between 1 and 168 hours (1 week)");
+    } else if (!Number.isInteger(hours)) {
+      errors.push("notOlderThanHours must be an integer");
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
 const validationUtils = {
   isValidDeviceHash,
   isValidEmail,
@@ -160,6 +185,7 @@ const validationUtils = {
   getClientIP,
   sanitizeInput,
   validatePagination,
+  validateScriptSettings,
 };
 
 export default validationUtils;

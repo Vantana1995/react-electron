@@ -204,3 +204,92 @@ export async function getLegionNFTMetadata(
     return null;
   }
 }
+
+/**
+ * Get wallet balance in ETH
+ * @param walletAddress - Ethereum wallet address
+ * @returns Promise<string> - Balance in ETH
+ */
+export async function getBalance(walletAddress: string): Promise<string> {
+  try {
+    const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
+    const balance = await provider.getBalance(walletAddress);
+    return ethers.formatEther(balance);
+  } catch (error) {
+    console.error("Error getting balance:", error);
+    return "0";
+  }
+}
+
+/**
+ * Get network information
+ * @returns Promise<{chainId: number, name: string}>
+ */
+export async function getNetworkInfo(): Promise<{
+  chainId: number;
+  name: string;
+}> {
+  try {
+    const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
+    const network = await provider.getNetwork();
+    return {
+      chainId: Number(network.chainId),
+      name: network.name,
+    };
+  } catch (error) {
+    console.error("Error getting network info:", error);
+    return { chainId: 0, name: "unknown" };
+  }
+}
+
+/**
+ * Check Legion NFT ownership with full details
+ * @param walletAddress - Ethereum wallet address
+ * @returns Promise with ownership details
+ */
+export async function checkLegionNFTOwnership(walletAddress: string): Promise<{
+  hasNFT: boolean;
+  userAddress: string;
+  contractAddress: string;
+  networkName: string;
+  nftCount: number;
+}> {
+  try {
+    const hasNFT = await hasLegionNFT(walletAddress);
+    const nftCount = hasNFT ? await getLegionNFTBalance(walletAddress) : 0;
+    const networkInfo = await getNetworkInfo();
+
+    return {
+      hasNFT,
+      userAddress: walletAddress,
+      contractAddress: LEGION_NFT_CONTRACT,
+      networkName: networkInfo.name || "Sepolia Testnet",
+      nftCount,
+    };
+  } catch (error) {
+    console.error("Error checking Legion NFT ownership:", error);
+    return {
+      hasNFT: false,
+      userAddress: walletAddress,
+      contractAddress: LEGION_NFT_CONTRACT,
+      networkName: "Sepolia Testnet",
+      nftCount: 0,
+    };
+  }
+}
+
+/**
+ * Blockchain Service - exported singleton
+ */
+export const blockchainService = {
+  hasLegionNFT,
+  getLegionNFTBalance,
+  getLegionNFTBaseURI,
+  getLegionNFTMetadata,
+  getBalance,
+  getNetworkInfo,
+  checkLegionNFTOwnership,
+  // Constants
+  LEGION_NFT_CONTRACT,
+  SEPOLIA_RPC,
+};

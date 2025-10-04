@@ -1,6 +1,6 @@
 /**
  * Script Manager Service
- * Управляет скриптами и их выполнением
+ * Manages scripts and their execution
  */
 
 import fs from "fs";
@@ -51,7 +51,7 @@ export class ScriptManager {
   }
 
   /**
-   * Загрузить все скрипты из папки
+   * Load all scripts from directory
    */
   private loadScripts(): void {
     try {
@@ -100,21 +100,21 @@ export class ScriptManager {
   }
 
   /**
-   * Получить список всех скриптов
+   * Get list of all scripts
    */
   getScripts(): ScriptInstance[] {
     return Array.from(this.scripts.values());
   }
 
   /**
-   * Получить скрипт по ID
+   * Get script by ID
    */
   getScript(scriptId: string): ScriptInstance | null {
     return this.scripts.get(scriptId) || null;
   }
 
   /**
-   * Получить код скрипта по ID
+   * Get script code by ID
    */
   getScriptCode(scriptId: string): string | null {
     const script = this.getScript(scriptId);
@@ -135,7 +135,7 @@ export class ScriptManager {
   }
 
   /**
-   * Получить скрипты по категории
+   * Get scripts by category
    */
   getScriptsByCategory(category: string): ScriptInstance[] {
     return Array.from(this.scripts.values()).filter(
@@ -144,7 +144,7 @@ export class ScriptManager {
   }
 
   /**
-   * Получить скрипты по тегам
+   * Get scripts by tags
    */
   getScriptsByTags(tags: string[]): ScriptInstance[] {
     return Array.from(this.scripts.values()).filter((script) =>
@@ -153,7 +153,7 @@ export class ScriptManager {
   }
 
   /**
-   * Выполнить скрипт
+   * Execute script
    */
   async executeScript(
     scriptId: string,
@@ -170,7 +170,7 @@ export class ScriptManager {
     }
 
     try {
-      // Проверяем безопасность
+      // Check security
       const securityCheck = this.checkSecurity(script, params, deviceData);
       if (!securityCheck.allowed) {
         return {
@@ -179,7 +179,7 @@ export class ScriptManager {
         };
       }
 
-      // Загружаем скрипт
+      // Load script
       const scriptModule = await this.loadScriptModule(script);
       if (!scriptModule) {
         return {
@@ -188,16 +188,16 @@ export class ScriptManager {
         };
       }
 
-      // Выполняем скрипт
+      // Execute script
       console.log(`🚀 Executing script: ${script.config.name}`);
       console.log(`📋 Script parameters:`, params);
       console.log(`📱 Device data keys:`, Object.keys(deviceData));
 
-      // Проверяем, является ли модуль функцией
+      // Check if module is a function
       if (typeof scriptModule === "function") {
         const result = await scriptModule(params, deviceData);
 
-        // Обновляем время последнего использования
+        // Update last used time
         script.lastUsed = new Date();
 
         return {
@@ -205,14 +205,14 @@ export class ScriptManager {
           result,
         };
       } else {
-        // Если модуль экспортирует объект, ищем функцию execute или main
+        // If module exports an object, look for execute or main function
         const executeFunction =
           scriptModule.execute || scriptModule.main || scriptModule.default;
 
         if (typeof executeFunction === "function") {
           const result = await executeFunction(params, deviceData);
 
-          // Обновляем время последнего использования
+          // Update last used time
           script.lastUsed = new Date();
 
           return {
@@ -236,7 +236,7 @@ export class ScriptManager {
   }
 
   /**
-   * Загрузить модуль скрипта
+   * Load script module
    */
   private async loadScriptModule(script: ScriptInstance): Promise<any> {
     try {
@@ -250,7 +250,7 @@ export class ScriptManager {
 
       console.log(`📦 Loading script module from: ${modulePath}`);
 
-      // Используем динамический импорт вместо require
+      // Use dynamic import instead of require
       const scriptModule = await import(modulePath);
 
       console.log(`📦 Script module loaded:`, typeof scriptModule);
@@ -265,7 +265,7 @@ export class ScriptManager {
   }
 
   /**
-   * Проверить безопасность скрипта
+   * Check script security
    */
   private checkSecurity(
     script: ScriptInstance,
@@ -274,7 +274,7 @@ export class ScriptManager {
   ): { allowed: boolean; reason?: string } {
     const { security } = script.config;
 
-    // Проверяем таймаут
+    // Check timeout
     if (security.timeout && security.timeout > 60000) {
       return {
         allowed: false,
@@ -282,7 +282,7 @@ export class ScriptManager {
       };
     }
 
-    // Проверяем разрешенные домены
+    // Check allowed domains
     if (params.url) {
       const url = new URL(params.url);
       const allowedDomains = security.allowed_domains || [];
@@ -295,7 +295,7 @@ export class ScriptManager {
       }
     }
 
-    // Проверяем sandbox
+    // Check sandbox
     if (!security.sandbox) {
       return {
         allowed: false,
@@ -307,7 +307,7 @@ export class ScriptManager {
   }
 
   /**
-   * Получить статистику скриптов
+   * Get script statistics
    */
   getStats(): {
     total: number;
@@ -334,7 +334,7 @@ export class ScriptManager {
   }
 
   /**
-   * Перезагрузить скрипты
+   * Reload scripts
    */
   reloadScripts(): void {
     this.scripts.clear();
@@ -343,5 +343,5 @@ export class ScriptManager {
   }
 }
 
-// Создаем глобальный экземпляр
+// Create global instance
 export const scriptManager = new ScriptManager();
