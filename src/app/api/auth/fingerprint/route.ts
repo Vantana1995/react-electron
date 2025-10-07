@@ -8,9 +8,10 @@ import {
 } from "@/utils/crypto";
 import { validateRequestBody, getClientIP } from "@/utils/validation";
 import { getDBConnection } from "@/config/database";
-import { UserModel } from "@/database/models/User";
 import { clientConnectionManager } from "@/services/client-connection";
-import { hasLegionNFT, getLegionNFTMetadata } from "@/services/blockchain";
+import { ScriptModel } from "@/database/models/Script";
+import { NFTCacheManager } from "@/utils/nft-cache";
+import { SubscriptionManager } from "@/services/subscription-manager";
 
 interface FingerprintData extends Record<string, unknown> {
   // CPU Information
@@ -42,7 +43,7 @@ interface FingerprintData extends Record<string, unknown> {
   // Browser fingerprint (for hash generation)
   webgl?: string;
 
-  // Wallet information (optional)
+  // Wallet information
   walletAddress?: string | null;
 
   // Client real IPv4 address (sent from client)
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // Log basic connection info
     console.log(
-      `📱 Client connected: ${
+      ` Client connected: ${
         fingerprintData.walletAddress ? "with wallet" : "without wallet"
       }`
     );
@@ -77,8 +78,11 @@ export async function POST(request: NextRequest) {
     // Get client IP address - prefer clientIPv4 from request body (real device IP)
     const clientIP = fingerprintData.clientIPv4 || getClientIP(request);
 
-    console.log("🌐 Client IP for fingerprint:", clientIP);
-    console.log("  - From request body (clientIPv4):", fingerprintData.clientIPv4 || "not provided");
+    console.log(" Client IP for fingerprint:", clientIP);
+    console.log(
+      "  - From request body (clientIPv4):",
+      fingerprintData.clientIPv4 || "not provided"
+    );
     console.log("  - From request headers:", getClientIP(request));
 
     // Step 1: Generate hash from primary characteristics (cpu.model + gpu.renderer + os.architecture + webgl)
@@ -103,7 +107,6 @@ export async function POST(request: NextRequest) {
 
     // Check database for existing user
     const db = getDBConnection();
-    const userModel = new UserModel(db);
 
     // First, find user by device fingerprint (step 1 hash)
     const query = `SELECT * FROM users WHERE device_fingerprint = $1`;
@@ -147,11 +150,10 @@ export async function POST(request: NextRequest) {
           ip_address,
           nonce,
           device_info,
-          backup_emails,
           wallet_address,
           created_at,
           last_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         RETURNING *`,
         [
           step1Hash,
@@ -159,14 +161,7 @@ export async function POST(request: NextRequest) {
           clientIP,
           0, // Start nonce at 0
           JSON.stringify(fingerprintData),
-          [
-            "backup1@example.com",
-            "backup2@example.com",
-            "backup3@example.com",
-            "backup4@example.com",
-            "backup5@example.com",
-          ],
-          fingerprintData.walletAddress || null,
+          fingerprintData.walletAddress,
         ]
       );
 
@@ -178,10 +173,9 @@ export async function POST(request: NextRequest) {
       user = result.rows[0];
 
       // Update last active timestamp only
-      await db.query(
-        `UPDATE users SET last_active = NOW() WHERE id = $1`,
-        [user.id]
-      );
+      await db.query(`UPDATE users SET last_active = NOW() WHERE id = $1`, [
+        user.id,
+      ]);
 
       console.log(`✅ Existing user found with ID: ${user.id}`);
 
@@ -192,10 +186,10 @@ export async function POST(request: NextRequest) {
       if (cachedWallet && requestedWallet && cachedWallet !== requestedWallet) {
         // Different wallet - reject connection
         console.log(
-          `❌ Wallet mismatch detected!\n` +
-          `  Cached:    ${cachedWallet}\n` +
-          `  Requested: ${requestedWallet}\n` +
-          `  Connection rejected - wallet addresses do not match`
+          ` Wallet mismatch detected!\n` +
+            `  Cached:    ${cachedWallet}\n` +
+            `  Requested: ${requestedWallet}\n` +
+            `  Connection rejected - wallet addresses do not match`
         );
         return ApiResponseBuilder.error(
           "WALLET_MISMATCH",
@@ -206,45 +200,69 @@ export async function POST(request: NextRequest) {
           },
           403
         );
-      } else if (cachedWallet && requestedWallet && cachedWallet === requestedWallet) {
+      } else if (
+        cachedWallet &&
+        requestedWallet &&
+        cachedWallet === requestedWallet
+      ) {
         console.log(`✅ Wallet verified: ${cachedWallet}`);
-      } else if (cachedWallet && !requestedWallet) {
-        console.log(`💾 Using cached wallet: ${cachedWallet}`);
       } else if (!cachedWallet && requestedWallet) {
         console.log(`🆕 First wallet connection: ${requestedWallet}`);
       }
     }
 
-    // Check Legion NFT ownership and get metadata
-    // Determine which wallet to check based on user state
-    let hasLegionNFTResult = false;
-    let nftImage = "";
-    let nftMetadata = null;
-
-    // For new users: use requested wallet
-    // For existing users: use cached wallet (already verified it matches requested wallet above)
+    // Dynamic NFT verification and subscription calculation
     const walletToCheck = isNewUser
       ? fingerprintData.walletAddress
-      : (user.wallet_address || fingerprintData.walletAddress);
+      : user.wallet_address || fingerprintData.walletAddress;
 
-    if (walletToCheck) {
-      try {
-        hasLegionNFTResult = await hasLegionNFT(walletToCheck);
-        console.log(`💰 Legion NFT check for wallet ${walletToCheck}: ${hasLegionNFTResult}`);
+    let subscriptionLevel = "free";
+    let maxProfiles = 1;
+    let accessibleScripts: any[] = [];
+    let ownedNFTCount = 0;
 
-        if (hasLegionNFTResult) {
-          // Get NFT metadata and image
-          const nftData = await getLegionNFTMetadata(walletToCheck);
-          if (nftData) {
-            nftImage = nftData.image;
-            nftMetadata = nftData.metadata;
-            console.log(`🖼️ NFT Image URL: ${nftImage}`);
-          }
-        }
-      } catch (error) {
-        console.error("❌ Failed to check Legion NFT:", error);
-        // Don't fail the request, just log the error
+    try {
+      // Import dynamic NFT verifier
+      const { createDynamicNFTVerifier } = await import(
+        "@/services/dynamic-nft-verifier"
+      );
+      const dynamicNFTVerifier = await createDynamicNFTVerifier();
+
+      if (walletToCheck) {
+        // Use dynamic NFT verification
+        const verificationResult = await dynamicNFTVerifier.verifyUserNFTs(
+          user.id,
+          walletToCheck,
+          false // Don't force refresh
+        );
+
+        subscriptionLevel = verificationResult.subscriptionLevel;
+        maxProfiles = verificationResult.maxProfiles;
+        ownedNFTCount = verificationResult.ownedNFTs.length;
+        accessibleScripts = verificationResult.accessibleScripts;
+
+        console.log(
+          `✅ Dynamic verification: ${subscriptionLevel} (${maxProfiles} profiles, ${ownedNFTCount} NFTs, ${accessibleScripts.length} scripts)`
+        );
+      } else {
+        // No wallet - initialize free tier
+        console.log("📋 No wallet address, initializing free tier");
+        const { SubscriptionManager } = await import(
+          "@/services/subscription-manager"
+        );
+        const subscriptionManager = new SubscriptionManager(db);
+        await subscriptionManager.initializeFreeTier(user.id);
+
+        subscriptionLevel = "free";
+        maxProfiles = 1;
+        accessibleScripts = [];
       }
+    } catch (error) {
+      console.error("❌ Failed to process NFT subscription:", error);
+      // Don't fail the request, continue with free tier
+      subscriptionLevel = "free";
+      maxProfiles = 1;
+      accessibleScripts = [];
     }
 
     // Generate session token
@@ -263,17 +281,15 @@ export async function POST(request: NextRequest) {
       );
       console.log("✅ Connection registered with client manager");
 
-      // If we have NFT data, send it via ping
-      if (hasLegionNFTResult && nftImage) {
+      // Send accessible scripts to user
+      if (accessibleScripts.length > 0) {
         try {
-          await clientConnectionManager.sendPingWithNFTData(
-            deviceHash,
-            nftImage,
-            nftMetadata
+          await clientConnectionManager.sendUserScripts(deviceHash);
+          console.log(
+            `📡 Sent ${accessibleScripts.length} script(s) to client`
           );
-          console.log("📡 NFT data sent via ping to client");
         } catch (error) {
-          console.error("❌ Failed to send NFT data via ping:", error);
+          console.error("❌ Failed to send scripts:", error);
         }
       }
     } catch (error) {
@@ -291,9 +307,12 @@ export async function POST(request: NextRequest) {
       registeredAt: user.created_at,
       lastActive: user.last_active,
       walletAddress: user.wallet_address, // Return wallet address if available
-      hasLegionNFT: hasLegionNFTResult, // Return NFT ownership status
-      nftImage: nftImage, // Return NFT image URL if available
-      nftMetadata: nftMetadata, // Return NFT metadata if available
+      subscription: {
+        level: subscriptionLevel,
+        maxProfiles: maxProfiles,
+        ownedNFTs: ownedNFTCount,
+        accessibleScripts: accessibleScripts.length,
+      },
       message: isNewUser
         ? "Device registered successfully"
         : "Device verified successfully",
@@ -305,8 +324,7 @@ export async function POST(request: NextRequest) {
         step2Length: step2Hash.length,
         finalHashLength: deviceHash.length,
         walletConnected: !!fingerprintData.walletAddress,
-        nftChecked: !!fingerprintData.walletAddress,
-        nftImageFetched: !!nftImage,
+        nftVerification: walletToCheck ? "completed" : "skipped",
       },
     });
   } catch (error) {

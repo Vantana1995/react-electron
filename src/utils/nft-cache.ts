@@ -36,7 +36,8 @@ export class NFTCacheManager {
   private pool: Pool;
   private cacheExpiryHours: number;
 
-  constructor(pool: Pool, cacheExpiryHours: number = 24) {
+  constructor(pool: Pool, cacheExpiryHours: number = 30 * 24) {
+    // 30 days default (720 hours)
     this.pool = pool;
     this.cacheExpiryHours = cacheExpiryHours;
   }
@@ -47,15 +48,28 @@ export class NFTCacheManager {
    */
   async getCachedVerification(
     userId: number,
-    walletAddress: string
+    walletAddress: string,
+    nftContract?: string
   ): Promise<NFTCacheEntry | null> {
     try {
-      const query = `
-        SELECT * FROM user_nft_cache
-        WHERE user_id = $1 AND wallet_address = $2
-      `;
+      let query: string;
+      let params: (string | number)[];
 
-      const result = await this.pool.query(query, [userId, walletAddress]);
+      if (nftContract) {
+        query = `
+          SELECT * FROM user_nft_cache
+          WHERE user_id = $1 AND wallet_address = $2 AND nft_contract = $3
+        `;
+        params = [userId, walletAddress, nftContract];
+      } else {
+        query = `
+          SELECT * FROM user_nft_cache
+          WHERE user_id = $1 AND wallet_address = $2
+        `;
+        params = [userId, walletAddress];
+      }
+
+      const result = await this.pool.query(query, params);
 
       if (result.rows.length === 0) {
         console.log(`📋 No NFT cache found for user ${userId}`);
@@ -67,13 +81,17 @@ export class NFTCacheManager {
 
       if (isCacheStale) {
         console.log(
-          `⏰ NFT cache stale for user ${userId} (${this.getHoursSinceVerification(cache.verified_at)}h old)`
+          `⏰ NFT cache stale for user ${userId} (${this.getHoursSinceVerification(
+            cache.verified_at
+          )}h old)`
         );
         return null;
       }
 
       console.log(
-        `✅ Valid NFT cache found for user ${userId} (${this.getHoursSinceVerification(cache.verified_at)}h old)`
+        `✅ Valid NFT cache found for user ${userId} (${this.getHoursSinceVerification(
+          cache.verified_at
+        )}h old)`
       );
       return cache;
     } catch (error) {
@@ -90,6 +108,7 @@ export class NFTCacheManager {
   async verifyNFTWithCache(
     userId: number,
     walletAddress: string,
+    nftContract: string,
     forceRefresh: boolean = false
   ): Promise<NFTVerificationResult> {
     try {
@@ -97,7 +116,8 @@ export class NFTCacheManager {
       if (!forceRefresh) {
         const cachedResult = await this.getCachedVerification(
           userId,
-          walletAddress
+          walletAddress,
+          nftContract
         );
 
         // If cache exists and shows ownership, use it
@@ -123,9 +143,15 @@ export class NFTCacheManager {
       }
 
       // Verify on blockchain
-      console.log(`🔗 Verifying NFT ownership on blockchain for ${walletAddress.substring(0, 8)}...`);
-      const blockchainResult = await blockchainService.checkLegionNFTOwnership(
-        walletAddress
+      console.log(
+        `🔗 Verifying NFT ownership on blockchain for ${walletAddress.substring(
+          0,
+          8
+        )}...`
+      );
+      const blockchainResult = await blockchainService.checkNFTOwnership(
+        walletAddress,
+        nftContract
       );
 
       // Update cache
@@ -168,15 +194,16 @@ export class NFTCacheManager {
           nft_contract,
           network_name,
           nft_count,
-          verified_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (user_id, wallet_address)
+          verified_at,
+          expires_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW() + INTERVAL '30 days')
+        ON CONFLICT (user_id, wallet_address, nft_contract)
         DO UPDATE SET
           has_nft = EXCLUDED.has_nft,
-          nft_contract = EXCLUDED.nft_contract,
           network_name = EXCLUDED.network_name,
           nft_count = EXCLUDED.nft_count,
           verified_at = NOW(),
+          expires_at = NOW() + INTERVAL '30 days',
           updated_at = NOW()
       `;
 
@@ -199,6 +226,134 @@ export class NFTCacheManager {
   }
 
   /**
+   * Verify multiple NFT contracts with cache
+   * Checks ownership of multiple NFT contracts efficiently
+   */
+  async verifyMultipleNFTsWithCache(
+    userId: number,
+    walletAddress: string,
+    contractAddresses: string[],
+    forceRefresh: boolean = false
+  ): Promise<NFTVerificationResult[]> {
+    if (contractAddresses.length === 0) {
+      console.log("⚠️ No NFT contracts to verify");
+      return [];
+    }
+
+    console.log(
+      `🔍 Verifying ${contractAddresses.length} NFT contract(s) for user ${userId}`
+    );
+
+    const results: NFTVerificationResult[] = [];
+
+    for (const contractAddress of contractAddresses) {
+      try {
+        // Check cache first (unless force refresh)
+        let cachedResult: NFTCacheEntry | null = null;
+
+        if (!forceRefresh) {
+          const cacheQuery = `
+            SELECT * FROM user_nft_cache
+            WHERE user_id = $1 AND wallet_address = $2 AND nft_contract = $3
+          `;
+
+          const cacheResult = await this.pool.query(cacheQuery, [
+            userId,
+            walletAddress,
+            contractAddress,
+          ]);
+
+          if (cacheResult.rows.length > 0) {
+            const cache = cacheResult.rows[0];
+            const isCacheStale = this.isCacheStale(cache.verified_at);
+
+            if (!isCacheStale) {
+              cachedResult = cache;
+            }
+          }
+        }
+
+        // If cache exists and shows ownership, use it
+        if (cachedResult && cachedResult.has_nft) {
+          results.push({
+            hasNFT: cachedResult.has_nft,
+            walletAddress: cachedResult.wallet_address,
+            nftContract: cachedResult.nft_contract,
+            networkName: cachedResult.network_name,
+            nftCount: cachedResult.nft_count,
+            isCached: true,
+            verifiedAt: cachedResult.verified_at,
+          });
+
+          console.log(
+            `✅ Cache hit for ${contractAddress.substring(0, 8)}... (has NFT)`
+          );
+          continue;
+        }
+
+        // If cache exists but shows no ownership, log it and still verify blockchain
+        if (cachedResult && !cachedResult.has_nft) {
+          console.log(
+            `🔄 Cache shows no NFT for ${contractAddress.substring(
+              0,
+              8
+            )}..., re-verifying blockchain...`
+          );
+        }
+
+        // Verify on blockchain
+        console.log(
+          `🔗 Checking blockchain for ${contractAddress.substring(0, 8)}...`
+        );
+
+        const blockchainResult = await blockchainService.checkNFTOwnership(
+          walletAddress,
+          contractAddress
+        );
+
+        // Update cache
+        await this.updateCache(userId, walletAddress, {
+          hasNFT: blockchainResult.hasNFT,
+          contractAddress: blockchainResult.contractAddress,
+          networkName: blockchainResult.networkName,
+          nftCount: blockchainResult.nftCount,
+        });
+
+        results.push({
+          hasNFT: blockchainResult.hasNFT,
+          walletAddress: blockchainResult.userAddress,
+          nftContract: blockchainResult.contractAddress,
+          networkName: blockchainResult.networkName,
+          nftCount: blockchainResult.nftCount,
+          isCached: false,
+          verifiedAt: new Date(),
+        });
+      } catch (error) {
+        console.error(`❌ Error verifying NFT ${contractAddress}:`, error);
+        // Add failed result
+        results.push({
+          hasNFT: false,
+          walletAddress,
+          nftContract: contractAddress,
+          networkName: "Unknown",
+          nftCount: 0,
+          isCached: false,
+          verifiedAt: new Date(),
+        });
+      }
+    }
+
+    const ownedCount = results.filter((r) => r.hasNFT).length;
+    const cachedCount = results.filter((r) => r.isCached).length;
+
+    console.log(
+      `✅ Multi-NFT verification complete: ${ownedCount}/${contractAddresses.length} owned, ${cachedCount} from cache`
+    );
+
+    return results;
+  }
+
+  /**
    * Invalidate cache for user (force next check to verify blockchain)
    */
   async invalidateCache(userId: number, walletAddress: string): Promise<void> {
@@ -217,10 +372,44 @@ export class NFTCacheManager {
   }
 
   /**
-   * Check if cache is stale (older than expiry hours)
+   * Invalidate cache for specific NFT contract
    */
-  private isCacheStale(verifiedAt: Date): boolean {
+  async invalidateCacheForContract(
+    userId: number,
+    contractAddress: string
+  ): Promise<void> {
+    try {
+      const query = `
+        DELETE FROM user_nft_cache
+        WHERE user_id = $1 AND nft_contract = $2
+      `;
+
+      await this.pool.query(query, [userId, contractAddress]);
+      console.log(
+        `🗑️ Invalidated cache for user ${userId}, contract ${contractAddress.substring(
+          0,
+          8
+        )}...`
+      );
+    } catch (error) {
+      console.error("Error invalidating NFT cache for contract:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if cache is stale (older than expiry hours or past expires_at)
+   */
+  private isCacheStale(verifiedAt: Date, expiresAt?: Date): boolean {
     const now = new Date();
+    
+    // If expires_at is provided, use it for more accurate expiration check
+    if (expiresAt) {
+      const expirationTime = new Date(expiresAt);
+      return now > expirationTime;
+    }
+    
+    // Fallback to time-based calculation
     const verifiedTime = new Date(verifiedAt);
     const hoursSinceVerification =
       (now.getTime() - verifiedTime.getTime()) / (1000 * 60 * 60);

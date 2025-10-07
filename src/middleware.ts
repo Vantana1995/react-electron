@@ -9,19 +9,24 @@ import {
 } from "./utils/cors";
 import { getClientIP } from "./utils/validation";
 
-// Routes that don't require authentication
+/**
+ * Routes that don't require authentication
+ * These endpoints are publicly accessible and don't need device hash or session token
+ */
 const PUBLIC_ROUTES = [
-  "/api/auth/fingerprint",
-  "/api/auth/register",
-  "/api/health",
-  "/api/status",
+  "/api/auth/fingerprint", // Main authentication endpoint (registration + login)
+  "/api/health",           // Health check endpoint
+  "/api/status",           // System status endpoint
+  "/api/admin",            // Admin endpoints (check IP internally, no device_hash needed)
 ];
 
-// Routes that require device hash but not session token
+/**
+ * Routes that require device hash but not session token
+ * Used for server-client callbacks and connection management
+ */
 const DEVICE_HASH_ROUTES = [
-  "/api/auth/verify",
-  "/api/auth/callback",
-  "/api/auth/backup-emails",
+  "/api/auth/callback",         // Server-to-client callback registration
+  "/api/auth/confirm-connection", // Connection confirmation
 ];
 
 // Admin-only routes (require admin IP)

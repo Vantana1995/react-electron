@@ -7,6 +7,7 @@ export interface User {
   ip_address: string;
   nonce: number;
   backup_emails: string[];
+  wallet_address?: string; // Optional wallet address
   created_at: Date;
   last_active: Date | null;
   device_info: Record<string, unknown>;

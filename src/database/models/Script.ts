@@ -6,7 +6,7 @@ export interface Script {
   name: string;
   description: string | null;
   version: string;
-  ipfs_hash: string;
+  script_content: string;
   nft_addresses: string[];
   category: string | null;
   is_active: boolean;
@@ -21,7 +21,7 @@ export interface CreateScriptData {
   name: string;
   description?: string;
   version: string;
-  ipfs_hash: string;
+  script_content: string;
   nft_addresses: string[];
   category?: string;
   config?: Record<string, any>;
@@ -32,7 +32,7 @@ export interface UpdateScriptData {
   name?: string;
   description?: string;
   version?: string;
-  ipfs_hash?: string;
+  script_content?: string;
   nft_addresses?: string[];
   category?: string;
   is_active?: boolean;
@@ -44,7 +44,7 @@ export interface ScriptVersion {
   id: number;
   script_id: number;
   version: string;
-  ipfs_hash: string;
+  script_content: string;
   nft_addresses: string[];
   changelog: string | null;
   is_current: boolean;
@@ -69,7 +69,7 @@ export class ScriptModel {
         name,
         description,
         version,
-        ipfs_hash,
+        script_content,
         nft_addresses,
         category,
         config,
@@ -84,7 +84,7 @@ export class ScriptModel {
       scriptData.name,
       scriptData.description || null,
       scriptData.version,
-      scriptData.ipfs_hash,
+      scriptData.script_content,
       scriptData.nft_addresses,
       scriptData.category || null,
       JSON.stringify(scriptData.config || {}),
@@ -169,6 +169,39 @@ export class ScriptModel {
   }
 
   /**
+   * Get public scripts (available without NFT ownership)
+   * Returns scripts with empty nft_addresses array
+   */
+  async getPublicScripts(): Promise<Script[]> {
+    const query = `
+      SELECT * FROM scripts_library
+      WHERE is_active = true
+      AND cardinality(nft_addresses) = 0
+      ORDER BY name ASC
+    `;
+
+    const result = await this.pool.query(query);
+    return result.rows;
+  }
+
+  /**
+   * Get scripts for user based on NFT ownership
+   * Returns public scripts for non-NFT holders, all accessible scripts for NFT holders
+   */
+  async getScriptsForUser(
+    hasNFT: boolean,
+    nftAddresses: string[] = []
+  ): Promise<Script[]> {
+    if (!hasNFT) {
+      // Non-NFT holders get only public scripts
+      return this.getPublicScripts();
+    }
+
+    // NFT holders get all scripts they have access to
+    return this.getByNFTAddresses(nftAddresses);
+  }
+
+  /**
    * Update script
    */
   async update(
@@ -224,7 +257,7 @@ export class ScriptModel {
     scriptId: number,
     versionData: {
       version: string;
-      ipfs_hash: string;
+      script_content: string;
       nft_addresses: string[];
       changelog?: string;
       created_by?: string;
@@ -235,7 +268,7 @@ export class ScriptModel {
       INSERT INTO script_versions (
         script_id,
         version,
-        ipfs_hash,
+        script_content,
         nft_addresses,
         changelog,
         created_by,
@@ -248,7 +281,7 @@ export class ScriptModel {
     const values = [
       scriptId,
       versionData.version,
-      versionData.ipfs_hash,
+      versionData.script_content,
       versionData.nft_addresses,
       versionData.changelog || null,
       versionData.created_by || null,
@@ -327,12 +360,72 @@ export class ScriptModel {
   }
 
   /**
+   * Get all unique NFT addresses from active scripts
+   * Returns array of unique NFT contract addresses
+   */
+  async getAllNFTAddresses(): Promise<string[]> {
+    const query = `
+      SELECT DISTINCT unnest(nft_addresses) as nft_address
+      FROM scripts_library
+      WHERE is_active = true
+      AND cardinality(nft_addresses) > 0
+    `;
+
+    try {
+      const result = await this.pool.query(query);
+      const addresses = result.rows.map((r) => r.nft_address);
+
+      console.log(
+        `📋 Found ${addresses.length} unique NFT contract(s) in scripts_library`
+      );
+
+      return addresses;
+    } catch (error) {
+      console.error("Error getting all NFT addresses:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Get first public script (for free tier users)
+   * Returns first script without NFT requirements
+   */
+  async getFirstPublicScript(): Promise<Script | null> {
+    const query = `
+      SELECT * FROM scripts_library
+      WHERE is_active = true
+      AND cardinality(nft_addresses) = 0
+      ORDER BY created_at ASC
+      LIMIT 1
+    `;
+
+    try {
+      const result = await this.pool.query(query);
+
+      if (result.rows.length === 0) {
+        console.log("⚠️ No public scripts available");
+        return null;
+      }
+
+      console.log(`✅ Retrieved first public script: "${result.rows[0].name}"`);
+
+      return result.rows[0];
+    } catch (error) {
+      console.error("Error getting first public script:", error);
+      return null;
+    }
+  }
+
+  /**
    * Get script statistics
    */
   async getStats(): Promise<{
     total: number;
     active: number;
     byCategory: Record<string, number>;
+    publicScripts: number;
+    nftGatedScripts: number;
+    uniqueNFTContracts: number;
   }> {
     const totalQuery = `SELECT COUNT(*) as count FROM scripts_library`;
     const activeQuery = `SELECT COUNT(*) as count FROM scripts_library WHERE is_active = true`;
@@ -342,11 +435,21 @@ export class ScriptModel {
       WHERE category IS NOT NULL
       GROUP BY category
     `;
+    const publicQuery = `SELECT COUNT(*) as count FROM scripts_library WHERE cardinality(nft_addresses) = 0`;
+    const nftGatedQuery = `SELECT COUNT(*) as count FROM scripts_library WHERE cardinality(nft_addresses) > 0`;
 
-    const [totalResult, activeResult, categoryResult] = await Promise.all([
+    const [
+      totalResult,
+      activeResult,
+      categoryResult,
+      publicResult,
+      nftGatedResult,
+    ] = await Promise.all([
       this.pool.query(totalQuery),
       this.pool.query(activeQuery),
       this.pool.query(categoryQuery),
+      this.pool.query(publicQuery),
+      this.pool.query(nftGatedQuery),
     ]);
 
     const byCategory: Record<string, number> = {};
@@ -354,10 +457,15 @@ export class ScriptModel {
       byCategory[row.category] = parseInt(row.count);
     });
 
+    const uniqueNFTs = await this.getAllNFTAddresses();
+
     return {
       total: parseInt(totalResult.rows[0].count),
       active: parseInt(activeResult.rows[0].count),
       byCategory,
+      publicScripts: parseInt(publicResult.rows[0].count),
+      nftGatedScripts: parseInt(nftGatedResult.rows[0].count),
+      uniqueNFTContracts: uniqueNFTs.length,
     };
   }
 }

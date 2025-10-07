@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       name,
       description,
       version,
-      ipfs_hash,
+      script_content,
       nft_addresses,
       category,
       config,
@@ -40,10 +40,10 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!script_id || !name || !version || !ipfs_hash) {
+    if (!script_id || !name || !version || !script_content) {
       return ApiResponseBuilder.error(
         "MISSING_FIELDS",
-        "script_id, name, version, and ipfs_hash are required"
+        "script_id, name, version, and script_content are required"
       );
     }
 
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       name,
       description,
       version,
-      ipfs_hash,
+      script_content,
       nft_addresses: nft_addresses || [],
       category,
       config,
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Create initial version
     await scriptModel.createVersion(script.id, {
       version,
-      ipfs_hash,
+      script_content,
       nft_addresses: nft_addresses || [],
       changelog: "Initial version",
       created_by: clientIP,
@@ -107,6 +107,23 @@ export async function POST(request: NextRequest) {
       `✅ Admin added new script: ${script_id} v${version} from IP ${clientIP}`
     );
 
+    // Auto-refresh NFT listeners if script has NFT addresses
+    if (nft_addresses && nft_addresses.length > 0) {
+      try {
+        console.log(
+          `🔄 Auto-refreshing NFT listeners for new script with ${nft_addresses.length} NFT contract(s)`
+        );
+        const { dynamicNFTListenerManager } = await import(
+          "@/services/dynamic-nft-listener-manager"
+        );
+        await dynamicNFTListenerManager.forceRefresh();
+        console.log("✅ NFT listeners refreshed successfully");
+      } catch (error) {
+        console.error("❌ Failed to refresh NFT listeners:", error);
+        // Don't fail the script creation, just log the error
+      }
+    }
+
     return ApiResponseBuilder.success({
       message: "Script added successfully",
       script: {
@@ -114,11 +131,11 @@ export async function POST(request: NextRequest) {
         script_id: script.script_id,
         name: script.name,
         version: script.version,
-        ipfs_hash: script.ipfs_hash,
         nft_addresses: script.nft_addresses,
         category: script.category,
         is_active: script.is_active,
       },
+      nftListenersRefreshed: nft_addresses && nft_addresses.length > 0,
     });
   } catch (error) {
     console.error("❌ Error adding script:", error);
@@ -137,7 +154,9 @@ export async function PUT(request: NextRequest) {
     // Check admin IP
     const clientIP = getClientIP(request);
     if (!ADMIN_IPS.includes(clientIP)) {
-      console.warn(`⚠️ Unauthorized script update attempt from IP: ${clientIP}`);
+      console.warn(
+        `⚠️ Unauthorized script update attempt from IP: ${clientIP}`
+      );
       return ApiResponseBuilder.unauthorized(
         "This endpoint is restricted to admin IPs"
       );
@@ -149,7 +168,7 @@ export async function PUT(request: NextRequest) {
       name,
       description,
       version,
-      ipfs_hash,
+      script_content,
       nft_addresses,
       category,
       is_active,
@@ -181,7 +200,8 @@ export async function PUT(request: NextRequest) {
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (version !== undefined) updateData.version = version;
-    if (ipfs_hash !== undefined) updateData.ipfs_hash = ipfs_hash;
+    if (script_content !== undefined)
+      updateData.script_content = script_content;
     if (nft_addresses !== undefined) updateData.nft_addresses = nft_addresses;
     if (category !== undefined) updateData.category = category;
     if (is_active !== undefined) updateData.is_active = is_active;
@@ -192,10 +212,10 @@ export async function PUT(request: NextRequest) {
     const updatedScript = await scriptModel.update(script_id, updateData);
 
     // Create new version if requested
-    if (create_version && version && ipfs_hash) {
+    if (create_version && version && script_content) {
       await scriptModel.createVersion(existingScript.id, {
         version,
-        ipfs_hash,
+        script_content,
         nft_addresses: nft_addresses || existingScript.nft_addresses,
         changelog: changelog || "Updated version",
         created_by: clientIP,
@@ -203,13 +223,29 @@ export async function PUT(request: NextRequest) {
       });
     }
 
-    console.log(
-      `✅ Admin updated script: ${script_id} from IP ${clientIP}`
-    );
+    console.log(`✅ Admin updated script: ${script_id} from IP ${clientIP}`);
+
+    // Auto-refresh NFT listeners if script has NFT addresses
+    if (nft_addresses && nft_addresses.length > 0) {
+      try {
+        console.log(
+          `🔄 Auto-refreshing NFT listeners for updated script with ${nft_addresses.length} NFT contract(s)`
+        );
+        const { dynamicNFTListenerManager } = await import(
+          "@/services/dynamic-nft-listener-manager"
+        );
+        await dynamicNFTListenerManager.forceRefresh();
+        console.log("✅ NFT listeners refreshed successfully");
+      } catch (error) {
+        console.error("❌ Failed to refresh NFT listeners:", error);
+        // Don't fail the script update, just log the error
+      }
+    }
 
     return ApiResponseBuilder.success({
       message: "Script updated successfully",
       script: updatedScript,
+      nftListenersRefreshed: nft_addresses && nft_addresses.length > 0,
     });
   } catch (error) {
     console.error("❌ Error updating script:", error);
@@ -261,7 +297,9 @@ export async function DELETE(request: NextRequest) {
     // Check admin IP
     const clientIP = getClientIP(request);
     if (!ADMIN_IPS.includes(clientIP)) {
-      console.warn(`⚠️ Unauthorized script delete attempt from IP: ${clientIP}`);
+      console.warn(
+        `⚠️ Unauthorized script delete attempt from IP: ${clientIP}`
+      );
       return ApiResponseBuilder.unauthorized(
         "This endpoint is restricted to admin IPs"
       );
@@ -288,9 +326,7 @@ export async function DELETE(request: NextRequest) {
 
     await scriptModel.delete(script_id);
 
-    console.log(
-      `✅ Admin deleted script: ${script_id} from IP ${clientIP}`
-    );
+    console.log(`✅ Admin deleted script: ${script_id} from IP ${clientIP}`);
 
     return ApiResponseBuilder.success({
       message: "Script deleted successfully",

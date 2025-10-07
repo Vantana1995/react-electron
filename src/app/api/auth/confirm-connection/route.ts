@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { ApiResponseBuilder } from "@/utils/api-response";
-import { validateRequestBody, getClientIP } from "@/utils/validation";
+import { validateRequestBody } from "@/utils/validation";
 import { verifySessionToken } from "@/utils/crypto";
 import { getDBConnection } from "@/config/database";
 import { UserModel } from "@/database/models/User";
-import { blockchainService } from "@/services/blockchain";
+import { ScriptModel } from "@/database/models/Script";
 import { NFTCacheManager } from "@/utils/nft-cache";
+import { SubscriptionManager } from "@/services/subscription-manager";
 
 /**
  * Confirm connection after all verifications are complete
@@ -49,7 +50,9 @@ export async function POST(request: NextRequest) {
 
     const db = getDBConnection();
     const userModel = new UserModel(db);
-    const nftCacheManager = new NFTCacheManager(db);
+    const scriptModel = new ScriptModel(db);
+    const nftCacheManager = new NFTCacheManager(db, 30 * 24); // 30 days cache
+    const subscriptionManager = new SubscriptionManager(db);
 
     // Find user by device hash
     const user = await userModel.findByDeviceHash(deviceHash);
@@ -60,102 +63,64 @@ export async function POST(request: NextRequest) {
     // Update user's last activity
     await userModel.updateLastActive(user.id);
 
-    let subscriptionType = "free";
-    let nftVerified = false;
-    let nftCount = 0;
+    let subscriptionLevel = "free";
+    let maxProfiles = 1;
+    let accessibleScripts: any[] = [];
+    let ownedNFTCount = 0;
     let isCachedResult = false;
-    let verifiedAt: Date | null = null;
 
-    // If wallet address provided, check NFT ownership using smart caching
+    // If wallet address provided, perform dynamic NFT verification
     if (walletAddress) {
       // Update user's wallet address
       await userModel.updateWalletAddress(user.id, walletAddress);
 
       try {
-        // Use NFT cache manager for smart verification
-        const nftResult = await nftCacheManager.verifyNFTWithCache(
+        // Use dynamic NFT verification
+        const { createDynamicNFTVerifier } = await import(
+          "@/services/dynamic-nft-verifier"
+        );
+        const dynamicNFTVerifier = await createDynamicNFTVerifier();
+
+        const verificationResult = await dynamicNFTVerifier.verifyUserNFTs(
           user.id,
           walletAddress,
-          false // Don't force refresh, use cache if valid
+          false // Don't force refresh
         );
 
-        nftVerified = nftResult.hasNFT;
-        nftCount = nftResult.nftCount;
-        isCachedResult = nftResult.isCached;
-        verifiedAt = nftResult.verifiedAt;
+        subscriptionLevel = verificationResult.subscriptionLevel;
+        maxProfiles = verificationResult.maxProfiles;
+        ownedNFTCount = verificationResult.ownedNFTs.length;
+        accessibleScripts = verificationResult.accessibleScripts;
+        isCachedResult = true; // Dynamic verifier handles caching internally
 
-        if (nftResult.hasNFT) {
-          subscriptionType = "lifetime_legion";
-
-          // Create or update subscription
-          const existingSubscription = await db.query(
-            "SELECT * FROM subscriptions WHERE user_id = $1 AND subscription_type = $2 AND is_active = true",
-            [user.id, "lifetime_legion"]
-          );
-
-          if (existingSubscription.rows.length > 0) {
-            // Update existing subscription
-            await db.query(
-              `UPDATE subscriptions SET
-               wallet_address = $1,
-               nft_contract = $2,
-               network_name = $3,
-               last_verified = NOW()
-               WHERE user_id = $4 AND subscription_type = $5`,
-              [
-                walletAddress,
-                nftResult.nftContract,
-                nftResult.networkName,
-                user.id,
-                "lifetime_legion",
-              ]
-            );
-            console.log(
-              `✅ Updated existing Legion NFT subscription for user ${user.id} (cached: ${isCachedResult})`
-            );
-          } else {
-            // Create new lifetime subscription
-            await db.query(
-              `INSERT INTO subscriptions (
-                user_id,
-                subscription_type,
-                wallet_address,
-                nft_contract,
-                network_name,
-                start_date,
-                end_date,
-                is_active,
-                features_access,
-                last_verified
-              ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW() + INTERVAL '100 years', true, $6, NOW())`,
-              [
-                user.id,
-                "lifetime_legion",
-                walletAddress,
-                nftResult.nftContract,
-                nftResult.networkName,
-                JSON.stringify([
-                  "all_features",
-                  "priority_support",
-                  "unlimited_usage",
-                ]),
-              ]
-            );
-            console.log(
-              `🎉 Created new Legion NFT lifetime subscription for user ${user.id} (cached: ${isCachedResult})`
-            );
-          }
-        }
+        console.log(
+          `✅ Dynamic verification: ${subscriptionLevel} (${maxProfiles} profiles, ${ownedNFTCount} NFTs, ${accessibleScripts.length} scripts)`
+        );
       } catch (error) {
-        console.error("❌ NFT verification failed:", error);
-        // Continue without NFT verification
+        console.error("❌ Dynamic NFT verification failed:", error);
+        // Continue with free tier
+        const { SubscriptionManager } = await import(
+          "@/services/subscription-manager"
+        );
+        const subscriptionManager = new SubscriptionManager(db);
+        await subscriptionManager.initializeFreeTier(user.id);
+        accessibleScripts = [];
       }
+    } else {
+      // No wallet - free tier
+      console.log("📋 No wallet address, using free tier");
+      const { SubscriptionManager } = await import(
+        "@/services/subscription-manager"
+      );
+      const subscriptionManager = new SubscriptionManager(db);
+      await subscriptionManager.initializeFreeTier(user.id);
+      accessibleScripts = [];
     }
 
     console.log(
       `✅ Connection confirmed for user ${user.id}, wallet: ${
         walletAddress || "none"
-      }, subscription: ${subscriptionType}, NFT cached: ${isCachedResult}`
+      }, subscription: ${subscriptionLevel}, cached: ${isCachedResult}`
     );
 
     return ApiResponseBuilder.success({
@@ -165,15 +130,13 @@ export async function POST(request: NextRequest) {
       registeredAt: user.created_at,
       lastActive: user.last_active,
       walletAddress: walletAddress || null,
-      subscriptionType,
-      nftVerified,
-      nftDetails: walletAddress
-        ? {
-            count: nftCount,
-            isCached: isCachedResult,
-            verifiedAt: verifiedAt,
-          }
-        : null,
+      subscription: {
+        level: subscriptionLevel,
+        maxProfiles: maxProfiles,
+        ownedNFTs: ownedNFTCount,
+        accessibleScripts: accessibleScripts.length,
+        isCached: isCachedResult,
+      },
       message: "Connection confirmed successfully",
       // Start monitoring after confirmation
       monitoring: {
