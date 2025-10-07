@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { NFTData, UserProfile } from "../../types";
+import { NFTData, UserProfile, ScriptData } from "../../types";
+import { useLanguage } from "../../contexts/LanguageContext";
 import "./NFTDisplay.css";
 
 interface NFTDisplayProps {
@@ -13,6 +14,10 @@ interface NFTDisplayProps {
   onImageClick?: (nftData: NFTData) => void;
   profiles?: UserProfile[];
   maxProfiles?: number;
+  scriptMaxProfiles?: number; // Max profiles for the specific script
+  scriptId?: string; // ID of the current script
+  scriptData?: ScriptData; // Script data for free tier (no NFT)
+  runningScripts?: string[]; // Array of running script proxy addresses
   onScriptExecute?: (
     nftData: NFTData,
     profile: UserProfile,
@@ -31,14 +36,20 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   onImageClick,
   profiles = [],
   maxProfiles,
+  scriptMaxProfiles,
+  scriptId,
+  scriptData,
+  runningScripts: globalRunningScripts = [],
   onScriptExecute,
   onProfileActivate,
   navigationUrl: externalNavigationUrl = "",
   onNavigationUrlChange,
   onOpenSearchBuilder,
 }) => {
+  const { t } = useLanguage();
+
   // Ключ для сохранения состояния в localStorage
-  const STORAGE_KEY = 'nft-display-state';
+  const STORAGE_KEY = "nft-display-state";
 
   // Функция загрузки состояния из localStorage
   const loadState = () => {
@@ -49,7 +60,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
         return state;
       }
     } catch (error) {
-      console.error('Failed to load NFT state:', error);
+      console.error("Failed to load NFT state:", error);
     }
     return null;
   };
@@ -59,7 +70,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
-      console.error('Failed to save NFT state:', error);
+      console.error("Failed to save NFT state:", error);
     }
   };
 
@@ -68,12 +79,21 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [imageError, setImageError] = useState<boolean>(false);
   const [showNFT, setShowNFT] = useState<boolean>(visible);
-  const [isExpanded, setIsExpanded] = useState<boolean>(savedState?.isExpanded ?? false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(
+    savedState?.isExpanded ?? false
+  );
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(
     savedState?.selectedProfile ?? null
   );
-  const [headlessMode, setHeadlessMode] = useState<boolean>(savedState?.headlessMode ?? true);
-  const [notOlderThanHours, setNotOlderThanHours] = useState<number>(savedState?.notOlderThanHours ?? 24);
+  const [headlessMode, setHeadlessMode] = useState<boolean>(
+    savedState?.headlessMode ?? true
+  );
+  const [enableScreenshots, setEnableScreenshots] = useState<boolean>(
+    savedState?.enableScreenshots ?? false
+  );
+  const [notOlderThanHours, setNotOlderThanHours] = useState<number>(
+    savedState?.notOlderThanHours ?? 24
+  );
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [scriptLogs, setScriptLogs] = useState<string[]>([]);
   const [runningScriptId, setRunningScriptId] = useState<string | null>(null);
@@ -84,10 +104,18 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     savedState?.regexTags ?? ["crypto", "web3", "ticker", "memecoin"]
   );
   const [regexInput, setRegexInput] = useState<string>("");
-  const [commentTemplates, setCommentTemplates] = useState<string>(savedState?.commentTemplates ?? "");
-  const [delayBetweenActions, setDelayBetweenActions] = useState<number>(savedState?.delayBetweenActions ?? 3);
-  const [saveImagesFolder, setSaveImagesFolder] = useState<string>(savedState?.saveImagesFolder ?? "");
-  const [navigationUrl, setNavigationUrl] = useState<string>(savedState?.navigationUrl ?? "");
+  const [commentTemplates, setCommentTemplates] = useState<string>(
+    savedState?.commentTemplates ?? ""
+  );
+  const [delayBetweenActions, setDelayBetweenActions] = useState<number>(
+    savedState?.delayBetweenActions ?? 3
+  );
+  const [saveImagesFolder, setSaveImagesFolder] = useState<string>(
+    savedState?.saveImagesFolder ?? ""
+  );
+  const [navigationUrl, setNavigationUrl] = useState<string>(
+    savedState?.navigationUrl ?? ""
+  );
 
   // Множественные запущенные скрипты
   interface RunningScript {
@@ -104,10 +132,14 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       setShowNFT(true);
       setImageError(false);
       console.log("🖼️ NFT data received:", nft.address);
+    } else if (scriptData) {
+      // Показываем компонент даже без NFT, если есть скрипт
+      setShowNFT(true);
+      console.log("📜 Script data received without NFT:", scriptData.name);
     } else {
       setShowNFT(visible);
     }
-  }, [nft, visible]);
+  }, [nft, visible, scriptData]);
 
   // Debug logging for maxProfiles
   useEffect(() => {
@@ -127,19 +159,33 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       isExpanded,
       selectedProfile,
       headlessMode,
+      enableScreenshots,
       notOlderThanHours,
       regexTags,
       commentTemplates,
       delayBetweenActions,
       saveImagesFolder,
-      navigationUrl
+      navigationUrl,
     });
-  }, [isExpanded, selectedProfile, headlessMode, notOlderThanHours, regexTags, commentTemplates, delayBetweenActions, saveImagesFolder, navigationUrl]);
+  }, [
+    isExpanded,
+    selectedProfile,
+    headlessMode,
+    enableScreenshots,
+    notOlderThanHours,
+    regexTags,
+    commentTemplates,
+    delayBetweenActions,
+    saveImagesFolder,
+    navigationUrl,
+  ]);
 
   // Синхронизируем выбранный профиль с актуальным списком
   useEffect(() => {
     if (savedState?.selectedProfile && profiles.length > 0) {
-      const matchingProfile = profiles.find(p => p.id === savedState.selectedProfile.id);
+      const matchingProfile = profiles.find(
+        (p) => p.id === savedState.selectedProfile.id
+      );
       if (matchingProfile) {
         setSelectedProfile(matchingProfile);
       }
@@ -152,33 +198,42 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
 
     const handleScriptOutput = (data: any) => {
       if (data.scriptId === runningScriptId) {
-        setScriptLogs(prev => [...prev, data.output]);
+        setScriptLogs((prev) => [...prev, data.output]);
       }
     };
 
     const handleScriptStopped = (data: any) => {
       // Удаляем из списка запущенных скриптов
-      setRunningScripts(prev => prev.filter(s => s.scriptId !== data.scriptId));
+      setRunningScripts((prev) =>
+        prev.filter((s) => s.scriptId !== data.scriptId)
+      );
 
       // Если это текущий выполняющийся скрипт
       if (data.scriptId === runningScriptId) {
         setIsExecuting(false);
         setRunningScriptId(null);
-        const reason = data.reason === 'browser-closed' ? 'Browser closed by user' : 'Script stopped';
-        setScriptLogs(prev => [...prev, `✅ ${reason}`]);
+        const reason =
+          data.reason === "browser-closed"
+            ? "Browser closed by user"
+            : "Script stopped";
+        setScriptLogs((prev) => [...prev, `✅ ${reason}`]);
       }
     };
 
     const handleScriptFinished = (data: any) => {
       // Удаляем из списка запущенных скриптов
-      setRunningScripts(prev => prev.filter(s => s.scriptId !== data.scriptId));
+      setRunningScripts((prev) =>
+        prev.filter((s) => s.scriptId !== data.scriptId)
+      );
 
       // Если это текущий выполняющийся скрипт
       if (data.scriptId === runningScriptId) {
         setIsExecuting(false);
         setRunningScriptId(null);
-        const message = data.success ? '✅ Script completed' : '❌ Script failed';
-        setScriptLogs(prev => [...prev, message]);
+        const message = data.success
+          ? "✅ Script completed"
+          : "❌ Script failed";
+        setScriptLogs((prev) => [...prev, message]);
       }
     };
 
@@ -212,12 +267,30 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   };
 
   const handleExecuteScript = async () => {
-    if (!nft || !selectedProfile) return;
+    if ((!nft && !scriptData) || !selectedProfile) return;
 
     // Check if script is already running with this profile
-    const profileAlreadyRunning = runningScripts.some(s => s.profileId === selectedProfile.id);
+    const profileAlreadyRunning = runningScripts.some(
+      (s) => s.profileId === selectedProfile.id
+    );
     if (profileAlreadyRunning) {
-      alert(`Script is already running with profile "${selectedProfile.name}". Please stop it first or use a different profile.`);
+      alert(
+        `Script is already running with profile "${selectedProfile.name}". Please stop it first or use a different profile.`
+      );
+      return;
+    }
+
+    // Check profile limit before starting script
+    const effectiveMaxProfiles = scriptMaxProfiles || maxProfiles || 1;
+    const totalRunningProfiles = globalRunningScripts.length;
+
+    if (totalRunningProfiles >= effectiveMaxProfiles) {
+      alert(
+        `Cannot start script: Maximum ${effectiveMaxProfiles} profile(s) limit reached. Please stop a running script first.`
+      );
+      console.warn(
+        `⚠️ Profile limit reached: ${totalRunningProfiles}/${effectiveMaxProfiles} profiles running`
+      );
       return;
     }
 
@@ -225,31 +298,43 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     if (commentTemplates.trim()) {
       try {
         // Clean trailing commas (common in JS but invalid in JSON)
-        const cleanedTemplates = commentTemplates.replace(/,\s*([\]}])/g, '$1');
+        const cleanedTemplates = commentTemplates.replace(/,\s*([\]}])/g, "$1");
 
         const parsed = JSON.parse(cleanedTemplates);
         if (!Array.isArray(parsed)) {
-          alert("Comment Templates must be a JSON array (e.g., [\"template1\", \"template2\"])");
+          alert(
+            'Comment Templates must be a JSON array (e.g., ["template1", "template2"])'
+          );
           return;
         }
         // Check that all elements are strings
-        if (!parsed.every(item => typeof item === 'string')) {
+        if (!parsed.every((item) => typeof item === "string")) {
           alert("All items in Comment Templates array must be strings");
           return;
         }
       } catch (error) {
-        console.error('JSON parse error:', error);
-        alert(`Invalid JSON format in Comment Templates field.\n\nError: ${(error as Error).message}\n\nMake sure:\n- Array starts with [ and ends with ]\n- Each string is in double quotes ""`);
+        console.error("JSON parse error:", error);
+        alert(
+          `Invalid JSON format in Comment Templates field.\n\nError: ${
+            (error as Error).message
+          }\n\nMake sure:\n- Array starts with [ and ends with ]\n- Each string is in double quotes ""`
+        );
         return;
       }
     }
 
-    // Get current script from window object
-    const currentScript = typeof window !== "undefined" ? (window as any).currentScript : null;
+    // Get current script from props or window object
+    const currentScript =
+      scriptData ||
+      (typeof window !== "undefined" ? (window as any).currentScript : null);
 
     if (!currentScript) {
-      console.error("❌ No script available. Please wait for script to be loaded from server.");
-      alert("No script available yet. Please wait for the server to send the script.");
+      console.error(
+        "❌ No script available. Please wait for script to be loaded from server."
+      );
+      alert(
+        "No script available yet. Please wait for the server to send the script."
+      );
       return;
     }
 
@@ -270,13 +355,16 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
           setSelectedProfile({ ...selectedProfile, isActive: true });
         } catch (activationError) {
           console.error("❌ Failed to activate profile:", activationError);
-          const errorMsg = activationError instanceof Error ? activationError.message : "Failed to activate profile";
+          const errorMsg =
+            activationError instanceof Error
+              ? activationError.message
+              : "Failed to activate profile";
           alert(`Cannot execute script: ${errorMsg}`);
           setIsExecuting(false);
           return;
         }
       }
-      if (onScriptExecute) {
+      if (onScriptExecute && nft) {
         await onScriptExecute(
           nft,
           selectedProfile,
@@ -292,13 +380,16 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
         if (commentTemplates.trim()) {
           try {
             // Clean trailing commas (same as validation)
-            const cleanedTemplates = commentTemplates.replace(/,\s*([\]}])/g, '$1');
+            const cleanedTemplates = commentTemplates.replace(
+              /,\s*([\]}])/g,
+              "$1"
+            );
             const parsed = JSON.parse(cleanedTemplates);
             if (Array.isArray(parsed)) {
               commentTemplatesArray = parsed;
             }
           } catch (error) {
-            console.error('Failed to parse comment templates JSON:', error);
+            console.error("Failed to parse comment templates JSON:", error);
             // Already validated above, but just in case
           }
         }
@@ -306,18 +397,17 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
         const result = await window.electronAPI.executeScript({
           script: currentScript,
           settings: {
-            profileId: selectedProfile.id, // Add profileId for tracking
             profile: selectedProfile,
             headless: headlessMode,
-            notOlderThanHours: notOlderThanHours,
-            regexPattern: regexTags.join('|'),
+            enableScreenshots: enableScreenshots,
+            regexPattern: regexTags.join("|"),
             regexTags: regexTags,
-            saveImagesFolder: saveImagesFolder,
+            saveImagesFolder: enableScreenshots ? saveImagesFolder : "",
             navigationUrl: navigationUrl || externalNavigationUrl,
             commentTemplates: commentTemplatesArray,
-            delayBetweenActions: delayBetweenActions * 1000 // Convert seconds to milliseconds
+            delayBetweenActions: delayBetweenActions * 1000, // Convert seconds to milliseconds
           },
-          nftData: nft
+          nftData: nft || undefined,
         });
         console.log("✅ Script execution result:", result);
 
@@ -329,9 +419,9 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
             profileId: selectedProfile.id,
             profileName: selectedProfile.name,
             startTime: Date.now(),
-            headless: headlessMode
+            headless: headlessMode,
           };
-          setRunningScripts(prev => [...prev, newRunningScript]);
+          setRunningScripts((prev) => [...prev, newRunningScript]);
 
           setRunningScriptId(result.scriptId);
           setScriptLogs([`✅ Script started: ${currentScript.name}`]);
@@ -347,7 +437,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
         } else {
           // Script failed to start
           setIsExecuting(false);
-          alert(`Script failed to start: ${result.error || 'Unknown error'}`);
+          alert(`Script failed to start: ${result.error || "Unknown error"}`);
         }
       } else {
         console.log("📝 Script would execute with:", {
@@ -355,13 +445,17 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
           profile: selectedProfile.name,
           headless: headlessMode,
           regexTags: regexTags,
-          saveImagesFolder
+          saveImagesFolder,
         });
         setIsExecuting(false);
       }
     } catch (error) {
       console.error("❌ Script execution failed:", error);
-      alert(`Script execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(
+        `Script execution failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
       setIsExecuting(false);
     }
   };
@@ -402,14 +496,20 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   };
 
   const handleRemoveRegexTag = (tagToRemove: string) => {
-    setRegexTags(regexTags.filter(tag => tag !== tagToRemove));
+    setRegexTags(regexTags.filter((tag) => tag !== tagToRemove));
   };
 
-  const handleRegexInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+  const handleRegexInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       handleAddRegexTag();
-    } else if (e.key === 'Backspace' && regexInput === '' && regexTags.length > 0) {
+    } else if (
+      e.key === "Backspace" &&
+      regexInput === "" &&
+      regexTags.length > 0
+    ) {
       // Remove last tag if input is empty and backspace is pressed
       setRegexTags(regexTags.slice(0, -1));
     }
@@ -433,34 +533,52 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
 
   return (
     <div className="nft-display">
-      {nft ? (
+      {nft || scriptData ? (
         <>
           {/* Main NFT Card */}
-          <div className={`nft-card ${isExpanded ? "expanded" : ""}`} onClick={!isExpanded ? handleContainerClick : undefined}>
+          <div
+            className={`nft-card ${isExpanded ? "expanded" : ""}`}
+            onClick={!isExpanded ? handleContainerClick : undefined}
+          >
             {/* NFT Image Section */}
             {!isExpanded && (
               <div className="nft-card-collapsed">
                 <div className="nft-image-container">
-                  {isLoading && (
-                    <div className="loading-placeholder">Loading...</div>
-                  )}
+                  {nft?.image ? (
+                    <>
+                      {isLoading && (
+                        <div className="loading-placeholder">Loading...</div>
+                      )}
 
-                  {imageError ? (
-                    <div className="error-placeholder">❌ Failed to load image</div>
+                      {imageError ? (
+                        <div className="error-placeholder">
+                          ❌ Failed to load image
+                        </div>
+                      ) : (
+                        <img
+                          src={nft.image}
+                          alt={nft.metadata?.name || "NFT Image"}
+                          className="nft-image"
+                          onLoad={handleImageLoad}
+                          onError={handleImageError}
+                          style={{ display: isLoading ? "none" : "block" }}
+                        />
+                      )}
+                    </>
                   ) : (
-                    <img
-                      src={nft.image}
-                      alt={nft.metadata?.name || "NFT Image"}
-                      className="nft-image"
-                      onLoad={handleImageLoad}
-                      onError={handleImageError}
-                      style={{ display: isLoading ? "none" : "block" }}
-                    />
+                    <div className="script-placeholder">
+                      <div className="script-icon">Script</div>
+                      <div className="script-name">
+                        {scriptData?.name || "Script"}
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {nft.metadata?.name && (
-                  <div className="nft-card-title">{nft.metadata.name}</div>
+                {(nft?.metadata?.name || scriptData?.name) && (
+                  <div className="nft-card-title">
+                    {nft?.metadata?.name || scriptData?.name}
+                  </div>
                 )}
 
                 <div className="click-hint">
@@ -469,245 +587,290 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
               </div>
             )}
 
-          {/* Expanded Settings View */}
-          {isExpanded && (
-            <div className="nft-card-expanded">
-              {/* Left Column - Settings */}
-              <div className="settings-column">
-                <div className="settings-scroll">
-                  <h4>⚙️ Script Configuration</h4>
+            {/* Expanded Settings View */}
+            {isExpanded && (
+              <div className="nft-card-expanded">
+                {/* Left Column - Settings */}
+                <div className="settings-column">
+                  <div className="settings-scroll">
+                    <h4>Script Configuration</h4>
 
-                  {/* Profile Selection */}
-                  <div className="control-section">
-                    <label>👤 Select Profile:</label>
-                    <select
-                      value={selectedProfile?.id || ""}
-                      onChange={(e) => {
-                        const profile = profiles.find(
-                          (p) => p.id === e.target.value
-                        );
-                        if (profile) handleProfileSelect(profile);
-                      }}
-                      disabled={profiles.length === 0}
-                    >
-                      <option value="">Choose a profile...</option>
-                      {profiles.map((profile) => (
-                        <option
-                          key={profile.id}
-                          value={profile.id}
-                        >
-                          {profile.name}{profile.isActive ? " ✓" : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="profile-info">
-                      Active profiles: {getActiveProfilesCount()} /{" "}
-                      {maxProfiles || 0}
-                    </div>
-                  </div>
-
-                  {/* Headless Mode Toggle */}
-                  <div className="control-section">
-                    <label className="toggle-label">
-                      <input
-                        type="checkbox"
-                        checked={headlessMode}
-                        onChange={(e) => setHeadlessMode(e.target.checked)}
-                      />
-                      🔇 Headless Mode
-                    </label>
-                  </div>
-
-                  {/* Content Age Filter */}
-                  <div className="control-section">
-                    <label>⏱️ Content Age (hours):</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="168"
-                      value={notOlderThanHours}
-                      onChange={(e) => setNotOlderThanHours(parseInt(e.target.value) || 24)}
-                      placeholder="24"
-                      title="Interact with content not older than N hours (1-168)"
-                      style={{
-                        width: '80px',
-                        padding: '4px 8px',
-                        marginLeft: '8px'
-                      }}
-                    />
-                    <span style={{ fontSize: '0.9em', marginLeft: '8px', opacity: 0.7 }}>
-                      (1-168 hours)
-                    </span>
-                  </div>
-
-                  {/* Regex Tags */}
-                  <div className="control-section">
-                    <label>🔍 Keywords:</label>
-                    <div className="regex-tags-container">
-                      <div className="regex-tags">
-                        {regexTags.map((tag, index) => (
-                          <span key={index} className="regex-tag">
-                            {tag}
-                            <button
-                              className="regex-tag-remove"
-                              onClick={() => handleRemoveRegexTag(tag)}
-                              type="button"
-                            >
-                              ×
-                            </button>
-                          </span>
+                    {/* Profile Selection */}
+                    <div className="control-section">
+                      <label>Select Profile:</label>
+                      <select
+                        value={selectedProfile?.id || ""}
+                        onChange={(e) => {
+                          const profile = profiles.find(
+                            (p) => p.id === e.target.value
+                          );
+                          if (profile) handleProfileSelect(profile);
+                        }}
+                        disabled={profiles.length === 0}
+                      >
+                        <option value="">{t("nft.chooseProfile")}</option>
+                        {profiles.map((profile) => (
+                          <option key={profile.id} value={profile.id}>
+                            {profile.name}
+                            {profile.isActive ? " ✓" : ""}
+                          </option>
                         ))}
-                        <input
-                          type="text"
-                          placeholder="Add keyword..."
-                          value={regexInput}
-                          onChange={(e) => setRegexInput(e.target.value)}
-                          onKeyDown={handleRegexInputKeyDown}
-                          onBlur={handleAddRegexTag}
-                          className="regex-tag-input"
-                        />
-                      </div>
-                    </div>
-                    <small className="input-hint">
-                      Press Enter or comma to add
-                    </small>
-                  </div>
-
-                  {/* Save Images Folder */}
-                  <div className="control-section">
-                    <label>📁 Save Folder:</label>
-                    <div className="folder-selector">
-                      <input
-                        type="text"
-                        placeholder="No folder"
-                        value={saveImagesFolder}
-                        readOnly
-                        className="folder-input"
-                      />
-                      <button
-                        className="select-folder-button"
-                        onClick={handleSelectFolder}
-                      >
-                        📂
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Navigation URL */}
-                  <div className="control-section">
-                    <label>🌐 Navigation URL:</label>
-                    {(navigationUrl || externalNavigationUrl) ? (
-                      <div className="url-display-container">
-                        <div className="url-display">
-                          {navigationUrl || externalNavigationUrl}
-                        </div>
-                        <button
-                          className="clear-url-button"
-                          onClick={() => {
-                            setNavigationUrl("");
-                            onNavigationUrlChange?.("");
-                          }}
-                          type="button"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        className="open-search-builder-button"
-                        onClick={onOpenSearchBuilder}
-                        type="button"
-                      >
-                        🔍 Open Builder
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Delay */}
-                  <div className="control-section">
-                    <label>⏱️ Delay (seconds):</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      step="1"
-                      value={delayBetweenActions}
-                      onChange={(e) =>
-                        setDelayBetweenActions(parseInt(e.target.value) || 3)
-                      }
-                      className="number-input"
-                    />
-                  </div>
-
-                  {/* Execute/Stop Buttons */}
-                  <div className="control-section">
-                    {!isExecuting ? (
-                      <button
-                        className="execute-button"
-                        onClick={handleExecuteScript}
-                        disabled={!selectedProfile}
-                      >
-                        ▶️ Execute Script
-                      </button>
-                    ) : (
-                      <div className="executing-controls">
-                        <button
-                          className="execute-button executing"
-                          disabled
-                        >
-                          🔄 Running...
-                        </button>
-                        {runningScriptId && (
-                          <button
-                            className="stop-button"
-                            onClick={handleStopScript}
+                      </select>
+                      <div className="profile-info">
+                        Running profiles: {globalRunningScripts.length} /{" "}
+                        {scriptMaxProfiles || maxProfiles || 1}
+                        {scriptMaxProfiles &&
+                          scriptMaxProfiles !== maxProfiles && (
+                            <span className="script-specific-limit">
+                              {" "}
+                              (Script: {scriptMaxProfiles}, Global:{" "}
+                              {maxProfiles || 1})
+                            </span>
+                          )}
+                        {globalRunningScripts.length >=
+                          (scriptMaxProfiles || maxProfiles || 1) && (
+                          <span
+                            className="limit-reached"
+                            style={{
+                              color: "var(--accent-error)",
+                              fontWeight: "bold",
+                            }}
                           >
-                            ⏹️ Stop
-                          </button>
+                            {" "}
+                            ⚠️ Limit reached
+                          </span>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Back Button */}
-                  <div className="control-section">
-                    <button
-                      className="back-button"
-                      onClick={() => setIsExpanded(false)}
-                    >
-                      ← Close Settings
-                    </button>
+                    {/* Headless Mode Toggle */}
+                    <div className="control-section">
+                      <label className="toggle-label">
+                        <input
+                          type="checkbox"
+                          checked={headlessMode}
+                          onChange={(e) => setHeadlessMode(e.target.checked)}
+                        />
+                        {t("nft.headlessMode")}
+                      </label>
+                    </div>
+
+                    {/* Screenshots Toggle */}
+                    <div className="control-section">
+                      <label className="toggle-label">
+                        <input
+                          type="checkbox"
+                          checked={enableScreenshots}
+                          onChange={(e) =>
+                            setEnableScreenshots(e.target.checked)
+                          }
+                        />
+                        {t("nft.enableScreenshots")}
+                      </label>
+                    </div>
+
+                    {/* Content Age Filter */}
+                    <div className="control-section">
+                      <label>Content Age (hours):</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="168"
+                        value={notOlderThanHours}
+                        onChange={(e) =>
+                          setNotOlderThanHours(parseInt(e.target.value) || 24)
+                        }
+                        placeholder="24"
+                        title="Interact with content not older than N hours (1-168)"
+                        style={{
+                          width: "80px",
+                          padding: "4px 8px",
+                          marginLeft: "8px",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "0.9em",
+                          marginLeft: "8px",
+                          opacity: 0.7,
+                        }}
+                      >
+                        (1-168 hours)
+                      </span>
+                    </div>
+
+                    {/* Regex Tags */}
+                    <div className="control-section">
+                      <label>Keywords:</label>
+                      <div className="regex-tags-container">
+                        <div className="regex-tags">
+                          {regexTags.map((tag, index) => (
+                            <span key={index} className="regex-tag">
+                              {tag}
+                              <button
+                                className="regex-tag-remove"
+                                onClick={() => handleRemoveRegexTag(tag)}
+                                type="button"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                          <input
+                            type="text"
+                            placeholder="Add keyword..."
+                            value={regexInput}
+                            onChange={(e) => setRegexInput(e.target.value)}
+                            onKeyDown={handleRegexInputKeyDown}
+                            onBlur={handleAddRegexTag}
+                            className="regex-tag-input"
+                          />
+                        </div>
+                      </div>
+                      <small className="input-hint">
+                        Press Enter or comma to add
+                      </small>
+                    </div>
+
+                    {/* Save Images Folder - only show when screenshots enabled */}
+                    {enableScreenshots && (
+                      <div className="control-section">
+                        <label>Save Folder:</label>
+                        <div className="folder-selector">
+                          <input
+                            type="text"
+                            placeholder="No folder"
+                            value={saveImagesFolder}
+                            readOnly
+                            className="folder-input"
+                          />
+                          <button
+                            className="select-folder-button"
+                            onClick={handleSelectFolder}
+                          >
+                            Select
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Navigation URL */}
+                    <div className="control-section">
+                      <label>Navigation URL:</label>
+                      {navigationUrl || externalNavigationUrl ? (
+                        <div className="url-display-container">
+                          <div className="url-display">
+                            {navigationUrl || externalNavigationUrl}
+                          </div>
+                          <button
+                            className="clear-url-button"
+                            onClick={() => {
+                              setNavigationUrl("");
+                              onNavigationUrlChange?.("");
+                            }}
+                            type="button"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="open-search-builder-button"
+                          onClick={onOpenSearchBuilder}
+                          type="button"
+                        >
+                          Open Builder
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Delay */}
+                    <div className="control-section">
+                      <label>Delay (seconds):</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        step="1"
+                        value={delayBetweenActions}
+                        onChange={(e) =>
+                          setDelayBetweenActions(parseInt(e.target.value) || 3)
+                        }
+                        className="number-input"
+                      />
+                    </div>
+
+                    {/* Execute/Stop Buttons */}
+                    <div className="control-section">
+                      {!isExecuting ? (
+                        <button
+                          className="execute-button"
+                          onClick={handleExecuteScript}
+                          disabled={
+                            !selectedProfile ||
+                            globalRunningScripts.length >=
+                              (scriptMaxProfiles || maxProfiles || 1)
+                          }
+                        >
+                          {t("nft.execute")}
+                        </button>
+                      ) : (
+                        <div className="executing-controls">
+                          <button className="execute-button executing" disabled>
+                            {t("nft.running")}
+                          </button>
+                          {runningScriptId && (
+                            <button
+                              className="stop-button"
+                              onClick={handleStopScript}
+                            >
+                              {t("nft.stop")}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Back Button */}
+                    <div className="control-section">
+                      <button
+                        className="back-button"
+                        onClick={() => setIsExpanded(false)}
+                      >
+                        ← {t("nft.closeSettings")}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Right Column - JSON Templates */}
-              <div className="json-column">
-                <div className="json-scroll">
-                  <h4>💬 Response Templates (JSON)</h4>
+                {/* Right Column - JSON Templates */}
+                <div className="json-column">
+                  <div className="json-scroll">
+                    <h4>Response Templates (JSON)</h4>
 
-                  <div className="control-section">
-                    <label>Comment Templates (JSON Array):</label>
-                    <textarea
-                      placeholder={`[
+                    <div className="control-section">
+                      <label>Comment Templates (JSON Array):</label>
+                      <textarea
+                        placeholder={`[
   "gmski fren, TGIF - #MORICOIN weekend vibes incoming",
   "good morning legend, Friday feels and #MORICOIN weekend reels",
   "mate guMornin, thank god its Friday with #MORICOIN",
   "broski gm, end of week #MORICOIN grind complete"
 ]`}
-                      value={commentTemplates}
-                      onChange={(e) => setCommentTemplates(e.target.value)}
-                      rows={15}
-                      className="json-textarea"
-                    />
-                    <small className="input-hint">
-                      JSON array format: ["template1", "template2", ...]. Random selection.
-                    </small>
+                        value={commentTemplates}
+                        onChange={(e) => setCommentTemplates(e.target.value)}
+                        rows={15}
+                        className="json-textarea"
+                      />
+                      <small className="input-hint">
+                        JSON array format: ["template1", "template2", ...].
+                        Random selection.
+                      </small>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
 
           {/* Running Scripts - Display as NFT Cards */}
@@ -719,20 +882,25 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
             >
               <div className="nft-card-collapsed">
                 <div className="nft-image-container">
-                  {!imageError && nft.image ? (
+                  {!imageError && nft?.image ? (
                     <img
                       src={nft.image}
                       alt={`Running: ${runningScript.profileName}`}
                       className="nft-image"
                     />
                   ) : (
-                    <div className="error-placeholder">❌ No image</div>
+                    <div className="script-placeholder">
+                      <div className="script-icon">Running</div>
+                      <div className="script-name">Running</div>
+                    </div>
                   )}
 
                   {/* STOP Overlay */}
                   <div className="stop-overlay">
                     <div className="stop-text">STOP</div>
-                    <div className="stop-subtitle">{runningScript.profileName}</div>
+                    <div className="stop-subtitle">
+                      {runningScript.profileName}
+                    </div>
                   </div>
                 </div>
 
@@ -750,10 +918,10 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       ) : (
         <div className="nft-placeholder">
           <div className="placeholder-content">
-            <span>🔄 Waiting for NFT data from server...</span>
+            <span>Waiting for script or NFT data from server...</span>
             <p>
-              Connect your wallet and wait for server ping to receive NFT
-              information.
+              Connect your wallet and wait for server ping to receive script or
+              NFT information.
             </p>
           </div>
         </div>

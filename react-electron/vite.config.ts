@@ -51,7 +51,8 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    sourcemap: false,
+    minify: true,
     rollupOptions: {
       // Externalize deps that shouldn't be bundled
       external: [

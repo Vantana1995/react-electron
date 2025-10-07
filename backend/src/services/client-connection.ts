@@ -7,7 +7,6 @@ import {
   encryptData,
   createVerificationHash,
 } from "@/utils/encryption";
-import { scriptManager } from "@/services/script-manager";
 
 interface ActiveConnection {
   userId: number;
@@ -272,30 +271,9 @@ class ClientConnectionManager {
   }
 
   /**
-   * Send instruction to specific client
+   * Send user scripts based on subscription (dynamic NFT-based system)
    */
-  async sendInstructionToClient(
-    deviceHash: string,
-    instruction: ClientInstruction
-  ): Promise<boolean> {
-    const connection = this.activeConnections.get(deviceHash);
-
-    if (!connection) {
-      console.log(`❌ Client not connected: ${deviceHash.substring(0, 8)}...`);
-      return false;
-    }
-
-    return await this.sendDirectCallToClient(connection, instruction);
-  }
-
-  /**
-   * Send ping with NFT data and Puppeteer script to specific client
-   */
-  async sendPingWithNFTData(
-    deviceHash: string,
-    nftImage: string,
-    nftMetadata?: any
-  ): Promise<boolean> {
+  async sendUserScripts(deviceHash: string): Promise<boolean> {
     const connection = this.activeConnections.get(deviceHash);
 
     if (!connection) {
@@ -304,68 +282,179 @@ class ClientConnectionManager {
     }
 
     try {
-      // Get Twitter GM Commenter script info
-      const twitterScript = scriptManager.getScript("twitter-gm-commenter");
+      const db = getDBConnection();
+      const userModel = new UserModel(db);
+      const { SubscriptionManager } = await import(
+        "@/services/subscription-manager"
+      );
+      const subscriptionManager = new SubscriptionManager(db);
 
-      if (!twitterScript) {
-        console.error("❌ Twitter GM Commenter script not found");
+      // Get user
+      const user = await userModel.findByDeviceHash(deviceHash);
+      if (!user) {
+        console.error("❌ User not found");
         return false;
       }
 
-      // Get script code
-      const scriptCode = scriptManager.getScriptCode("twitter-gm-commenter");
+      // Get subscription summary from user_nft_ownership
+      const subscription = await subscriptionManager.getSubscriptionSummary(
+        user.id
+      );
+      console.log(
+        `📊 User subscription: ${subscription.subscriptionLevel} (${subscription.maxProfiles} profiles, ${subscription.accessibleScripts.length} scripts)`
+      );
 
-      if (!scriptCode) {
-        console.error("❌ Failed to read Twitter GM Commenter script code");
+      // Get accessible scripts
+      const { ScriptModel } = await import("@/database/models/Script");
+      const scriptModel = new ScriptModel(db);
+
+      // Get full script objects by IDs
+      const scripts = await Promise.all(
+        subscription.accessibleScripts.map((scriptId) =>
+          scriptModel.findByScriptId(scriptId)
+        )
+      );
+
+      const validScripts = scripts.filter((s) => s !== null);
+
+      if (validScripts.length === 0) {
+        console.error("❌ No scripts available for user");
         return false;
       }
+
+      // Prepare all scripts data
+      const scriptsData = validScripts.map((script) => ({
+        id: script.id,
+        name: script.name,
+        description: script.description,
+        version: script.version,
+        category: script.category,
+        features: script.config?.features || [],
+        usage: script.config?.usage || {},
+        security: script.config?.security || {},
+        entryPoint: script.config?.entry_point || "index.js",
+        path: script.script_id,
+        code: script.script_content,
+        content: script.script_content,
+      }));
+
+      // Get NFT image for the first NFT (all images will be the same)
+      let nftImageUrl =
+        "https://via.placeholder.com/300x300/4CAF50/white?text=NFT"; // Default fallback
+
+      if (subscription.ownedNFTs.length > 0) {
+        try {
+          const { getNFTMetadata } = await import("@/services/blockchain");
+          const firstNFT = subscription.ownedNFTs[0];
+          const nftMetadata = await getNFTMetadata(
+            firstNFT.contractAddress,
+            "1"
+          ); // Use tokenId = 1 for all
+
+          if (nftMetadata && nftMetadata.image) {
+            nftImageUrl = nftMetadata.image;
+            console.log(`🖼️ NFT image loaded: ${nftImageUrl}`);
+          } else {
+            console.log("⚠️ No NFT image found, using fallback");
+          }
+        } catch (error) {
+          console.error("❌ Failed to load NFT image:", error);
+        }
+      }
+
+      // Create NFT+Script pairs for each owned NFT
+      const nftScriptPairs = subscription.ownedNFTs.map((nft, index) => {
+        // Find scripts that require this specific NFT
+        const correspondingScripts = validScripts.filter((script) =>
+          script.nft_addresses.includes(nft.contractAddress)
+        );
+
+        // If no specific script for this NFT, use first available script
+        const correspondingScript =
+          correspondingScripts.length > 0
+            ? correspondingScripts[0]
+            : validScripts[0] || null;
+
+        return {
+          nft: {
+            address: nft.contractAddress,
+            image: nftImageUrl, // Use the same image for all NFTs
+            metadata: {
+              name: `NFT #${nft.count}`,
+              description: `Owned NFT from ${nft.networkName}`,
+              attributes: [
+                {
+                  trait_type: "Network",
+                  value: nft.networkName,
+                },
+                {
+                  trait_type: "Count",
+                  value: nft.count,
+                },
+                {
+                  trait_type: "Contract",
+                  value: nft.contractAddress.substring(0, 8) + "...",
+                },
+              ],
+            },
+            timestamp: Date.now(),
+          },
+          script: correspondingScript
+            ? {
+                id: correspondingScript.id,
+                name: correspondingScript.name,
+                description: correspondingScript.description,
+                version: correspondingScript.version,
+                category: correspondingScript.category,
+                features: correspondingScript.config?.features || [],
+                usage: correspondingScript.config?.usage || {},
+                security: correspondingScript.config?.security || {},
+                entryPoint:
+                  correspondingScript.config?.entry_point || "index.js",
+                path: correspondingScript.script_id,
+                code: correspondingScript.script_content,
+                content: correspondingScript.script_content,
+              }
+            : null,
+          maxProfiles: subscription.maxProfiles, // Each NFT gets the same max profiles for now
+          nftInfo: nft, // Original NFT ownership data
+        };
+      });
 
       // Increment nonce for this ping
       connection.nonce = (connection.nonce || 0) + 1;
 
-      // Prepare data to encrypt (nonce is now sent separately)
+      // Prepare data to encrypt
       const pingData = {
         timestamp: Date.now(),
         serverTime: new Date().toISOString(),
-        // nonce removed - now sent as separate variable
-        nftImage: nftImage,
-        nftMetadata: nftMetadata,
-        script: {
-          id: twitterScript.id,
-          name: twitterScript.config.name,
-          description: twitterScript.config.description,
-          version: twitterScript.config.version,
-          category: twitterScript.config.category,
-          features: twitterScript.config.features,
-          usage: twitterScript.config.usage,
-          security: twitterScript.config.security,
-          entryPoint: twitterScript.config.entry_point,
-          path: twitterScript.path,
-          // Add the actual script code
-          code: scriptCode,
-          content: scriptCode, // Добавляем также как content для совместимости
-        },
-        // Profile management settings - NFT holders get 5 profiles
+        // New structure: array of NFT+Script pairs
+        nftScriptPairs: nftScriptPairs,
+        // Legacy support
+        scripts: scriptsData,
+        script: scriptsData[0], // Keep first script for backward compatibility
+        nft: nftScriptPairs.length > 0 ? nftScriptPairs[0].nft : null, // First NFT for backward compatibility
         subscription: {
-          maxProfiles: 5,
-          subscriptionLevel: "basic",
-          features: ["profile_management", "proxy_support", "automation"]
+          level: subscription.subscriptionLevel,
+          maxProfiles: subscription.maxProfiles,
+          ownedNFTs: subscription.ownedNFTs,
+          accessibleScripts: subscription.accessibleScripts,
+          nftCount: subscription.ownedNFTs.length,
+          scriptCount: subscription.accessibleScripts.length,
         },
-        type: "nft_data_with_script",
+        type: "user_scripts",
       };
 
       // Generate encryption key from device data
       const cpuModelForKey = connection.deviceData?.cpuModel || "unknown";
-      const ipAddressForKey = connection.deviceData?.ipAddress || connection.ipAddress;
+      const ipAddressForKey =
+        connection.deviceData?.ipAddress || connection.ipAddress;
 
       console.log("🔑 BACKEND ENCRYPTION KEY GENERATION:");
       console.log("- CPU Model:", cpuModelForKey);
       console.log("- IP Address:", ipAddressForKey);
-      console.log("- Device Data:", JSON.stringify(connection.deviceData, null, 2));
 
       const deviceKey = generateDeviceKey(cpuModelForKey, ipAddressForKey);
-      console.log("- Generated Device Key (hex):", deviceKey.toString('hex').substring(0, 16) + "...");
-      console.log("- Full Device Key for comparison:", deviceKey.toString('hex'));
 
       // Encrypt the data
       const encryptedData = encryptData(pingData, deviceKey);
@@ -374,8 +463,34 @@ class ClientConnectionManager {
       const verificationHash = createVerificationHash(pingData, deviceKey);
 
       console.log(
-        `🔐 Sending encrypted data to client: ${deviceHash.substring(0, 8)}...`
+        `🔐 Sending ${
+          validScripts.length
+        } script(s) to client: ${deviceHash.substring(0, 8)}...`
       );
+
+      console.log("📊 Subscription data:", {
+        level: subscription.subscriptionLevel,
+        maxProfiles: subscription.maxProfiles,
+        nftCount: subscription.ownedNFTs.length,
+        scriptCount: subscription.accessibleScripts.length,
+        ownedNFTs: subscription.ownedNFTs.map((nft) => ({
+          contract: nft.contractAddress.substring(0, 8) + "...",
+          count: nft.count,
+          network: nft.networkName,
+        })),
+      });
+
+      console.log("🖼️ NFT+Script pairs being sent:", {
+        pairsCount: nftScriptPairs.length,
+        nftImageUrl: nftImageUrl,
+        pairs: nftScriptPairs.map((pair, index) => ({
+          index: index + 1,
+          nftAddress: pair.nft.address.substring(0, 8) + "...",
+          nftName: pair.nft.metadata.name,
+          scriptName: pair.script?.name || "No script",
+          maxProfiles: pair.maxProfiles,
+        })),
+      });
 
       return await this.sendDirectCallToClient(connection, {
         action: "verify_connection",
@@ -384,32 +499,27 @@ class ClientConnectionManager {
           encrypted: encryptedData,
           hash: verificationHash,
           type: "encrypted_ping",
-          nonce: connection.nonce, // Add nonce as separate variable
+          nonce: connection.nonce,
         },
       });
     } catch (error) {
-      console.error("Failed to encrypt ping data:", error);
+      console.error("Failed to send user scripts:", error);
       return false;
     }
   }
 
   /**
-   * Broadcast instruction to all connected clients
+   * @deprecated Use sendUserScripts() instead
+   * Legacy method for backward compatibility
    */
-  async broadcastInstruction(instruction: ClientInstruction): Promise<void> {
-    const results = await Promise.allSettled(
-      Array.from(this.activeConnections.values()).map((connection) =>
-        this.sendDirectCallToClient(connection, instruction)
-      )
+  async sendPingWithNFTData(
+    deviceHash: string,
+    nftContractAddress: string
+  ): Promise<boolean> {
+    console.warn(
+      "⚠️ sendPingWithNFTData is deprecated, use sendUserScripts instead"
     );
-
-    const successful = results.filter(
-      (result) => result.status === "fulfilled" && result.value === true
-    ).length;
-
-    console.log(
-      `📡 Broadcast sent to ${this.activeConnections.size} clients, ${successful} successful`
-    );
+    return this.sendUserScripts(deviceHash);
   }
 
   /**

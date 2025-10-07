@@ -1,8 +1,19 @@
-# Adding telegram support for handling messages for user
+я хочу изменить на фронте отображение, не буду использовать нфт скрипт пара, вот они сейчас приходят двумя обьектами и их так и будем добавлять в массив к примеру в мемори
+Вот как нужно сделать
 
-1. First we need to add button at Profile management section Add Telegram bot
-2. When user click on Add Telegram bot so electron app show user gif with creating bot for telegram and how to get API
-3. When user get HTTP API from "@BotFather"(its must be like a link to telegram bot conversation) paste to placeholder and app store this key for current Profile at its Setting folder.
-4. Lets create a simple folder for each profile with name of this profile as name of folder + move inside of folder cookies, search data saves, images, telegram API data with dialogue id
-5. When User paste HTTP API and process API connections frontend server or electron use https://api.telegram.org/botHTTP API/getUpdates and fetch json with data like this `{"ok":true,"result":[{"update_id":51655371,"message":{"message_id":2,"from":{"id":5114215836,"is_bot":false,"first_name":"Ivan","username":"vantanama","language_code":"ru"},"chat":{"id":5114215836,"first_name":"Ivan","username":"vantanama","type":"private"},"date":1759602476,"text":"\u043f\u0440\u0438\u0432\u0435\u0442"}}]}`, where 5114215836 for me is current id where bot will send info and for check connection it must use https://api.telegram.org/botHTTP API/sendMessage?chat_id=5114215836&text=Hey there from API!,  save this data with Profile setting
-## !!Code must be with english comments in NatSpec style
+// Expose currentNFT and currentScript to window object for component access
+this we need to remove ↓
+// Sync with window.nftScriptPairs from serverApiService
+
+here // Показываем секцию профилей сразу после успешного подключения we need to check for global maxProfiles because it can be setup early
+
+Check how we pack data before sent
+
+`// Modernized NFT+Script handling - check for new nftScriptPairs first` check how we get scripts with nfts from backend part, i think we must get object with nft and scrip inside or with only script or with only maxProfile
+I think we didnt get `data.**nftScriptPairs**`
+
+Я считаю что мы когда получаем скрипт с нфт в одном обьекте должны их так и добавлять в мемори
+
+Возможно так и будем добавлять обьектами и уже обьекты использовать в нфтОтображении в приложении, а при поступлении нового обьекта мы добавляем его в конец списка и проверяем есть ли новые скрипты или новые нфт или максимально количество профилей больше
+
+При получении в вызове макс профилей мы устанавливаем их глобально для приложения на этот раз когда мы открыли ее, если в каком либо из обьектов есть количество пользователей больше оно устанавливается автоматически, у каждого скрипта свой собственный счетчик активных скриптов одновременно

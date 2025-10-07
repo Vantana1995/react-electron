@@ -28,6 +28,7 @@ interface ElectronAPI {
       profile: any;
       customData: string;
       headless: boolean;
+      enableScreenshots?: boolean;
       regexPattern?: string;
       saveImagesFolder?: string;
       navigationUrl?: string;
@@ -42,7 +43,10 @@ interface ElectronAPI {
   stopScript: (scriptId: string) => Promise<any>;
 
   // Profile history management
-  clearProfileHistory: (profileId: string, saveImagesFolder: string) => Promise<{ success: boolean; message: string }>;
+  clearProfileHistory: (
+    profileId: string,
+    saveImagesFolder: string
+  ) => Promise<{ success: boolean; message: string }>;
 
   // Event listeners
   onWalletConnected?: (
@@ -130,7 +134,11 @@ interface ElectronAPI {
   ) => void;
 
   onScriptStopped?: (
-    callback: (data: { scriptId: string; timestamp: number; reason?: string }) => void
+    callback: (data: {
+      scriptId: string;
+      timestamp: number;
+      reason?: string;
+    }) => void
   ) => void;
 
   removeAllListeners?: (channel: string) => void;
@@ -159,6 +167,29 @@ interface ElectronAPI {
 
   // File system operations
   selectFolder: () => Promise<string | null>;
+
+  // Telegram bot operations
+  testTelegramConnection: (httpApi: string) => Promise<{
+    success: boolean;
+    chatId?: string;
+    botName?: string;
+    error?: string;
+  }>;
+
+  sendTelegramMessage: (
+    httpApi: string,
+    chatId: string,
+    text: string
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+
+  getTelegramChatId: (httpApi: string) => Promise<{
+    success: boolean;
+    chatId?: string;
+    error?: string;
+  }>;
 }
 
 interface Window {

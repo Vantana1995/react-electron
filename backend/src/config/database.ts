@@ -8,10 +8,25 @@ const dbConfig: PoolConfig = {
   user: process.env.DB_USER || "postgres",
   password: process.env.DB_PASSWORD || "password",
 
-  // Connection pool settings
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // How long a client can be idle before being closed
-  connectionTimeoutMillis: 2000, // How long to wait when connecting a new client
+  /**
+   * Connection Pool Settings
+   *
+   * PostgreSQL connection pooling allows efficient reuse of database connections.
+   * Instead of creating a new connection for each query, the pool maintains a set
+   * of active connections that can be reused by multiple requests.
+   *
+   * This is for the BACKEND SERVER itself - not for tracking user connections.
+   * The pool manages how the Next.js backend connects to PostgreSQL.
+   *
+   * Benefits:
+   * - Reduces overhead of creating/destroying connections
+   * - Handles concurrent database requests efficiently
+   * - Prevents database connection exhaustion
+   * - Automatically manages connection lifecycle
+   */
+  max: 20, // Maximum number of database connections in the pool (20 concurrent queries max)
+  idleTimeoutMillis: 30000, // Close idle connections after 30 seconds to free resources
+  connectionTimeoutMillis: 2000, // Fail fast if can't get a connection within 2 seconds
 
   // No SSL for local database
   ssl: false,

@@ -5,8 +5,18 @@
 
 import React, { useState } from "react";
 import { SearchQueryBuilderProps } from "../../types";
-import { SearchOperator, SEARCH_OPERATORS, OPERATOR_CATEGORIES } from "./SearchOperators";
-import { SearchQueryState, createEmptyQuery, buildSearchQuery, generateSearchURL, validateQuery } from "./utils/queryBuilder";
+import {
+  SearchOperator,
+  SEARCH_OPERATORS,
+  OPERATOR_CATEGORIES,
+} from "./SearchOperators";
+import {
+  SearchQueryState,
+  createEmptyQuery,
+  buildSearchQuery,
+  generateSearchURL,
+  validateQuery,
+} from "./utils/queryBuilder";
 import { TagInput } from "./components/TagInput";
 import { OrGroupsInput } from "./components/OrGroupsInput";
 import { QueryPreview } from "./QueryPreview";
@@ -18,7 +28,9 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
   profileContext,
 }) => {
   const [query, setQuery] = useState<SearchQueryState>(createEmptyQuery());
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["basic"]));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(["basic"])
+  );
   const [sortBy, setSortBy] = useState<"live" | "top" | "latest">("live");
 
   // Build query string and URL
@@ -43,16 +55,16 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
       const newQuery = { ...prev, [field]: value };
 
       // Mutual exclusion logic for retweets
-      if (field === 'isRetweet' && value === true) {
+      if (field === "isRetweet" && value === true) {
         newQuery.excludeRetweets = false;
-      } else if (field === 'excludeRetweets' && value === true) {
+      } else if (field === "excludeRetweets" && value === true) {
         newQuery.isRetweet = false;
       }
 
       // Mutual exclusion logic for replies
-      if (field === 'isReply' && value === true) {
+      if (field === "isReply" && value === true) {
         newQuery.excludeReplies = false;
-      } else if (field === 'excludeReplies' && value === true) {
+      } else if (field === "excludeReplies" && value === true) {
         newQuery.isReply = false;
       }
 
@@ -117,10 +129,16 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
       case "tags":
         return (
           <TagInput
-            tags={query[fieldName] as string[] || []}
+            tags={(query[fieldName] as string[]) || []}
             onChange={(tags) => updateQuery(fieldName, tags)}
             placeholder={operator.placeholder}
-            prefix={operator.syntax?.startsWith("#") ? "#" : operator.syntax?.startsWith("@") ? "@" : ""}
+            prefix={
+              operator.syntax?.startsWith("#")
+                ? "#"
+                : operator.syntax?.startsWith("@")
+                ? "@"
+                : ""
+            }
           />
         );
 
@@ -130,7 +148,7 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
             type="text"
             className="sqb-input"
             placeholder={operator.placeholder}
-            value={query[fieldName] as string || ""}
+            value={(query[fieldName] as string) || ""}
             onChange={(e) => updateQuery(fieldName, e.target.value)}
           />
         );
@@ -142,7 +160,12 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
             className="sqb-input"
             placeholder={operator.placeholder}
             value={(query[fieldName] as number | null) ?? ""}
-            onChange={(e) => updateQuery(fieldName, e.target.value ? parseInt(e.target.value) : null)}
+            onChange={(e) =>
+              updateQuery(
+                fieldName,
+                e.target.value ? parseInt(e.target.value) : null
+              )
+            }
             min={0}
           />
         );
@@ -152,7 +175,7 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
           <input
             type="date"
             className="sqb-input"
-            value={query[fieldName] as string || ""}
+            value={(query[fieldName] as string) || ""}
             onChange={(e) => updateQuery(fieldName, e.target.value)}
           />
         );
@@ -162,7 +185,7 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
           <label className="sqb-checkbox-label">
             <input
               type="checkbox"
-              checked={query[fieldName] as boolean || false}
+              checked={(query[fieldName] as boolean) || false}
               onChange={(e) => updateQuery(fieldName, e.target.checked)}
             />
             <span>Include in search</span>
@@ -173,7 +196,7 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
         return (
           <select
             className="sqb-select"
-            value={query[fieldName] as string || ""}
+            value={(query[fieldName] as string) || ""}
             onChange={(e) => updateQuery(fieldName, e.target.value)}
           >
             <option value="">Any</option>
@@ -216,13 +239,18 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
                   <label className="sqb-operator-label">
                     <span className="sqb-operator-name">{operator.name}</span>
                     {operator.tooltip && (
-                      <span className="sqb-operator-tooltip" title={operator.tooltip}>
-                        ℹ️
+                      <span
+                        className="sqb-operator-tooltip"
+                        title={operator.tooltip}
+                      >
+                        Info
                       </span>
                     )}
                   </label>
                   {operator.description && (
-                    <p className="sqb-operator-description">{operator.description}</p>
+                    <p className="sqb-operator-description">
+                      {operator.description}
+                    </p>
                   )}
                   {renderOperatorInput(operator)}
                   {operator.example && (
@@ -242,15 +270,21 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
   return (
     <div className="search-query-builder">
       <div className="sqb-header">
-        <h2>🔍 {profileContext ? `Build Query for Profile: ${profileContext.profileName}` : 'Twitter/X Advanced Search Builder'}</h2>
+        <h2>
+          {profileContext
+            ? `Build Query for Profile: ${profileContext.profileName}`
+            : "Twitter/X Advanced Search Builder"}
+        </h2>
         <p className="sqb-subtitle">
           {profileContext
             ? `Configure search query for profile "${profileContext.profileName}"`
-            : 'Build complex search queries visually - no syntax knowledge required'}
+            : "Build complex search queries visually - no syntax knowledge required"}
         </p>
         {queryString.trim().length === 0 && (
           <div className="sqb-empty-hint">
-            💡 <strong>Get started:</strong> Fill in search criteria below (keywords, accounts, dates, etc.), then click "Use in Script" to apply the search URL.
+            <strong>Get started:</strong> Fill in search criteria below
+            (keywords, accounts, dates, etc.), then click "Use in Script" to
+            apply the search URL.
           </div>
         )}
       </div>
@@ -267,7 +301,9 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
               <select
                 className="sqb-select"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "live" | "top" | "latest")}
+                onChange={(e) =>
+                  setSortBy(e.target.value as "live" | "top" | "latest")
+                }
               >
                 <option value="live">Live (Real-time)</option>
                 <option value="top">Top (Most popular)</option>
@@ -285,26 +321,30 @@ export const SearchQueryBuilder: React.FC<SearchQueryBuilderProps> = ({
               className="sqb-btn sqb-btn-primary"
               onClick={handleUseInScript}
               disabled={!validation.isValid || queryString.trim().length === 0}
-              title={!validation.isValid ? "Fix errors before using" : "Use this URL in script"}
+              title={
+                !validation.isValid
+                  ? "Fix errors before using"
+                  : "Use this URL in script"
+              }
             >
-              ✅ Use in Script
+              Use in Script
             </button>
             <button
               className="sqb-btn sqb-btn-secondary"
               onClick={handleCopyURL}
               disabled={queryString.trim().length === 0}
             >
-              📋 Copy URL
+              Copy URL
             </button>
             <button
               className="sqb-btn sqb-btn-secondary"
               onClick={handleOpenSearch}
               disabled={queryString.trim().length === 0}
             >
-              🔗 Open in Twitter
+              Open in Twitter
             </button>
             <button className="sqb-btn sqb-btn-danger" onClick={handleReset}>
-              🗑️ Reset All
+              Reset All
             </button>
           </div>
         </div>

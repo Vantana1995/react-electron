@@ -26,39 +26,22 @@ export const ERROR_CODES = {
   DATABASE_ERROR: "DATABASE_ERROR",
 } as const;
 
-// Subscription Types
-export const SUBSCRIPTION_TYPES = {
-  BASIC: "basic",
-  PRO: "pro",
-  PREMIUM: "premium",
-  ENTERPRISE: "enterprise",
-} as const;
+// Dynamic NFT-Based Subscription Configuration
+export const SUBSCRIPTION_CONFIG = {
+  // Free tier (no NFT ownership)
+  FREE_MAX_PROFILES: 1,
 
-// Feature Access Levels
-export const FEATURES = {
-  BASIC: ["twitter_basic_automation", "profile_scraping"],
-  PRO: [
-    "twitter_basic_automation",
-    "profile_scraping",
-    "advanced_automation",
-    "bulk_operations",
-    "multiple_accounts_+10",
-  ],
-  PREMIUM: [
-    "twitter_basic_automation",
-    "profile_scraping",
-    "advanced_automation",
-    "bulk_operations",
-    "analytics_export",
-    "custom_scripts",
-    "multiple_accounts_+20",
-  ],
-  ENTERPRISE: [
-    "all_features",
-    "priority_support",
-    "custom_development",
-    "multiple_accounts_+50",
-  ],
+  // NFT holder tier (owns at least one NFT from scripts_library)
+  NFT_HOLDER_MAX_PROFILES: 5,
+
+  // NFT cache duration (30 days in hours)
+  NFT_CACHE_DURATION_HOURS: 30 * 24,
+
+  // Subscription levels
+  LEVELS: {
+    FREE: "free",
+    NFT_HOLDER: "nft_holder",
+  },
 } as const;
 
 // Rate Limiting
@@ -103,12 +86,12 @@ export const IPFS = {
 
 // CORS Configuration
 export const CORS_CONFIG = {
-  // Admin IP addresses with full access
+  // Admin IP addresses with full access (IPv4 only)
   ADMIN_IPS: process.env.ADMIN_IPS
     ? process.env.ADMIN_IPS.split(",").map((ip) => ip.trim())
     : [
-        process.env.ADMIN_IP_ADDRESS || "127.0.0.1", // Fallback to single admin IP
-        "::1", // IPv6 localhost
+        process.env.ADMIN_IP_ADDRESS, // Fallback to single admin IP
+        "127.0.0.1", // IPv4 localhost
         "localhost",
       ],
 

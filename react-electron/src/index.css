@@ -1,5 +1,5 @@
 /* Import theme variables */
-@import './styles/themes.css';
+@import "./styles/themes.css";
 
 :root {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -23,10 +23,9 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  width: 100%;
 }
 
 h1 {

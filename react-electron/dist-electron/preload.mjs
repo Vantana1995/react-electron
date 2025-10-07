@@ -62,7 +62,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // File system operations
   selectFolder: () => ipcRenderer.invoke("select-folder"),
   // Profile history management
-  clearProfileHistory: (profileId, saveImagesFolder) => ipcRenderer.invoke("clear-profile-history", profileId, saveImagesFolder)
+  clearProfileHistory: (profileId, saveImagesFolder) => ipcRenderer.invoke("clear-profile-history", profileId, saveImagesFolder),
+  // Telegram bot operations
+  testTelegramConnection: (httpApi) => ipcRenderer.invoke("telegram-test-connection", httpApi),
+  sendTelegramMessage: (httpApi, chatId, text) => ipcRenderer.invoke("telegram-send-message", httpApi, chatId, text),
+  getTelegramChatId: (httpApi) => ipcRenderer.invoke("telegram-get-chat-id", httpApi)
 });
 contextBridge.exposeInMainWorld("ipcRenderer", {
   on(...args) {

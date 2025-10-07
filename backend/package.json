@@ -24,26 +24,16 @@
     "next": "15.5.4",
     "node-cron": "^4.2.1",
     "pg": "^8.16.3",
-    "puppeteer": "^24.22.2",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "web3": "^4.16.0",
     "winston": "^3.17.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "nodemon": "^3.1.10",
-    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }

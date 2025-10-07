@@ -119,11 +119,14 @@ export interface ScriptData {
   version: string;
   ipfsHash?: string;
   features: string[];
+  maxProfiles?: number; // Maximum profiles allowed for this specific script
   metadata?: {
     description?: string;
     author?: string;
     created?: string;
     updated?: string;
+    entryPoint?: string;
+    category?: string;
   };
 }
 
@@ -178,6 +181,7 @@ export interface ScriptEvent {
 // ===== NFT & SUBSCRIPTION =====
 
 export interface NFTData {
+  address?: string;
   image: string;
   metadata?: {
     name?: string;
@@ -320,13 +324,11 @@ export interface ElectronAPI {
   closeApp: () => Promise<{ success: boolean; message: string }>;
 
   // Script execution and management
-  executeScript: (
-    params: {
-      script: ScriptData;
-      settings?: any;
-      nftAddress?: string;
-    }
-  ) => Promise<ScriptExecutionResult>;
+  executeScript: (params: {
+    script: ScriptData;
+    settings?: any;
+    nftAddress?: string;
+  }) => Promise<ScriptExecutionResult>;
   getActiveScripts: () => Promise<{
     success: boolean;
     scripts?: ActiveScript[];
@@ -360,7 +362,12 @@ export interface ElectronAPI {
     }) => void
   ) => void;
   onScriptStopped: (
-    callback: (data: { scriptId: string; timestamp: number; reason?: string; proxyAddress?: string }) => void
+    callback: (data: {
+      scriptId: string;
+      timestamp: number;
+      reason?: string;
+      proxyAddress?: string;
+    }) => void
   ) => void;
 }
 
@@ -371,7 +378,6 @@ export interface WalletComponentProps {
   onConnect: () => void;
   onDisconnect: () => void;
 }
-
 
 export interface LogComponentProps {
   logs: LogEntry[];
@@ -568,12 +574,25 @@ export interface ProfileCookie {
   sameSite?: "Strict" | "Lax" | "None";
 }
 
+/**
+ * Telegram Bot Configuration
+ * Stores bot API credentials and connection status
+ */
+export interface TelegramBotConfig {
+  httpApi: string; // Bot HTTP API token from @BotFather
+  chatId: string; // User's chat ID for sending messages
+  botName?: string; // Optional bot name for display
+  connected: boolean; // Connection status
+  connectedAt?: number; // Timestamp when bot was connected
+}
+
 export interface UserProfile {
   id: string;
   name: string;
   proxy: ProfileProxy;
   cookies: ProfileCookie[];
   navigationUrl?: string; // Search query URL configured for this profile
+  telegram?: TelegramBotConfig; // Optional Telegram bot configuration
   createdAt: number;
   updatedAt: number;
   isActive: boolean;
@@ -590,8 +609,11 @@ export interface ProfileState {
 export interface AddProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (profile: Omit<UserProfile, "id" | "createdAt" | "updatedAt" | "isActive">) => void;
+  onSave: (
+    profile: Omit<UserProfile, "id" | "createdAt" | "updatedAt" | "isActive">
+  ) => void;
   existingProfiles: UserProfile[];
+  editingProfile?: UserProfile;
 }
 
 export interface ProfileCardProps {
@@ -601,11 +623,14 @@ export interface ProfileCardProps {
   onSelect: (profile: UserProfile) => void;
   onBuildQuery?: (profile: UserProfile) => void;
   onClearHistory?: (profile: UserProfile) => void;
+  onAddTelegramBot?: (profile: UserProfile) => void;
 }
 
 export interface ProfileManagerProps {
   profiles: UserProfile[];
-  onProfileCreate: (profile: Omit<UserProfile, "id" | "createdAt" | "updatedAt" | "isActive">) => void;
+  onProfileCreate: (
+    profile: Omit<UserProfile, "id" | "createdAt" | "updatedAt" | "isActive">
+  ) => void;
   onProfileUpdate: (profile: UserProfile) => void;
   onProfileDelete: (profileId: string) => void;
   onProfileSelect: (profile: UserProfile) => void;
@@ -613,6 +638,62 @@ export interface ProfileManagerProps {
   maxProfiles: number;
   onBuildQuery?: (profile: UserProfile) => void;
   onClearHistory?: (profile: UserProfile) => void;
+  onAddTelegramBot?: (profile: UserProfile) => void;
+}
+
+/**
+ * Props for AddTelegramBotModal component
+ */
+export interface AddTelegramBotModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (telegramConfig: TelegramBotConfig) => void;
+  profile: UserProfile;
+  existingConfig?: TelegramBotConfig;
+}
+
+/**
+ * Telegram API response types
+ */
+export interface TelegramGetUpdatesResponse {
+  ok: boolean;
+  result: Array<{
+    update_id: number;
+    message?: {
+      message_id: number;
+      from: {
+        id: number;
+        is_bot: boolean;
+        first_name: string;
+        username?: string;
+        language_code?: string;
+      };
+      chat: {
+        id: number;
+        first_name: string;
+        username?: string;
+        type: string;
+      };
+      date: number;
+      text: string;
+    };
+  }>;
+}
+
+export interface TelegramSendMessageResponse {
+  ok: boolean;
+  result?: {
+    message_id: number;
+    chat: {
+      id: number;
+      first_name: string;
+      username?: string;
+      type: string;
+    };
+    date: number;
+    text: string;
+  };
+  description?: string;
 }
 
 export const PROFILE_STORAGE_KEY = "twitter_automation_profiles";

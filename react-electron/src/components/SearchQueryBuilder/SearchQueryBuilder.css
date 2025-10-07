@@ -3,8 +3,8 @@
  */
 
 .search-query-builder {
-  /* Убрали max-width для адаптивности */
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   padding: 24px;
   background: var(--bg-primary);
   min-height: 100vh;

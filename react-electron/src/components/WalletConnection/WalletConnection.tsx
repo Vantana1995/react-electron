@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { WalletConnectionStatus } from "../../types";
 import { walletService } from "../../services/walletService";
+import { useLanguage } from "../../contexts/LanguageContext";
 import "./WalletConnection.css";
 
 interface WalletConnectionProps {
@@ -17,6 +18,7 @@ export const WalletConnection: React.FC<WalletConnectionProps> = ({
   onWalletConnected,
   onWalletDisconnected,
 }) => {
+  const { t } = useLanguage();
   const [walletStatus, setWalletStatus] = useState<WalletConnectionStatus>({
     isConnected: false,
   });
@@ -106,7 +108,7 @@ export const WalletConnection: React.FC<WalletConnectionProps> = ({
             walletStatus.isConnected ? "connected" : "disconnected"
           }`}
         ></span>
-        {walletStatus.isConnected ? "Connected" : "Not Connected"}
+        {walletStatus.isConnected ? t('wallet.connected') : t('wallet.notConnected')}
       </div>
 
       {walletStatus.isConnected && walletStatus.walletAddress && (
@@ -115,7 +117,7 @@ export const WalletConnection: React.FC<WalletConnectionProps> = ({
             {formatAddress(walletStatus.walletAddress)}
           </div>
           <button className="disconnect-button" onClick={handleDisconnect}>
-            Disconnect Wallet
+            {t('wallet.disconnect')}
           </button>
         </div>
       )}
@@ -126,7 +128,7 @@ export const WalletConnection: React.FC<WalletConnectionProps> = ({
           onClick={handleConnect}
           disabled={isConnecting}
         >
-          {isConnecting ? "Connecting..." : "Connect MetaMask"}
+          {isConnecting ? t('wallet.connecting') : t('wallet.connect')}
         </button>
       )}
 

@@ -116,7 +116,8 @@
 .form-group textarea {
   resize: vertical;
   min-height: 120px;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas,
+    "Courier New", monospace;
   font-size: 0.8rem;
   line-height: 1.4;
 }
@@ -211,20 +212,21 @@
 
 .cancel-btn,
 .save-btn {
-  padding: 10px 20px;
+  padding: 12px 24px;
   border-radius: 8px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   border: 1px solid;
-  min-width: 100px;
+  min-width: 140px;
+  flex: 1;
 }
 
 .cancel-btn {
-  background: none;
+  background: var(--bg-secondary);
   border-color: var(--border-primary);
-  color: var(--text-tertiary);
+  color: var(--text-primary);
 }
 
 .cancel-btn:hover:not(:disabled) {

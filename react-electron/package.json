@@ -6,13 +6,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc --project tsconfig.electron.json && vite build",
+    "build:electron": "npm run build && electron-builder",
+    "build:win": "npm run build && electron-builder --win",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "start": "cross-env NODE_ENV=production electron .",
     "dev:electron": "cross-env NODE_ENV=development electron .",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder --publish=never"
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder --publish=never",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@types/crypto-js": "^4.2.2",
@@ -43,42 +48,81 @@
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
-    "vite-plugin-electron-renderer": "^0.14.5"
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "ghost-cursor": "^2.2.0"
   },
   "main": "dist-electron/main.js",
   "homepage": "./",
   "author": "Twitter Automation Platform",
   "license": "MIT",
   "build": {
-    "appId": "com.twitterautomation.platform.react",
+    "appId": "com.local.twitterautomation",
+    "asar": true,
     "productName": "Twitter Automation Platform",
     "directories": {
-      "output": "dist"
+      "output": "release/${version}",
+      "buildResources": "build"
     },
+    "forceCodeSigning": false,
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false,
+    "electronDownload": {
+      "cache": false
+    },
+    "afterSign": null,
+    "afterAllArtifactBuild": null,
+    "beforeBuild": null,
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
       "node_modules/puppeteer/**/*",
-      "!node_modules/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "node_modules/puppeteer/.local-chromium",
-        "to": "puppeteer-chromium",
-        "filter": [
-          "**/*"
-        ]
-      }
+      "node_modules/puppeteer-extra/**/*",
+      "node_modules/puppeteer-extra-plugin-stealth/**/*",
+      "!node_modules/**/*",
+      "!**/*.map"
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Mac-${version}-${arch}.${ext}"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
     },
     "linux": {
-      "target": "AppImage"
-    }
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Linux-${version}.${ext}",
+      "category": "Office"
+    },
+    "publish": null
   }
 }

@@ -2,6 +2,7 @@ node_modules/
 .env
 dist/
 build/
+instructions/
 
 # Electron build files
 react-electron/dist-electron/
@@ -9,3 +10,6 @@ react-electron/dist-electron/
 # Temporary/system files
 backend/nul
 *.log
+.claude
+.cursor
+.vscode

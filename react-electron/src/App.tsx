@@ -24,10 +24,14 @@ import { ScriptManager } from "./components/ScriptManager/ScriptManager";
 import { ProfileManager } from "./components/ProfileManager";
 import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryBuilder";
 import { ThemeToggle } from "./components/ThemeToggle";
+import LanguageSwitcher from "./components/LanguageSwitcher/LanguageSwitcher";
+import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { timerService } from "./services/timerService";
 import "./App.css";
 
-function App() {
+// Internal component that uses hooks
+const AppContent: React.FC = () => {
+  const { t } = useLanguage();
   const [appState, setAppState] = useState<AppState>({
     wallet: {
       status: { isConnected: false },
@@ -65,8 +69,20 @@ function App() {
 
   const [currentNFT, setCurrentNFT] = useState<NFTData | undefined>();
   const [currentScript, setCurrentScript] = useState<ScriptData | undefined>();
-  const [nftScriptMapping, setNftScriptMapping] = useState<
-    Map<string, ScriptData>
+
+  // NFT+Script pairs state
+  const [nftScriptPairs, setNftScriptPairs] = useState<
+    Array<{
+      nft: NFTData;
+      script: ScriptData;
+      maxProfiles: number;
+      nftInfo: Record<string, unknown>;
+    }>
+  >([]);
+
+  // Track max profiles per script
+  const [scriptMaxProfiles, setScriptMaxProfiles] = useState<
+    Map<string, number>
   >(new Map());
 
   // Search Query Builder state
@@ -78,10 +94,101 @@ function App() {
   // Expose currentNFT and currentScript to window object for component access
   useEffect(() => {
     if (typeof window !== "undefined") {
-      (window as typeof window & { currentNFT?: NFTData; currentScript?: ScriptData }).currentNFT = currentNFT;
-      (window as typeof window & { currentNFT?: NFTData; currentScript?: ScriptData }).currentScript = currentScript;
+      (
+        window as typeof window & {
+          currentNFT?: NFTData;
+          currentScript?: ScriptData;
+        }
+      ).currentNFT = currentNFT;
+      (
+        window as typeof window & {
+          currentNFT?: NFTData;
+          currentScript?: ScriptData;
+        }
+      ).currentScript = currentScript;
     }
   }, [currentNFT, currentScript]);
+
+  // Sync with window.nftScriptPairs from serverApiService
+  useEffect(() => {
+    const checkForNFTPairs = () => {
+      if (
+        typeof window !== "undefined" &&
+        (window as typeof window & { nftScriptPairs?: Array<unknown> })
+          .nftScriptPairs
+      ) {
+        const windowWithNFT = window as typeof window & {
+          nftScriptPairs: Array<{
+            nft: NFTData;
+            script: ScriptData;
+            maxProfiles: number;
+            nftInfo: Record<string, unknown>;
+          }>;
+        };
+        const pairs = windowWithNFT.nftScriptPairs;
+        if (Array.isArray(pairs)) {
+          console.log("🔄 Syncing NFT+Script pairs from window:", pairs.length);
+
+          // Always update with latest pairs (they may have been added dynamically)
+          console.log("🔄 Updating NFT+Script pairs state");
+          setNftScriptPairs(pairs);
+
+          // Update max profiles for each script and calculate global max
+          const newScriptMaxProfiles = new Map<string, number>();
+          let globalMaxProfiles = 0;
+
+          pairs.forEach((pair) => {
+            if (pair.script && pair.script.id) {
+              const scriptId = pair.script.id;
+              const currentMax = newScriptMaxProfiles.get(scriptId) || 0;
+              const newMax = pair.maxProfiles || 0;
+
+              // Use the higher value
+              const finalMax = Math.max(currentMax, newMax);
+              newScriptMaxProfiles.set(scriptId, finalMax);
+
+              // Update global max profiles (use the highest value from all scripts)
+              globalMaxProfiles = Math.max(globalMaxProfiles, finalMax);
+
+              console.log(
+                `📊 Script ${scriptId}: maxProfiles = ${finalMax} (was ${currentMax}, new ${newMax})`
+              );
+            }
+          });
+
+          setScriptMaxProfiles(newScriptMaxProfiles);
+
+          // Set global max profiles for the application
+          if (globalMaxProfiles > 0) {
+            console.log(
+              `🌍 Setting global maxProfiles to ${globalMaxProfiles}`
+            );
+            setAppState((prev) => ({
+              ...prev,
+              profiles: {
+                ...prev.profiles,
+                maxProfiles: globalMaxProfiles,
+              },
+            }));
+          }
+
+          // Set first pair as current for backward compatibility
+          if (pairs[0]) {
+            setCurrentNFT(pairs[0].nft);
+            setCurrentScript(pairs[0].script);
+          }
+        }
+      }
+    };
+
+    // Check immediately
+    checkForNFTPairs();
+
+    // Set up interval to check for updates (more frequent for dynamic updates)
+    const interval = setInterval(checkForNFTPairs, 500); // Check every 500ms
+
+    return () => clearInterval(interval);
+  }, []);
 
   /**
    * Initialize the application
@@ -175,6 +282,21 @@ function App() {
               },
             }));
           }
+
+          // Показываем секцию профилей сразу после успешного подключения
+          // even if there's no NFT - user can get script without NFT
+          // Check for global maxProfiles because it can be setup early from NFT+Script pairs
+          const currentMaxProfiles = appState.profiles.maxProfiles;
+          const newMaxProfiles =
+            currentMaxProfiles > 0 ? currentMaxProfiles : 1; // Minimum 1 profile for free tier
+
+          setAppState((prev) => ({
+            ...prev,
+            profiles: {
+              ...prev.profiles,
+              maxProfiles: newMaxProfiles,
+            },
+          }));
         } else {
           updateSystemStatus(
             "error",
@@ -189,7 +311,11 @@ function App() {
         setIsInitialized(false);
       }
     },
-    [isInitialized, appState.wallet.status.walletAddress]
+    [
+      isInitialized,
+      appState.wallet.status.walletAddress,
+      appState.profiles.maxProfiles,
+    ]
   );
 
   /**
@@ -204,7 +330,7 @@ function App() {
         );
       },
 
-      onServerPing: (callback) => {},
+      onServerPing: () => {},
 
       onNFTReceived: (nft: NFTData) => {
         console.log("🖼️ NFT data received from SERVER API SERVICE:", nft);
@@ -240,15 +366,6 @@ function App() {
       },
 
       onScriptReceived: (script: ScriptData) => {
-        // Connect script with current NFT if available
-        if (currentNFT) {
-          setNftScriptMapping((prev) => {
-            const newMapping = new Map(prev);
-            newMapping.set(currentNFT.address, script);
-            return newMapping;
-          });
-        }
-
         // Сохраняем скрипт в состояние для отображения кнопки
         setCurrentScript(script);
         setAppState((prev) => ({
@@ -269,7 +386,7 @@ function App() {
       window.electronAPI.removeAllListeners("nft-received");
       window.electronAPI.removeAllListeners("script-received");
 
-      window.electronAPI.onServerPingReceived((data) => {
+      window.electronAPI.onServerPingReceived?.((data) => {
         // Обработка ping данных
         if (
           data.data &&
@@ -282,7 +399,7 @@ function App() {
         }
       });
 
-      window.electronAPI.onPingCounterUpdate((data) => {
+      window.electronAPI.onPingCounterUpdate?.((data) => {
         setAppState((prev) => ({
           ...prev,
           system: {
@@ -293,18 +410,23 @@ function App() {
         }));
       });
 
-      window.electronAPI.onNFTReceived((data) => {
+      window.electronAPI.onNFTReceived?.((data) => {
         console.log(
           "🖼️ NFT IPC data received from ELECTRON MAIN PROCESS:",
           data
         );
-        console.log("📊 Subscription data from ELECTRON:", data.subscription);
+        console.log(
+          "📊 Subscription data from ELECTRON:",
+          (data as Record<string, unknown>).subscription
+        );
 
         const nftData: NFTData = {
+          address: data.address,
           image: data.image,
           metadata: data.metadata,
           timestamp: data.timestamp || Date.now(),
-          subscription: data.subscription, // Include subscription data from IPC
+          subscription: (data as Record<string, unknown>)
+            .subscription as NFTData["subscription"], // Include subscription data from IPC
         };
 
         // More robust duplicate detection - check if it's the same NFT data
@@ -339,7 +461,7 @@ function App() {
         loadProfiles();
       });
 
-      window.electronAPI.onScriptReceived((data) => {
+      window.electronAPI.onScriptReceived?.((data) => {
         console.log("📜 Script received via Electron:", data.script.name);
         const scriptData: ScriptData = {
           id: data.script.id,
@@ -363,73 +485,97 @@ function App() {
 
       // Listen for script execution events
       if (window.electronAPI.onScriptFinished) {
-        window.electronAPI.onScriptFinished((data: { scriptId: string; exitCode: number; success: boolean; output: string; error: string; timestamp: number; proxyAddress?: string }) => {
-          console.log(
-            "✅ Script finished:",
-            data.scriptId,
-            "Proxy:",
-            data.proxyAddress
-          );
-          // Remove profile from running scripts using proxyAddress
-          if (data.proxyAddress) {
-            setAppState((prev) => ({
-              ...prev,
-              profiles: {
-                ...prev.profiles,
-                runningScripts: prev.profiles.runningScripts.filter(
-                  (proxyAddr) => proxyAddr !== data.proxyAddress
-                ),
-              },
-            }));
+        window.electronAPI.onScriptFinished(
+          (data: {
+            scriptId: string;
+            exitCode: number;
+            success: boolean;
+            output: string;
+            error: string;
+            timestamp: number;
+            proxyAddress?: string;
+          }) => {
+            console.log(
+              "✅ Script finished:",
+              data.scriptId,
+              "Proxy:",
+              data.proxyAddress
+            );
+            // Remove profile from running scripts using proxyAddress
+            if (data.proxyAddress) {
+              setAppState((prev) => ({
+                ...prev,
+                profiles: {
+                  ...prev.profiles,
+                  runningScripts: prev.profiles.runningScripts.filter(
+                    (proxyAddr) => proxyAddr !== data.proxyAddress
+                  ),
+                },
+              }));
+            }
           }
-        });
+        );
       }
 
       if (window.electronAPI.onScriptError) {
-        window.electronAPI.onScriptError((data: { scriptId: string; error: string; timestamp: number; proxyAddress?: string }) => {
-          console.log(
-            "❌ Script error:",
-            data.scriptId,
-            "Proxy:",
-            data.proxyAddress,
-            data.error
-          );
-          // Remove profile from running scripts using proxyAddress
-          if (data.proxyAddress) {
-            setAppState((prev) => ({
-              ...prev,
-              profiles: {
-                ...prev.profiles,
-                runningScripts: prev.profiles.runningScripts.filter(
-                  (proxyAddr) => proxyAddr !== data.proxyAddress
-                ),
-              },
-            }));
+        window.electronAPI.onScriptError(
+          (data: {
+            scriptId: string;
+            error: string;
+            timestamp: number;
+            proxyAddress?: string;
+          }) => {
+            console.log(
+              "❌ Script error:",
+              data.scriptId,
+              "Proxy:",
+              data.proxyAddress,
+              data.error
+            );
+            // Remove profile from running scripts using proxyAddress
+            if (data.proxyAddress) {
+              setAppState((prev) => ({
+                ...prev,
+                profiles: {
+                  ...prev.profiles,
+                  runningScripts: prev.profiles.runningScripts.filter(
+                    (proxyAddr) => proxyAddr !== data.proxyAddress
+                  ),
+                },
+              }));
+            }
           }
-        });
+        );
       }
 
       if (window.electronAPI.onScriptStopped) {
-        window.electronAPI.onScriptStopped((data: { scriptId: string; timestamp: number; reason?: string; proxyAddress?: string }) => {
-          console.log(
-            "⏹️ Script stopped:",
-            data.scriptId,
-            "Proxy:",
-            data.proxyAddress
-          );
-          // Remove profile from running scripts using proxyAddress
-          if (data.proxyAddress) {
-            setAppState((prev) => ({
-              ...prev,
-              profiles: {
-                ...prev.profiles,
-                runningScripts: prev.profiles.runningScripts.filter(
-                  (proxyAddr) => proxyAddr !== data.proxyAddress
-                ),
-              },
-            }));
+        window.electronAPI.onScriptStopped(
+          (data: {
+            scriptId: string;
+            timestamp: number;
+            reason?: string;
+            proxyAddress?: string;
+          }) => {
+            console.log(
+              "⏹️ Script stopped:",
+              data.scriptId,
+              "Proxy:",
+              data.proxyAddress
+            );
+            // Remove profile from running scripts using proxyAddress
+            if (data.proxyAddress) {
+              setAppState((prev) => ({
+                ...prev,
+                profiles: {
+                  ...prev.profiles,
+                  runningScripts: prev.profiles.runningScripts.filter(
+                    (proxyAddr) => proxyAddr !== data.proxyAddress
+                  ),
+                },
+              }));
+            }
           }
-        });
+        );
       }
     }
   };
@@ -440,13 +586,37 @@ function App() {
     // Listen for custom script-started event from ScriptManager
     const handleScriptStarted = (event: CustomEvent) => {
       const { proxyAddress, scriptId } = event.detail;
-      console.log("▶️ Script started for proxy:", proxyAddress);
-      setAppState((prev) => {
-        const newRunningScripts = [...new Set([...prev.profiles.runningScripts, proxyAddress])];
+      console.log(
+        "▶️ Script started for proxy:",
+        proxyAddress,
+        "script:",
+        scriptId
+      );
 
-        // Check if exceeds maxProfiles limit
-        if (newRunningScripts.length > prev.profiles.maxProfiles) {
-          console.warn(`⚠️ Cannot start script: Maximum ${prev.profiles.maxProfiles} profiles limit reached`);
+      setAppState((prev) => {
+        // Get max profiles for this specific script
+        const scriptMaxProfilesForScript = scriptMaxProfiles.get(scriptId) || 0;
+        const globalMaxProfiles = prev.profiles.maxProfiles;
+
+        // Use the higher value between script-specific and global max
+        const effectiveMaxProfiles = Math.max(
+          scriptMaxProfilesForScript,
+          globalMaxProfiles
+        );
+
+        console.log(
+          `📊 Script ${scriptId} max profiles: ${scriptMaxProfilesForScript}, Global max: ${globalMaxProfiles}, Effective: ${effectiveMaxProfiles}`
+        );
+
+        const newRunningScripts = [
+          ...new Set([...prev.profiles.runningScripts, proxyAddress]),
+        ];
+
+        // Check if exceeds effective maxProfiles limit
+        if (newRunningScripts.length > effectiveMaxProfiles) {
+          console.warn(
+            `⚠️ Cannot start script: Maximum ${effectiveMaxProfiles} profiles limit reached (script: ${scriptMaxProfilesForScript}, global: ${globalMaxProfiles})`
+          );
           return prev;
         }
 
@@ -480,7 +650,7 @@ function App() {
       console.log("🧹 App cleanup");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // setupServerCallbacks не добавляем в зависимости, чтобы избежать бесконечного цикла
+  }, [scriptMaxProfiles]); // Include scriptMaxProfiles to update when script limits change
 
   // Load profiles from localStorage once on mount
   useEffect(() => {
@@ -568,7 +738,6 @@ function App() {
     setCurrentScript(undefined);
   }, []);
 
-
   /**
    * Load profiles from storage
    */
@@ -651,7 +820,9 @@ function App() {
         const profile = appState.profiles.profiles.find(
           (p) => p.id === profileId
         );
-        const proxyAddress = profile ? `${profile.proxy.ip}:${profile.proxy.port}` : null;
+        const proxyAddress = profile
+          ? `${profile.proxy.ip}:${profile.proxy.port}`
+          : null;
 
         await profileStorage.deleteProfile(profileId);
         setAppState((prev) => ({
@@ -665,7 +836,9 @@ function App() {
                 : prev.profiles.selectedProfile,
             // Remove from running scripts by proxy address
             runningScripts: proxyAddress
-              ? prev.profiles.runningScripts.filter(addr => addr !== proxyAddress)
+              ? prev.profiles.runningScripts.filter(
+                  (addr) => addr !== proxyAddress
+                )
               : prev.profiles.runningScripts,
           },
         }));
@@ -691,7 +864,6 @@ function App() {
     }));
   }, []);
 
-
   /**
    * Handle navigation URL change from Search Builder
    */
@@ -703,7 +875,7 @@ function App() {
    * Handle opening Search Query Builder
    */
   const handleOpenSearchBuilder = useCallback(() => {
-    setMainPageScrollPosition(window.scrollY); 
+    setMainPageScrollPosition(window.scrollY);
     setShowSearchBuilder(true);
   }, []);
 
@@ -722,7 +894,8 @@ function App() {
   /**
    * State for profile query builder
    */
-  const [buildingQueryForProfile, setBuildingQueryForProfile] = useState<UserProfile | null>(null);
+  const [buildingQueryForProfile, setBuildingQueryForProfile] =
+    useState<UserProfile | null>(null);
 
   /**
    * Handle building query for a profile
@@ -736,75 +909,88 @@ function App() {
   /**
    * Handle saving query to profile
    */
-  const handleSaveQueryToProfile = useCallback(async (url: string) => {
-    if (buildingQueryForProfile) {
-      const updatedProfile: UserProfile = {
-        ...buildingQueryForProfile,
-        navigationUrl: url,
-        updatedAt: Date.now()
-      };
-      await handleProfileUpdate(updatedProfile);
-      setBuildingQueryForProfile(null);
-    }
-    setShowSearchBuilder(false);
-    setTimeout(() => window.scrollTo(0, mainPageScrollPosition), 0);
-  }, [buildingQueryForProfile, mainPageScrollPosition, handleProfileUpdate]);
+  const handleSaveQueryToProfile = useCallback(
+    async (url: string) => {
+      if (buildingQueryForProfile) {
+        const updatedProfile: UserProfile = {
+          ...buildingQueryForProfile,
+          navigationUrl: url,
+          updatedAt: Date.now(),
+        };
+        await handleProfileUpdate(updatedProfile);
+        setBuildingQueryForProfile(null);
+      }
+      setShowSearchBuilder(false);
+      setTimeout(() => window.scrollTo(0, mainPageScrollPosition), 0);
+    },
+    [buildingQueryForProfile, mainPageScrollPosition, handleProfileUpdate]
+  );
 
   /**
    * Handle clearing profile history (processed tweets)
    */
-  const handleClearProfileHistory = useCallback(async (profile: UserProfile) => {
-    try {
-      const profileId = `${profile.proxy.ip}_${profile.proxy.port}`;
+  const handleClearProfileHistory = useCallback(
+    async (profile: UserProfile) => {
+      try {
+        const profileId = `${profile.proxy.ip}_${profile.proxy.port}`;
 
-      // Get saveImagesFolder from localStorage (same key as NFTDisplay uses)
-      const savedState = localStorage.getItem('nft-display-state');
-      let saveImagesFolder = '';
+        // Get saveImagesFolder from localStorage (same key as NFTDisplay uses)
+        const savedState = localStorage.getItem("nft-display-state");
+        let saveImagesFolder = "";
 
-      if (savedState) {
-        try {
-          const state = JSON.parse(savedState);
-          saveImagesFolder = state.saveImagesFolder || '';
-        } catch (error) {
-          console.error('Failed to parse saved state:', error);
+        if (savedState) {
+          try {
+            const state = JSON.parse(savedState);
+            saveImagesFolder = state.saveImagesFolder || "";
+          } catch (error) {
+            console.error("Failed to parse saved state:", error);
+          }
         }
-      }
 
-      if (!saveImagesFolder) {
-        alert('Please select a folder for saving images first (in the script execution panel)');
-        return;
-      }
+        if (!saveImagesFolder) {
+          alert(
+            "Please select a folder for saving images first (in the script execution panel)"
+          );
+          return;
+        }
 
-      // Call electron IPC to delete the processed tweets file
-      if (window.electronAPI?.clearProfileHistory) {
-        const result = await window.electronAPI.clearProfileHistory(profileId, saveImagesFolder);
-        if (result.success) {
-          console.log(`✅ Cleared processed tweets history for profile: ${profile.name}`);
-          alert(`History cleared for profile "${profile.name}"`);
+        // Call electron IPC to delete the processed tweets file
+        if (window.electronAPI?.clearProfileHistory) {
+          const result = await window.electronAPI.clearProfileHistory(
+            profileId,
+            saveImagesFolder
+          );
+          if (result.success) {
+            console.log(
+              `✅ Cleared processed tweets history for profile: ${profile.name}`
+            );
+            alert(`History cleared for profile "${profile.name}"`);
+          } else {
+            console.warn("Failed to clear history:", result.message);
+            alert(`Failed to clear history: ${result.message}`);
+          }
         } else {
-          console.warn('Failed to clear history:', result.message);
-          alert(`Failed to clear history: ${result.message}`);
+          console.warn("clearProfileHistory IPC not available");
         }
-      } else {
-        console.warn('clearProfileHistory IPC not available');
+      } catch (error) {
+        console.error("Error clearing profile history:", error);
+        alert(`Error clearing history: ${(error as Error).message}`);
       }
-    } catch (error) {
-      console.error('Error clearing profile history:', error);
-      alert(`Error clearing history: ${(error as Error).message}`);
-    }
-  }, []);
+    },
+    []
+  );
 
   return (
     <div className="app-container">
-      <ThemeToggle />
+      <div className="app-controls">
+        <ThemeToggle />
+        <LanguageSwitcher />
+      </div>
       {!showSearchBuilder ? (
         <div className="main-content">
           <div className="app-header">
-            <h1>🚀 Twitter Automation Platform</h1>
-            <p>
-              Secure crypto wallet authentication with Puppeteer script
-              execution
-            </p>
+            <h1>{t("app.title")}</h1>
+            <p>{t("app.subtitle")}</p>
           </div>
 
           <div className="app-main">
@@ -820,23 +1006,78 @@ function App() {
               )}
             </div>
 
-            {/* NFT Display */}
-            {currentNFT && (
+            {/* NFT+Script Pairs Display */}
+            {nftScriptPairs.length > 0 ? (
+              nftScriptPairs.map((pair, index) => (
+                <div
+                  key={`${pair.nft.address || "unknown"}-${index}`}
+                  className="card nft-section"
+                >
+                  <div className="pair-header">
+                    <h3>NFT+Script Pair #{index + 1}</h3>
+                    <div className="pair-info">
+                      <span className="nft-name">
+                        {pair.nft.metadata?.name || "Unnamed NFT"}
+                      </span>
+                      <span className="script-name">{pair.script.name}</span>
+                      <span className="max-profiles">
+                        {pair.maxProfiles} profiles
+                      </span>
+                    </div>
+                  </div>
+                  <NFTDisplay
+                    nft={pair.nft}
+                    visible={appState.nft.visible}
+                    profiles={appState.profiles.profiles}
+                    maxProfiles={appState.profiles.maxProfiles}
+                    scriptMaxProfiles={pair.maxProfiles}
+                    scriptId={pair.script.id}
+                    scriptData={pair.script}
+                    runningScripts={appState.profiles.runningScripts}
+                    navigationUrl={navigationUrl}
+                    onNavigationUrlChange={handleNavigationUrlChange}
+                    onOpenSearchBuilder={handleOpenSearchBuilder}
+                  />
+                  <div className="script-info">
+                    <h4>Associated Script: {pair.script.name}</h4>
+                    <p>Version: {pair.script.version}</p>
+                    <p>Features: {pair.script.features.join(", ")}</p>
+                  </div>
+                </div>
+              ))
+            ) : currentNFT ? (
+              /* Legacy single NFT display for backward compatibility */
               <div className="card nft-section">
                 <NFTDisplay
                   nft={currentNFT}
                   visible={appState.nft.visible}
                   profiles={appState.profiles.profiles}
                   maxProfiles={appState.profiles.maxProfiles}
+                  scriptData={currentScript}
+                  runningScripts={appState.profiles.runningScripts}
                   navigationUrl={navigationUrl}
                   onNavigationUrlChange={handleNavigationUrlChange}
                   onOpenSearchBuilder={handleOpenSearchBuilder}
                 />
               </div>
-            )}
+            ) : currentScript ? (
+              /* Free tier script display without NFT */
+              <div className="card nft-section">
+                <NFTDisplay
+                  scriptData={currentScript}
+                  visible={true}
+                  profiles={appState.profiles.profiles}
+                  maxProfiles={appState.profiles.maxProfiles}
+                  runningScripts={appState.profiles.runningScripts}
+                  navigationUrl={navigationUrl}
+                  onNavigationUrlChange={handleNavigationUrlChange}
+                  onOpenSearchBuilder={handleOpenSearchBuilder}
+                />
+              </div>
+            ) : null}
 
-            {/* Profile Manager - показывается только после получения NFT */}
-            {currentNFT && (
+            {/* Profile Manager - показывается после подключения к серверу */}
+            {appState.system.connected && (
               <div className="card profile-section">
                 <ProfileManager
                   profiles={appState.profiles.profiles}
@@ -848,6 +1089,11 @@ function App() {
                   maxProfiles={appState.profiles.maxProfiles}
                   onBuildQuery={handleBuildQueryForProfile}
                   onClearHistory={handleClearProfileHistory}
+                  onAddTelegramBot={(profile) => {
+                    console.log(
+                      `🤖 Adding Telegram bot for profile: ${profile.name}`
+                    );
+                  }}
                 />
               </div>
             )}
@@ -874,16 +1120,33 @@ function App() {
             </button>
           </div>
           <SearchQueryBuilder
-            onUseInScript={buildingQueryForProfile ? handleSaveQueryToProfile : handleUseSearchUrl}
-            profileContext={buildingQueryForProfile ? {
-              profileName: buildingQueryForProfile.name,
-              existingUrl: buildingQueryForProfile.navigationUrl
-            } : undefined}
+            onUseInScript={
+              buildingQueryForProfile
+                ? handleSaveQueryToProfile
+                : handleUseSearchUrl
+            }
+            profileContext={
+              buildingQueryForProfile
+                ? {
+                    profileName: buildingQueryForProfile.name,
+                    existingUrl: buildingQueryForProfile.navigationUrl,
+                  }
+                : undefined
+            }
           />
         </div>
       )}
     </div>
   );
-}
+};
+
+// Main App component with LanguageProvider
+const App: React.FC = () => {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+};
 
 export default App;

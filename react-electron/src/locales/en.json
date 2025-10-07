@@ -1,0 +1,88 @@
+{
+  "app": {
+    "title": "Twitter Automation Platform",
+    "subtitle": "Secure crypto wallet authentication with Puppeteer script execution",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "wallet": {
+    "connect": "Connect Wallet",
+    "disconnect": "Disconnect",
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "notConnected": "Not Connected"
+  },
+  "nft": {
+    "display": "NFT Display",
+    "select": "Select NFT",
+    "execute": "Execute Script",
+    "stop": "Stop Script",
+    "running": "Running",
+    "stopped": "Stopped",
+    "image": "Image",
+    "script": "Script",
+    "settings": "Settings",
+    "profile": "Profile",
+    "mute": "Mute",
+    "screenshot": "Screenshot",
+    "delay": "Delay",
+    "search": "Search",
+    "folder": "Folder",
+    "web": "Web",
+    "start": "Start",
+    "restart": "Restart",
+    "stop": "Stop",
+    "comments": "Comments",
+    "chooseProfile": "Choose a profile...",
+    "headlessMode": "Headless Mode",
+    "enableScreenshots": "Enable Screenshots",
+    "closeSettings": "Close Settings"
+  },
+  "script": {
+    "memory": "Script Memory",
+    "name": "Name",
+    "version": "Version",
+    "features": "Features",
+    "description": "Description",
+    "status": "Status",
+    "loaded": "Loaded in memory",
+    "executing": "Executing script",
+    "stopped": "Script stopped",
+    "noScripts": "No scripts available"
+  },
+  "profile": {
+    "manager": "Profile Manager",
+    "add": "Add Profile",
+    "edit": "Edit Profile",
+    "delete": "Delete Profile",
+    "name": "Profile Name",
+    "url": "Profile URL",
+    "save": "Save",
+    "cancel": "Cancel",
+    "telegram": "Telegram Bot",
+    "addBot": "Add Bot",
+    "botToken": "Bot Token",
+    "testConnection": "Test Connection",
+    "sendMessage": "Send Message",
+    "saveBot": "Save Bot"
+  },
+  "search": {
+    "builder": "Search Query Builder",
+    "query": "Search Query",
+    "hint": "Enter your search query",
+    "generate": "Generate",
+    "copy": "Copy",
+    "clear": "Clear"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "toggle": "Toggle Theme"
+  },
+  "language": {
+    "select": "Select Language",
+    "english": "English",
+    "russian": "Русский"
+  }
+}

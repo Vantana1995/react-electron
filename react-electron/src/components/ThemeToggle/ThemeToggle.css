@@ -1,10 +1,6 @@
 /* Theme Toggle Button Styles */
 
 .theme-toggle {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -50,8 +46,6 @@
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .theme-toggle {
-    top: 12px;
-    right: 12px;
     padding: 8px 12px;
   }
 

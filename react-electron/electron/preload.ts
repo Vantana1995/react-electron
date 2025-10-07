@@ -10,7 +10,8 @@ import { ipcRenderer, contextBridge } from "electron";
 contextBridge.exposeInMainWorld("electronAPI", {
   // Device data
   getSystemInfo: () => ipcRenderer.invoke("get-system-info"),
-  setDeviceData: (deviceData: any) => ipcRenderer.invoke("set-device-data", deviceData),
+  setDeviceData: (deviceData: any) =>
+    ipcRenderer.invoke("set-device-data", deviceData),
 
   // Wallet authentication
   startWalletAuth: () => ipcRenderer.invoke("start-wallet-auth"),
@@ -143,7 +144,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   onScriptStopped: (
-    callback: (data: { scriptId: string; timestamp: number; reason?: string }) => void
+    callback: (data: {
+      scriptId: string;
+      timestamp: number;
+      reason?: string;
+    }) => void
   ) => {
     ipcRenderer.on("script-stopped", (_event, data) => callback(data));
   },
@@ -163,7 +168,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     active: boolean;
   }) => ipcRenderer.invoke("create-browser", config),
 
-  closeBrowser: (browserId: string) => ipcRenderer.invoke("close-browser", browserId),
+  closeBrowser: (browserId: string) =>
+    ipcRenderer.invoke("close-browser", browserId),
 
   executeBrowserScript: (params: {
     browserId: string;
@@ -171,12 +177,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     executeParams?: Record<string, unknown>;
   }) => ipcRenderer.invoke("execute-browser-script", params),
 
-  navigateBrowser: (params: {
-    browserId: string;
-    url: string;
-  }) => ipcRenderer.invoke("navigate-browser", params),
+  navigateBrowser: (params: { browserId: string; url: string }) =>
+    ipcRenderer.invoke("navigate-browser", params),
 
-  getBrowserStatus: (browserId: string) => ipcRenderer.invoke("get-browser-status", browserId),
+  getBrowserStatus: (browserId: string) =>
+    ipcRenderer.invoke("get-browser-status", browserId),
 
   // File system operations
   selectFolder: () => ipcRenderer.invoke("select-folder"),
@@ -184,6 +189,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Profile history management
   clearProfileHistory: (profileId: string, saveImagesFolder: string) =>
     ipcRenderer.invoke("clear-profile-history", profileId, saveImagesFolder),
+
+  // Telegram bot operations
+  testTelegramConnection: (httpApi: string) =>
+    ipcRenderer.invoke("telegram-test-connection", httpApi),
+
+  sendTelegramMessage: (httpApi: string, chatId: string, text: string) =>
+    ipcRenderer.invoke("telegram-send-message", httpApi, chatId, text),
+
+  getTelegramChatId: (httpApi: string) =>
+    ipcRenderer.invoke("telegram-get-chat-id", httpApi),
 });
 
 // Legacy ipcRenderer API for compatibility (if needed)

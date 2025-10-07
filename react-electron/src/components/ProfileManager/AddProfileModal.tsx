@@ -4,7 +4,12 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { AddProfileModalProps, UserProfile, ProfileCookie, ProfileProxy } from "../../types";
+import {
+  AddProfileModalProps,
+  UserProfile,
+  ProfileCookie,
+  ProfileProxy,
+} from "../../types";
 import { profileStorage } from "../../services/profileStorage";
 import "./AddProfileModal.css";
 
@@ -17,7 +22,7 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
   onClose,
   onSave,
   existingProfiles,
-  editingProfile
+  editingProfile,
 }) => {
   const [formData, setFormData] = useState({
     name: "",
@@ -25,9 +30,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
       login: "",
       password: "",
       ip: "",
-      port: ""
+      port: "",
     },
-    cookiesJson: ""
+    cookiesJson: "",
   });
 
   const [parsedCookies, setParsedCookies] = useState<ProfileCookie[]>([]);
@@ -46,9 +51,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
             login: editingProfile.proxy.login,
             password: editingProfile.proxy.password,
             ip: editingProfile.proxy.ip,
-            port: editingProfile.proxy.port.toString()
+            port: editingProfile.proxy.port.toString(),
           },
-          cookiesJson: JSON.stringify(editingProfile.cookies, null, 2)
+          cookiesJson: JSON.stringify(editingProfile.cookies, null, 2),
         });
         setParsedCookies(editingProfile.cookies);
       } else {
@@ -59,9 +64,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
             login: "",
             password: "",
             ip: "",
-            port: ""
+            port: "",
           },
-          cookiesJson: ""
+          cookiesJson: "",
         });
         setParsedCookies([]);
       }
@@ -73,17 +78,17 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
   const handleInputChange = (field: string, value: string) => {
     if (field.startsWith("proxy.")) {
       const proxyField = field.split(".")[1];
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         proxy: {
           ...prev.proxy,
-          [proxyField]: value
-        }
+          [proxyField]: value,
+        },
       }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [field]: value
+        [field]: value,
       }));
     }
 
@@ -94,9 +99,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
   };
 
   const handleCookiesChange = (value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      cookiesJson: value
+      cookiesJson: value,
     }));
 
     // Clear previous errors
@@ -120,7 +125,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
 
         setParsedCookies(validation.valid);
       } catch (error) {
-        setCookieErrors([error instanceof Error ? error.message : "Invalid JSON format"]);
+        setCookieErrors([
+          error instanceof Error ? error.message : "Invalid JSON format",
+        ]);
       }
     }, 500);
   };
@@ -138,9 +145,10 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
     }
 
     // Check for duplicate name (excluding current profile if editing)
-    const nameExists = existingProfiles.some(p =>
-      p.name.toLowerCase() === formData.name.toLowerCase() &&
-      (!editingProfile || p.id !== editingProfile.id)
+    const nameExists = existingProfiles.some(
+      (p) =>
+        p.name.toLowerCase() === formData.name.toLowerCase() &&
+        (!editingProfile || p.id !== editingProfile.id)
     );
     if (nameExists) {
       errors.push("Profile name already exists");
@@ -148,10 +156,12 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
 
     // Check for duplicate proxy address (excluding current profile if editing)
     const proxyAddress = `${formData.proxy.ip}:${formData.proxy.port}`;
-    const proxyExists = existingProfiles.some(p => {
+    const proxyExists = existingProfiles.some((p) => {
       const existingProxyAddress = `${p.proxy.ip}:${p.proxy.port}`;
-      return existingProxyAddress === proxyAddress &&
-        (!editingProfile || p.id !== editingProfile.id);
+      return (
+        existingProxyAddress === proxyAddress &&
+        (!editingProfile || p.id !== editingProfile.id)
+      );
     });
     if (proxyExists) {
       errors.push("Proxy address (IP:Port) already exists");
@@ -166,7 +176,10 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
     }
     if (!formData.proxy.ip.trim()) {
       errors.push("Proxy IP is required");
-    } else if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(formData.proxy.ip) && !formData.proxy.ip.includes(".")) {
+    } else if (
+      !/^(\d{1,3}\.){3}\d{1,3}$/.test(formData.proxy.ip) &&
+      !formData.proxy.ip.includes(".")
+    ) {
       errors.push("Invalid IP address format");
     }
 
@@ -200,18 +213,20 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
         login: formData.proxy.login.trim(),
         password: formData.proxy.password.trim(),
         ip: formData.proxy.ip.trim(),
-        port: parseInt(formData.proxy.port)
+        port: parseInt(formData.proxy.port),
       };
 
       const profileData = {
         name: formData.name.trim(),
         proxy,
-        cookies: parsedCookies
+        cookies: parsedCookies,
       };
 
       onSave(profileData);
     } catch (error) {
-      setFormErrors([error instanceof Error ? error.message : "Error saving profile"]);
+      setFormErrors([
+        error instanceof Error ? error.message : "Error saving profile",
+      ]);
     } finally {
       setIsValidating(false);
     }
@@ -230,7 +245,11 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
       <div className="add-profile-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{editingProfile ? "Edit Profile" : "Add New Profile"}</h3>
-          <button className="close-btn" onClick={handleClose} disabled={isValidating}>
+          <button
+            className="close-btn"
+            onClick={handleClose}
+            disabled={isValidating}
+          >
             ✕
           </button>
         </div>
@@ -252,7 +271,7 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
 
           {/* Proxy Settings */}
           <div className="form-section">
-            <h4>🌐 Proxy Settings</h4>
+            <h4>Proxy Settings</h4>
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="proxy-login">Login *</label>
@@ -260,7 +279,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
                   id="proxy-login"
                   type="text"
                   value={formData.proxy.login}
-                  onChange={(e) => handleInputChange("proxy.login", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("proxy.login", e.target.value)
+                  }
                   placeholder="Proxy username"
                   disabled={isValidating}
                 />
@@ -271,7 +292,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
                   id="proxy-password"
                   type="password"
                   value={formData.proxy.password}
-                  onChange={(e) => handleInputChange("proxy.password", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("proxy.password", e.target.value)
+                  }
                   placeholder="Proxy password"
                   disabled={isValidating}
                 />
@@ -284,7 +307,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
                   id="proxy-ip"
                   type="text"
                   value={formData.proxy.ip}
-                  onChange={(e) => handleInputChange("proxy.ip", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("proxy.ip", e.target.value)
+                  }
                   placeholder="192.168.1.1 or proxy.example.com"
                   disabled={isValidating}
                 />
@@ -295,7 +320,9 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
                   id="proxy-port"
                   type="number"
                   value={formData.proxy.port}
-                  onChange={(e) => handleInputChange("proxy.port", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("proxy.port", e.target.value)
+                  }
                   placeholder="8080"
                   min="1"
                   max="65535"
@@ -342,13 +369,14 @@ Alternative formats also supported:
             {/* Cookie Validation Status */}
             {parsedCookies.length > 0 && (
               <div className="cookies-status success">
-                ✅ {parsedCookies.length} valid cookie{parsedCookies.length !== 1 ? "s" : ""} parsed
+                {parsedCookies.length} valid cookie
+                {parsedCookies.length !== 1 ? "s" : ""} parsed
               </div>
             )}
 
             {cookieErrors.length > 0 && (
               <div className="cookies-status error">
-                ❌ Cookie errors:
+                Cookie errors:
                 <ul>
                   {cookieErrors.map((error, index) => (
                     <li key={index}>{error}</li>
@@ -382,9 +410,15 @@ Alternative formats also supported:
           <button
             className="save-btn"
             onClick={handleSave}
-            disabled={isValidating || formErrors.length > 0 || cookieErrors.length > 0}
+            disabled={
+              isValidating || formErrors.length > 0 || cookieErrors.length > 0
+            }
           >
-            {isValidating ? "Saving..." : editingProfile ? "Update Profile" : "Save Profile"}
+            {isValidating
+              ? "Saving..."
+              : editingProfile
+              ? "Update Profile"
+              : "Save Profile"}
           </button>
         </div>
       </div>
