@@ -27,6 +27,7 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import LanguageSwitcher from "./components/LanguageSwitcher/LanguageSwitcher";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { timerService } from "./services/timerService";
+import logoImage from "./assets/logo.png";
 import "./App.css";
 
 // Internal component that uses hooks
@@ -73,10 +74,10 @@ const AppContent: React.FC = () => {
   // NFT+Script pairs state
   const [nftScriptPairs, setNftScriptPairs] = useState<
     Array<{
-      nft: NFTData;
+      nft: NFTData | null; // NFT can be null for scripts without NFT image
       script: ScriptData;
       maxProfiles: number;
-      nftInfo: Record<string, unknown>;
+      nftInfo: Record<string, unknown> | null;
     }>
   >([]);
 
@@ -113,17 +114,19 @@ const AppContent: React.FC = () => {
   const handleNFTScriptPairs = useCallback(
     (
       pairs: Array<{
-        nft: NFTData;
+        nft: NFTData | null; // Can be null for scripts without NFT
         script: ScriptData;
         maxProfiles: number;
-        nftInfo: Record<string, unknown>;
+        nftInfo: Record<string, unknown> | null;
       }>
     ) => {
       if (!Array.isArray(pairs) || pairs.length === 0) {
         return;
       }
 
-      console.log("🔄 Processing NFT+Script pairs:", pairs.length);
+      logger.log("🔄 Processing NFT+Script pairs:", pairs.length);
+      logger.log(`  - With NFT: ${pairs.filter(p => p.nft).length}`);
+      logger.log(`  - Without NFT: ${pairs.filter(p => !p.nft).length}`);
 
       // Update NFT+Script pairs state
       setNftScriptPairs(pairs);
@@ -145,8 +148,8 @@ const AppContent: React.FC = () => {
           // Update global max profiles (use the highest value from all scripts)
           globalMaxProfiles = Math.max(globalMaxProfiles, finalMax);
 
-          console.log(
-            `📊 Script ${scriptId}: maxProfiles = ${finalMax} (was ${currentMax}, new ${newMax})`
+          logger.log(
+            `📊 Script ${scriptId} (${pair.script.name}): maxProfiles = ${finalMax}, hasNFT = ${!!pair.nft}`
           );
         }
       });
@@ -155,7 +158,7 @@ const AppContent: React.FC = () => {
 
       // Set first pair as current for backward compatibility
       if (pairs[0]) {
-        setCurrentNFT(pairs[0].nft);
+        setCurrentNFT(pairs[0].nft || undefined); // Convert null to undefined
         setCurrentScript(pairs[0].script);
         setAppState((prev) => ({
           ...prev,
@@ -165,6 +168,9 @@ const AppContent: React.FC = () => {
           },
         }));
       }
+
+      // Load profiles when pairs are received
+      loadProfiles();
     },
     []
   );
@@ -176,7 +182,7 @@ const AppContent: React.FC = () => {
     async (walletAddress?: string) => {
       // Предотвращаем повторную инициализацию
       if (isInitialized) {
-        console.log("🚫 App already initialized, skipping...");
+        logger.log("🚫 App already initialized, skipping...");
         return;
       }
 
@@ -223,7 +229,7 @@ const AppContent: React.FC = () => {
             pc.close();
             return ip;
           } catch (error) {
-            console.warn("Failed to get real IP:", error);
+            logger.warn("Failed to get real IP:", error);
             return "192.168.1.1";
           }
         };
@@ -303,8 +309,8 @@ const AppContent: React.FC = () => {
       onServerPing: () => {},
 
       onNFTReceived: (nft: NFTData) => {
-        console.log("🖼️ NFT data received from SERVER API SERVICE:", nft);
-        console.log("📊 Subscription data from SERVER API:", nft.subscription);
+        logger.log("🖼️ NFT data received from SERVER API SERVICE:", nft);
+        logger.log("📊 Subscription data from SERVER API:", nft.subscription);
 
         // Check if we already have this NFT to avoid duplicates
         const isSameNFT =
@@ -313,7 +319,7 @@ const AppContent: React.FC = () => {
             (currentNFT.image === nft.image && nft.image && nft.image !== ""));
 
         if (isSameNFT) {
-          console.log("🖼️ NFT already received, skipping duplicate");
+          logger.log("🖼️ NFT already received, skipping duplicate");
           return;
         }
 
@@ -354,7 +360,7 @@ const AppContent: React.FC = () => {
 
       // NEW: Direct callback for NFT+Script pairs
       onNFTScriptPairs: (pairs) => {
-        console.log("🔗 NFT+Script pairs received via callback:", pairs.length);
+        logger.log("🔗 NFT+Script pairs received via callback:", pairs.length);
         handleNFTScriptPairs(pairs);
       },
     });
@@ -368,7 +374,7 @@ const AppContent: React.FC = () => {
       window.electronAPI.removeAllListeners("script-received");
 
       window.electronAPI.onServerPingReceived?.((data) => {
-        console.log("📡 IPC ping received, processing data...");
+        logger.log("📡 IPC ping received, processing data...");
 
         // 1. Update nonce and timer
         if (
@@ -383,13 +389,13 @@ const AppContent: React.FC = () => {
 
         // 2. Process NFT+Script pairs (already decrypted in main.ts)
         if (data.data?.nftScriptPairs && Array.isArray(data.data.nftScriptPairs) && data.data.nftScriptPairs.length > 0) {
-          console.log(`🔗 Processing ${data.data.nftScriptPairs.length} NFT+Script pairs from IPC`);
+          logger.log(`🔗 Processing ${data.data.nftScriptPairs.length} NFT+Script pairs from IPC`);
           handleNFTScriptPairs(data.data.nftScriptPairs);
         }
         // 3. Process scripts without NFT
         else if (data.data?.scripts && Array.isArray(data.data.scripts) && data.data.scripts.length > 0) {
-          console.log(`📜 Processing ${data.data.scripts.length} scripts without NFT from IPC`);
-          const maxProfiles = data.data.maxProfiles || 1;
+          logger.log(`📜 Processing ${data.data.scripts.length} scripts without NFT from IPC`);
+          const maxProfiles = typeof data.data.maxProfiles === 'number' ? data.data.maxProfiles : 1;
 
           // Use first script
           if (data.data.scripts[0]) {
@@ -454,7 +460,7 @@ const AppContent: React.FC = () => {
           nftData.image !== "";
 
         if (isSameNFT) {
-          console.log(
+          logger.log(
             "🖼️ NFT already received via Electron, skipping duplicate"
           );
           return;
@@ -482,7 +488,7 @@ const AppContent: React.FC = () => {
       });
 
       window.electronAPI.onScriptReceived?.((data) => {
-        console.log("📜 Script received via Electron:", data.script.name);
+        logger.log("📜 Script received via Electron:", data.script.name);
         const scriptData: ScriptData = {
           id: data.script.id,
           name: data.script.name,
@@ -518,7 +524,7 @@ const AppContent: React.FC = () => {
             timestamp: number;
             proxyAddress?: string;
           }) => {
-            console.log(
+            logger.log(
               "✅ Script finished:",
               data.scriptId,
               "Proxy:",
@@ -548,7 +554,7 @@ const AppContent: React.FC = () => {
             timestamp: number;
             proxyAddress?: string;
           }) => {
-            console.log(
+            logger.log(
               "❌ Script error:",
               data.scriptId,
               "Proxy:",
@@ -579,7 +585,7 @@ const AppContent: React.FC = () => {
             reason?: string;
             proxyAddress?: string;
           }) => {
-            console.log(
+            logger.log(
               "⏹️ Script stopped:",
               data.scriptId,
               "Proxy:",
@@ -609,7 +615,7 @@ const AppContent: React.FC = () => {
     // Listen for custom script-started event from ScriptManager
     const handleScriptStarted = (event: CustomEvent) => {
       const { proxyAddress, scriptId } = event.detail;
-      console.log(
+      logger.log(
         "▶️ Script started for proxy:",
         proxyAddress,
         "script:",
@@ -627,7 +633,7 @@ const AppContent: React.FC = () => {
           globalMaxProfiles
         );
 
-        console.log(
+        logger.log(
           `📊 Script ${scriptId} max profiles: ${scriptMaxProfilesForScript}, Global max: ${globalMaxProfiles}, Effective: ${effectiveMaxProfiles}`
         );
 
@@ -637,7 +643,7 @@ const AppContent: React.FC = () => {
 
         // Check if exceeds effective maxProfiles limit
         if (newRunningScripts.length > effectiveMaxProfiles) {
-          console.warn(
+          logger.warn(
             `⚠️ Cannot start script: Maximum ${effectiveMaxProfiles} profiles limit reached (script: ${scriptMaxProfilesForScript}, global: ${globalMaxProfiles})`
           );
           return prev;
@@ -670,7 +676,7 @@ const AppContent: React.FC = () => {
         "script-started",
         handleScriptStarted as EventListener
       );
-      console.log("🧹 App cleanup");
+      logger.log("🧹 App cleanup");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scriptMaxProfiles, handleNFTScriptPairs]); // Include dependencies
@@ -687,11 +693,11 @@ const AppContent: React.FC = () => {
             profiles,
           },
         }));
-        console.log(
+        logger.log(
           `📁 Loaded ${profiles.length} profiles from storage on mount`
         );
       } catch (error) {
-        console.error("Error loading profiles on mount:", error);
+        logger.error("Error loading profiles on mount:", error);
       }
     };
     initProfiles();
@@ -736,7 +742,7 @@ const AppContent: React.FC = () => {
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error";
-          console.log(errorMessage);
+          logger.log(errorMessage);
         }
       }
     },
@@ -775,7 +781,7 @@ const AppContent: React.FC = () => {
         },
       }));
     } catch (error) {
-      console.error("Error loading profiles:", error);
+      logger.error("Error loading profiles:", error);
     }
   }, []);
 
@@ -801,7 +807,7 @@ const AppContent: React.FC = () => {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to create profile";
-        console.log(errorMessage);
+        logger.log(errorMessage);
         throw error;
       }
     },
@@ -829,7 +835,7 @@ const AppContent: React.FC = () => {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update profile";
-      console.log(errorMessage);
+      logger.log(errorMessage);
       throw error;
     }
   }, []);
@@ -868,7 +874,7 @@ const AppContent: React.FC = () => {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to delete profile";
-        console.log(errorMessage);
+        logger.log(errorMessage);
       }
     },
     [appState.profiles.profiles]
@@ -966,7 +972,7 @@ const AppContent: React.FC = () => {
             const state = JSON.parse(savedState);
             saveImagesFolder = state.saveImagesFolder || "";
           } catch (error) {
-            console.error("Failed to parse saved state:", error);
+            logger.error("Failed to parse saved state:", error);
           }
         }
 
@@ -984,19 +990,19 @@ const AppContent: React.FC = () => {
             saveImagesFolder
           );
           if (result.success) {
-            console.log(
+            logger.log(
               `✅ Cleared processed tweets history for profile: ${profile.name}`
             );
             alert(`History cleared for profile "${profile.name}"`);
           } else {
-            console.warn("Failed to clear history:", result.message);
+            logger.warn("Failed to clear history:", result.message);
             alert(`Failed to clear history: ${result.message}`);
           }
         } else {
-          console.warn("clearProfileHistory IPC not available");
+          logger.warn("clearProfileHistory IPC not available");
         }
       } catch (error) {
-        console.error("Error clearing profile history:", error);
+        logger.error("Error clearing profile history:", error);
         alert(`Error clearing history: ${(error as Error).message}`);
       }
     },
@@ -1012,6 +1018,7 @@ const AppContent: React.FC = () => {
       {!showSearchBuilder ? (
         <div className="main-content">
           <div className="app-header">
+            <img src={logoImage} alt="Logo" className="app-logo" />
             <h1>{t("app.title")}</h1>
             <p>{t("app.subtitle")}</p>
           </div>
@@ -1033,15 +1040,17 @@ const AppContent: React.FC = () => {
             {nftScriptPairs.length > 0 ? (
               nftScriptPairs.map((pair, index) => (
                 <div
-                  key={`${pair.nft.address || "unknown"}-${index}`}
+                  key={`${pair.nft?.address || pair.script.id}-${index}`}
                   className="card nft-section"
                 >
                   <div className="pair-header">
-                    <h3>NFT+Script Pair #{index + 1}</h3>
+                    <h3>{pair.nft ? `NFT+Script Pair #${index + 1}` : `Script #${index + 1}`}</h3>
                     <div className="pair-info">
-                      <span className="nft-name">
-                        {pair.nft.metadata?.name || "Unnamed NFT"}
-                      </span>
+                      {pair.nft && (
+                        <span className="nft-name">
+                          {pair.nft.metadata?.name || "Unnamed NFT"}
+                        </span>
+                      )}
                       <span className="script-name">{pair.script.name}</span>
                       <span className="max-profiles">
                         {pair.maxProfiles} profiles
@@ -1049,7 +1058,7 @@ const AppContent: React.FC = () => {
                     </div>
                   </div>
                   <NFTDisplay
-                    nft={pair.nft}
+                    nft={pair.nft || undefined}
                     visible={appState.nft.visible}
                     profiles={appState.profiles.profiles}
                     maxProfiles={appState.profiles.maxProfiles}
@@ -1113,7 +1122,7 @@ const AppContent: React.FC = () => {
                   onBuildQuery={handleBuildQueryForProfile}
                   onClearHistory={handleClearProfileHistory}
                   onAddTelegramBot={(profile) => {
-                    console.log(
+                    logger.log(
                       `🤖 Adding Telegram bot for profile: ${profile.name}`
                     );
                   }}

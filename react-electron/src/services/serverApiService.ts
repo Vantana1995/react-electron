@@ -10,6 +10,7 @@ import {
   NFTData,
   ScriptData,
 } from "../types";
+import { logger } from "../utils/logger";
 
 export class ServerApiService {
   private baseUrl: string = "http://localhost:3000";
@@ -26,10 +27,10 @@ export class ServerApiService {
     onScriptReceived?: (script: ScriptData) => void;
     onNFTScriptPairs?: (
       pairs: Array<{
-        nft: NFTData;
+        nft: NFTData | null; // Can be null for scripts without NFT
         script: ScriptData;
         maxProfiles: number;
-        nftInfo: Record<string, unknown>;
+        nftInfo: Record<string, unknown> | null;
       }>
     ) => void;
   } = {};
@@ -74,7 +75,7 @@ export class ServerApiService {
       pc.close();
       return ip;
     } catch (error) {
-      console.warn("Failed to get real IP, using fallback:", error);
+      logger.warn("Failed to get real IP, using fallback:", error);
       return "192.168.1.1"; // Fallback IP
     }
   }
@@ -95,7 +96,7 @@ export class ServerApiService {
     error?: string;
   }> {
     try {
-      console.log("🔄 Connecting to server...");
+      logger.log("🔄 Connecting to server...");
       this.updateConnectionStatus(false);
 
       if (!deviceData.fingerprint) {
@@ -104,7 +105,7 @@ export class ServerApiService {
 
       // Get real device IP address
       const realIPv4 = await this.getRealIPv4Address();
-      console.log("🌐 Real device IPv4:", realIPv4);
+      logger.log("🌐 Real device IPv4:", realIPv4);
 
       // Get real memory from system info via Electron IPC (if available)
       let totalMemory = 4294967296; // 4GB fallback
@@ -113,15 +114,15 @@ export class ServerApiService {
           const systemInfo = await window.electronAPI.getSystemInfo?.();
           if (systemInfo?.success && systemInfo.memory?.total) {
             totalMemory = systemInfo.memory.total;
-            console.log(`💾 Real system memory: ${(totalMemory / 1024 / 1024 / 1024).toFixed(2)} GB`);
+            logger.log(`💾 Real system memory: ${(totalMemory / 1024 / 1024 / 1024).toFixed(2)} GB`);
           }
         } else if ((navigator as any).deviceMemory) {
           // Browser API (returns in GB)
           totalMemory = (navigator as any).deviceMemory * 1024 * 1024 * 1024;
-          console.log(`💾 Browser-reported memory: ${(navigator as any).deviceMemory} GB`);
+          logger.log(`💾 Browser-reported memory: ${(navigator as any).deviceMemory} GB`);
         }
       } catch (error) {
-        console.warn("⚠️ Failed to get real memory, using fallback:", error);
+        logger.warn("⚠️ Failed to get real memory, using fallback:", error);
       }
 
       const requestPayload = {
@@ -144,7 +145,7 @@ export class ServerApiService {
         clientIPv4: realIPv4,
       };
 
-      console.log("🔍 Sending fingerprint request...");
+      logger.log("🔍 Sending fingerprint request...");
 
       // Send fingerprint request
       const response = await fetch(`${this.baseUrl}/api/auth/fingerprint`, {
@@ -155,7 +156,7 @@ export class ServerApiService {
         body: JSON.stringify(requestPayload),
       });
 
-      console.log(`🔍 Fingerprint API response status: ${response.status}`);
+      logger.log(`🔍 Fingerprint API response status: ${response.status}`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -183,20 +184,20 @@ export class ServerApiService {
         typeof data.sessionToken === "string" ? data.sessionToken : null;
       this.userId = typeof data.userId === "string" ? data.userId : null;
 
-      console.log(`🔑 Device hash: ${this.deviceHash?.substring(0, 16)}...`);
-      console.log(`🆔 User ID: ${this.userId}`);
+      logger.log(`🔑 Device hash: ${this.deviceHash?.substring(0, 16)}...`);
+      logger.log(`🆔 User ID: ${this.userId}`);
 
       if (data.isNewUser) {
-        console.log("✅ Device registered successfully");
+        logger.log("✅ Device registered successfully");
       } else {
-        console.log("✅ Device verified successfully");
+        logger.log("✅ Device verified successfully");
       }
 
       // Process data using new structured approach (same as ping data)
       this.processPingData(data);
 
       this.updateConnectionStatus(true);
-      console.log("✅ Successfully connected to server");
+      logger.log("✅ Successfully connected to server");
 
       // Send session to frontend server for callbacks
       await this.sendSessionToFrontendServer();
@@ -213,7 +214,7 @@ export class ServerApiService {
         clientIPv4: realIPv4, // Return the IP that was used
       };
     } catch (error) {
-      console.error("❌ Connection failed:", error);
+      logger.error("❌ Connection failed:", error);
       this.updateConnectionStatus(false);
 
       return {
@@ -247,12 +248,12 @@ export class ServerApiService {
       );
 
       if (response.ok) {
-        console.log("📡 Session data sent to frontend server");
+        logger.log("📡 Session data sent to frontend server");
       } else {
-        console.warn("⚠️ Failed to send session to frontend server");
+        logger.warn("⚠️ Failed to send session to frontend server");
       }
     } catch (error) {
-      console.warn("⚠️ Frontend server communication error:", error);
+      logger.warn("⚠️ Frontend server communication error:", error);
     }
   }
 
@@ -265,7 +266,7 @@ export class ServerApiService {
       clearInterval(this.callbackPollInterval);
     }
 
-    console.log("🔄 Starting callback polling...");
+    logger.log("🔄 Starting callback polling...");
 
     // HTTP polling for server callbacks
     this.callbackPollInterval = setInterval(async () => {
@@ -295,7 +296,7 @@ export class ServerApiService {
         const data = await response.json();
 
         if (data.hasCounterUpdate && data.lastCounterUpdate) {
-          console.log(
+          logger.log(
             `🔢 Counter update received: ${data.lastCounterUpdate.nonce}`
           );
 
@@ -343,14 +344,14 @@ export class ServerApiService {
    * Handle server callback
    */
   private handleServerCallback(callback: ServerCallback): void {
-    console.log(`📞 Server Callback: ${callback.instruction.action}`);
+    logger.log(`📞 Server Callback: ${callback.instruction.action}`);
 
     // Notify callback listeners
     this.callbacks.onServerPing?.(callback);
 
     // Handle different types of callbacks
     if (callback.instruction.action === "verify_connection") {
-      console.log("📡 Connection verification ping received");
+      logger.log("📡 Connection verification ping received");
 
       // Handle ping data if present
       if (callback.instruction.data) {
@@ -363,22 +364,22 @@ export class ServerApiService {
    * Process ping data from server (new structured approach)
    */
   private processPingData(data: unknown): void {
-    console.log("📡 Processing ping data from server");
+    logger.log("📡 Processing ping data from server");
 
     // Type guard for data object
     if (typeof data !== "object" || data === null) {
-      console.log("⚠️ Invalid ping data format");
+      logger.log("⚠️ Invalid ping data format");
       return;
     }
 
     const dataObj = data as Record<string, unknown>;
-    console.log("🔍 Ping data type:", dataObj.type);
-    console.log("🔍 Ping data nonce:", dataObj.nonce);
+    logger.log("🔍 Ping data type:", dataObj.type);
+    logger.log("🔍 Ping data nonce:", dataObj.nonce);
 
     // NEW STRUCTURED LOGIC
     // Case 1: NFT+Script pairs (user has NFTs)
     if (Array.isArray(dataObj.nftScriptPairs) && dataObj.nftScriptPairs.length > 0) {
-      console.log(`🖼️ Processing ${dataObj.nftScriptPairs.length} NFT+Script pairs`);
+      logger.log(`🖼️ Processing ${dataObj.nftScriptPairs.length} NFT+Script pairs`);
 
       const processedPairs: Array<{
         nft: NFTData;
@@ -390,7 +391,7 @@ export class ServerApiService {
       dataObj.nftScriptPairs.forEach((pair: any, index: number) => {
         // Full pair: NFT + Script
         if (pair.nft && pair.script) {
-          console.log(`📦 Pair ${index + 1}: ${pair.script.name} with NFT ${pair.nft.metadata?.name || 'Unknown'}`);
+          logger.log(`📦 Pair ${index + 1}: ${pair.script.name} with NFT ${pair.nft.metadata?.name || 'Unknown'}`);
 
           const nftData: NFTData = {
             address: pair.nft.address || "",
@@ -434,7 +435,7 @@ export class ServerApiService {
         }
         // NFT only (no script) - just update maxProfiles
         else if (pair.nft && !pair.script) {
-          console.log(`ℹ️ Pair ${index + 1}: NFT without script (maxProfiles update only)`);
+          logger.log(`ℹ️ Pair ${index + 1}: NFT without script (maxProfiles update only)`);
           // Don't display, just track maxProfiles increase
         }
       });
@@ -449,11 +450,11 @@ export class ServerApiService {
         this.callbacks.onNFTScriptPairs?.(processedPairs);
       }
 
-      console.log(`✅ Processed ${processedPairs.length} displayable NFT+Script pairs`);
+      logger.log(`✅ Processed ${processedPairs.length} displayable NFT+Script pairs`);
     }
     // Case 2: Scripts without NFT (free tier or no NFT holder)
     else if (Array.isArray(dataObj.scripts) && dataObj.scripts.length > 0) {
-      console.log(`📜 Processing ${dataObj.scripts.length} scripts without NFT`);
+      logger.log(`📜 Processing ${dataObj.scripts.length} scripts without NFT`);
 
       const maxProfiles = typeof dataObj.maxProfiles === "number" ? dataObj.maxProfiles : 1;
 
@@ -473,7 +474,7 @@ export class ServerApiService {
           },
         };
 
-        console.log(`📜 Script ${index + 1}: ${scriptData.name} (maxProfiles: ${maxProfiles})`);
+        logger.log(`📜 Script ${index + 1}: ${scriptData.name} (maxProfiles: ${maxProfiles})`);
 
         // Trigger callback for first script
         if (index === 0) {
@@ -481,11 +482,11 @@ export class ServerApiService {
         }
       });
 
-      console.log("✅ Scripts processed (will display with placeholder image)");
+      logger.log("✅ Scripts processed (will display with placeholder image)");
     }
     // Case 3: Simple connection ping (no data)
     else {
-      console.log("📡 Simple connection ping - nonce update only");
+      logger.log("📡 Simple connection ping - nonce update only");
       // Timer service will handle nonce update
     }
   }
@@ -510,10 +511,10 @@ export class ServerApiService {
     onScriptReceived?: (script: ScriptData) => void;
     onNFTScriptPairs?: (
       pairs: Array<{
-        nft: NFTData;
+        nft: NFTData | null; // Can be null for scripts without NFT
         script: ScriptData;
         maxProfiles: number;
-        nftInfo: Record<string, unknown>;
+        nftInfo: Record<string, unknown> | null;
       }>
     ) => void;
   }): void {
@@ -560,7 +561,7 @@ export class ServerApiService {
     this.userId = null;
     this.updateConnectionStatus(false);
 
-    console.log("🔌 Disconnected from server");
+    logger.log("🔌 Disconnected from server");
   }
 
   /**

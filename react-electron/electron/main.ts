@@ -13,6 +13,7 @@ import { Server } from "http";
 import { spawn, execSync } from "child_process";
 import fs from "fs";
 import os from "os";
+import { logger } from "./logger";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The built directory structure
@@ -75,7 +76,7 @@ class AuthFlow {
     error?: string;
   }> {
     try {
-      console.log("🔐 Starting wallet authentication flow...");
+      logger.log("🔐 Starting wallet authentication flow...");
 
       // Start local HTTP server
       await this.startLocalServer();
@@ -85,13 +86,13 @@ class AuthFlow {
 
       // Open system browser to auth page
       const authUrl = `http://localhost:${this.port}/auth?session=${sessionToken}`;
-      console.log(`🌐 Opening browser to: ${authUrl}`);
+      logger.log(`🌐 Opening browser to: ${authUrl}`);
 
       await shell.openExternal(authUrl);
 
       return { success: true, sessionToken, authUrl };
     } catch (error) {
-      console.error("❌ Authentication flow failed:", error);
+      logger.error("❌ Authentication flow failed:", error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -213,7 +214,7 @@ class AuthFlow {
               connectedAt: Date.now(),
             });
 
-            console.log(
+            logger.log(
               `💰 Wallet connected: ${address.substring(
                 0,
                 6
@@ -230,7 +231,7 @@ class AuthFlow {
 
             res.json({ success: true, message: "Wallet address received" });
           } catch (error) {
-            console.error("❌ Wallet connection error:", error);
+            logger.error("❌ Wallet connection error:", error);
             res
               .status(500)
               .json({ success: false, error: "Internal server error" });
@@ -240,16 +241,16 @@ class AuthFlow {
         // Start server on random port
         this.server = this.app.listen(0, "localhost", () => {
           this.port = (this.server?.address() as AddressInfo)?.port || null;
-          console.log(`🚀 Auth server started on port ${this.port}`);
+          logger.log(`🚀 Auth server started on port ${this.port}`);
           resolve();
         });
 
         this.server?.on("error", (error: Error) => {
-          console.error("❌ Server error:", error);
+          logger.error("❌ Server error:", error);
           reject(error);
         });
       } catch (error) {
-        console.error("❌ Failed to start server:", error);
+        logger.error("❌ Failed to start server:", error);
         reject(error);
       }
     });
@@ -289,7 +290,7 @@ class AuthFlow {
       if (this.server) {
         this.server.close();
         this.server = null;
-        console.log("🧹 Auth server closed");
+        logger.log("🧹 Auth server closed");
       }
 
       if (this.app) {
@@ -299,9 +300,9 @@ class AuthFlow {
       this.sessionTokens.clear();
       this.walletAddresses.clear();
 
-      console.log("🧹 All sessions cleared");
+      logger.log("🧹 All sessions cleared");
     } catch (error) {
-      console.error("❌ Cleanup error:", error);
+      logger.error("❌ Cleanup error:", error);
     }
   }
 }
@@ -345,7 +346,7 @@ class CallbackServer {
           async (req: Request, res: Response) => {
             try {
               const data = req.body;
-              console.log(
+              logger.log(
                 "📞 Server callback received:",
                 data.instruction?.action
               );
@@ -433,46 +434,46 @@ class CallbackServer {
                           }))
                         : undefined,
                     };
-                    console.log(JSON.stringify(dataSummary, null, 2));
-                    console.log("=".repeat(50));
+                    logger.log(JSON.stringify(dataSummary, null, 2));
+                    logger.log("=".repeat(50));
 
                     data.instruction.data = {
                       ...data.instruction.data,
                       ...decryptedData,
                     };
                   } catch (decryptError) {
-                    console.error("❌ DECRYPTION FAILED:", decryptError);
-                    console.log("⚠️ Data remains encrypted");
+                    logger.error("❌ DECRYPTION FAILED:", decryptError);
+                    logger.log("⚠️ Data remains encrypted");
                   }
                 }
 
                 if (data.instruction.data.nonce !== undefined) {
-                  console.log("- Nonce:", data.instruction.data.nonce);
+                  logger.log("- Nonce:", data.instruction.data.nonce);
                 }
 
                 if (data.instruction.data.script) {
-                  console.log("- Script data present:");
-                  console.log(
+                  logger.log("- Script data present:");
+                  logger.log(
                     "  - Script name:",
                     data.instruction.data.script.name
                   );
-                  console.log(
+                  logger.log(
                     "  - Script version:",
                     data.instruction.data.script.version
                   );
-                  console.log(
+                  logger.log(
                     "  - Script features:",
                     data.instruction.data.script.features
                   );
-                  console.log(
+                  logger.log(
                     "  - Has code:",
                     !!data.instruction.data.script.code
                   );
-                  console.log(
+                  logger.log(
                     "  - Code length:",
                     data.instruction.data.script.code?.length || 0
                   );
-                  console.log(
+                  logger.log(
                     "  - Code preview:",
                     data.instruction.data.script.code?.substring(0, 20) +
                       "..." || "No code"
@@ -480,7 +481,7 @@ class CallbackServer {
 
                   // Forward script data to React component
                   if (win && data.instruction.data.script.code) {
-                    console.log("📜 Forwarding script to React component");
+                    logger.log("📜 Forwarding script to React component");
                     win.webContents.send("script-received", {
                       action: "script_data",
                       script: {
@@ -501,7 +502,7 @@ class CallbackServer {
                 }
               }
 
-              console.log("=".repeat(50));
+              logger.log("=".repeat(50));
 
               // Handle server callbacks and notify renderer (matching frontend pattern)
               if (win) {
@@ -540,7 +541,7 @@ class CallbackServer {
                 message: "Connection verified",
               });
             } catch (error) {
-              console.error("❌ Callback processing error:", error);
+              logger.error("❌ Callback processing error:", error);
               res
                 .status(500)
                 .json({ success: false, error: "Internal server error" });
@@ -551,11 +552,11 @@ class CallbackServer {
         // API endpoint to set session data from frontend
         this.app.post("/api/set-session", (_req: Request, res: Response) => {
           try {
-            console.log("📱 Session data updated from frontend");
+            logger.log("📱 Session data updated from frontend");
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ success: true }));
           } catch (error) {
-            console.error("❌ Set session error:", error);
+            logger.error("❌ Set session error:", error);
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(
               JSON.stringify({ success: false, error: "Internal server error" })
@@ -599,16 +600,16 @@ class CallbackServer {
 
         // Start server
         this.server = this.app.listen(this.port, "localhost", () => {
-          console.log(`🚀 Callback server started on port ${this.port}`);
+          logger.log(`🚀 Callback server started on port ${this.port}`);
           resolve();
         });
 
         this.server.on("error", (error: Error) => {
-          console.error("❌ Callback server error:", error);
+          logger.error("❌ Callback server error:", error);
           reject(error);
         });
       } catch (error) {
-        console.error("❌ Failed to start callback server:", error);
+        logger.error("❌ Failed to start callback server:", error);
         reject(error);
       }
     });
@@ -619,14 +620,14 @@ class CallbackServer {
       if (this.server) {
         this.server.close();
         this.server = null;
-        console.log("🛑 Callback server stopped");
+        logger.log("🛑 Callback server stopped");
       }
 
       if (this.app) {
         this.app = null;
       }
     } catch (error) {
-      console.error("❌ Error stopping callback server:", error);
+      logger.error("❌ Error stopping callback server:", error);
     }
   }
 
@@ -639,6 +640,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
+    autoHideMenuBar: true, // Hide menu bar (File, Edit, View, Window, Help)
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -695,9 +697,9 @@ app.whenReady().then(async () => {
   // Start callback server for receiving pings from backend
   try {
     await callbackServer.startCallbackServer();
-    console.log("✅ Callback server ready for backend pings");
+    logger.log("✅ Callback server ready for backend pings");
   } catch (error) {
-    console.error("❌ Failed to start callback server:", error);
+    logger.error("❌ Failed to start callback server:", error);
   }
 
   app.on("activate", () => {
@@ -763,14 +765,14 @@ ipcMain.handle("get-system-info", async () => {
       },
     };
 
-    console.log("💻 Real system info:", systemInfo);
+    logger.log("💻 Real system info:", systemInfo);
 
     return {
       success: true,
       ...systemInfo,
     };
   } catch (error) {
-    console.error("Failed to get system info:", error);
+    logger.error("Failed to get system info:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -791,7 +793,7 @@ ipcMain.handle("start-wallet-auth", async () => {
     const result = await authFlow.startAuth();
     return result;
   } catch (error) {
-    console.error("❌ Wallet auth failed:", error);
+    logger.error("❌ Wallet auth failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -812,7 +814,7 @@ ipcMain.handle("get-wallet-status", async (_event, sessionToken) => {
       sessionToken,
     };
   } catch (error) {
-    console.error("❌ Get wallet status failed:", error);
+    logger.error("❌ Get wallet status failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -829,11 +831,11 @@ ipcMain.handle("disconnect-wallet", async (_event, sessionToken) => {
     // Clear global device data
     globalDeviceData = null;
 
-    console.log("🧹 Wallet disconnected and all cache cleared");
+    logger.log("🧹 Wallet disconnected and all cache cleared");
 
     return { success: true, message: "Wallet disconnected and cache cleared" };
   } catch (error) {
-    console.error("❌ Disconnect wallet failed:", error);
+    logger.error("❌ Disconnect wallet failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -847,7 +849,7 @@ ipcMain.handle("get-callback-server-status", async () => {
       port: callbackServer ? callbackServer.getPort() : null,
     };
   } catch (error) {
-    console.error("❌ Get callback server status failed:", error);
+    logger.error("❌ Get callback server status failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -870,7 +872,7 @@ ipcMain.handle("start-callback-server", async () => {
       port: callbackServer.getPort(),
     };
   } catch (error) {
-    console.error("❌ Start callback server failed:", error);
+    logger.error("❌ Start callback server failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -883,7 +885,7 @@ ipcMain.handle("stop-callback-server", async () => {
     }
     return { success: true, message: "Callback server stopped" };
   } catch (error) {
-    console.error("❌ Stop callback server failed:", error);
+    logger.error("❌ Stop callback server failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -891,7 +893,7 @@ ipcMain.handle("stop-callback-server", async () => {
 // Close application handler
 ipcMain.handle("close-app", async () => {
   try {
-    console.log(
+    logger.log(
       "🔒 Closing application due to ping timeout or security violation"
     );
 
@@ -913,14 +915,14 @@ ipcMain.handle("close-app", async () => {
 
     return { success: true, message: "Application closed" };
   } catch (error) {
-    console.error("❌ Close app failed:", error);
+    logger.error("❌ Close app failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
 
 ipcMain.handle("execute-script", async (_event, params) => {
   try {
-    console.log(
+    logger.log(
       "🚀 Executing Puppeteer script:",
       params.script?.name || "Unknown"
     );
@@ -935,7 +937,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
       .toString(36)
       .substr(2, 9)}`;
     const scriptPath = path.join(scriptsDir, `${scriptId}.js`);
-    console.log("📄 Script path:", scriptPath);
+    logger.log("📄 Script path:", scriptPath);
 
     const scriptContent = params.script?.content || params.script?.code || "";
     const profile = params.settings?.profile || {};
@@ -948,7 +950,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
         parsedCustomData = JSON.parse(customData);
       }
     } catch (e) {
-      console.warn("⚠️ Failed to parse customData as JSON, using as string");
+      logger.warn("⚠️ Failed to parse customData as JSON, using as string");
     }
 
     const puppeteerScript = `
@@ -962,10 +964,10 @@ ipcMain.handle("execute-script", async (_event, params) => {
       const headlessMode = ${headless};
       const telegramConfig = ${JSON.stringify(profile.telegram || null)};
 
-      console.log('[SCRIPT] Starting Puppeteer script execution...');
-      console.log('[SCRIPT] Profile:', profile.name);
-      console.log('[SCRIPT] Headless mode:', headlessMode);
-      console.log('[SCRIPT] Telegram bot:', telegramConfig ? 'Connected' : 'Not configured');
+      logger.log('[SCRIPT] Starting Puppeteer script execution...');
+      logger.log('[SCRIPT] Profile:', profile.name);
+      logger.log('[SCRIPT] Headless mode:', headlessMode);
+      logger.log('[SCRIPT] Telegram bot:', telegramConfig ? 'Connected' : 'Not configured');
 
       // ============================================
       // TELEGRAM NOTIFICATION HELPER
@@ -977,7 +979,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
        */
       async function sendTelegramNotification(message) {
         if (!telegramConfig || !telegramConfig.connected) {
-          console.log('[TELEGRAM] Bot not configured, skipping notification');
+          logger.log('[TELEGRAM] Bot not configured, skipping notification');
           return false;
         }
 
@@ -998,14 +1000,14 @@ ipcMain.handle("execute-script", async (_event, params) => {
           const data = await response.json();
 
           if (!data.ok) {
-            console.error('[TELEGRAM] Failed to send message:', data.description);
+            logger.error('[TELEGRAM] Failed to send message:', data.description);
             return false;
           }
 
-          console.log('[TELEGRAM] Notification sent successfully');
+          logger.log('[TELEGRAM] Notification sent successfully');
           return true;
         } catch (error) {
-          console.error('[TELEGRAM] Error sending notification:', error.message);
+          logger.error('[TELEGRAM] Error sending notification:', error.message);
           return false;
         }
       }
@@ -1026,7 +1028,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
         if (profile.proxy && profile.proxy.ip && profile.proxy.port) {
           const proxyServer = \`\${profile.proxy.ip}:\${profile.proxy.port}\`;
           browserArgs.push(\`--proxy-server=\${proxyServer}\`);
-          console.log(\`[PROXY] Proxy server: \${proxyServer}\`);
+          logger.log(\`[PROXY] Proxy server: \${proxyServer}\`);
         }
 
         // If not headless start maximized
@@ -1034,7 +1036,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
           browserArgs.push("--start-maximized");
         }
 
-        console.log('[BROWSER] Launching browser with args:', browserArgs);
+        logger.log('[BROWSER] Launching browser with args:', browserArgs);
 
         const browser = await puppeteer.launch({
           headless: headlessMode,
@@ -1050,13 +1052,13 @@ ipcMain.handle("execute-script", async (_event, params) => {
             username: profile.proxy.login,
             password: profile.proxy.password
           });
-          console.log(\`[AUTH] Proxy auth: \${profile.proxy.login}\`);
+          logger.log(\`[AUTH] Proxy auth: \${profile.proxy.login}\`);
         }
 
         // Cache cleaning
         const client = await page.createCDPSession();
         await client.send("Network.clearBrowserCache");
-        console.log('[CACHE] Browser cache cleared');
+        logger.log('[CACHE] Browser cache cleared');
 
         // Viewport setting - auto-detect from profile or use defaults
         const viewport = profile.viewport || {
@@ -1064,15 +1066,15 @@ ipcMain.handle("execute-script", async (_event, params) => {
           height: 1080
         };
         await page.setViewport(viewport);
-        console.log(\`[VIEWPORT] Set to \${viewport.width}x\${viewport.height}\`);
+        logger.log(\`[VIEWPORT] Set to \${viewport.width}x\${viewport.height}\`);
 
         // Cookie 
         if (profile.cookies && profile.cookies.length > 0) {
           try {
             await page.setCookie(...profile.cookies);
-            console.log(\`[COOKIES] Set \${profile.cookies.length} cookies from profile\`);
+            logger.log(\`[COOKIES] Set \${profile.cookies.length} cookies from profile\`);
           } catch (error) {
-            console.warn('[COOKIES] Failed to set some cookies:', error.message);
+            logger.warn('[COOKIES] Failed to set some cookies:', error.message);
           }
         }
 
@@ -1112,7 +1114,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
         ...customData
       };
 
-      console.log('[CONFIG] Script config:', JSON.stringify(config, null, 2));
+      logger.log('[CONFIG] Script config:', JSON.stringify(config, null, 2));
 
       // ============================================
       // Main func
@@ -1121,7 +1123,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
         let browser, page;
 
         try {
-          console.log('[MAIN] Starting script execution...');
+          logger.log('[MAIN] Starting script execution...');
 
           // Send startup notification
           await sendTelegramNotification(
@@ -1139,7 +1141,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
 
           // Отслеживаем закрытие браузера пользователем
           browser.on('disconnected', () => {
-            console.log('[BROWSER] Browser was closed by user');
+            logger.log('[BROWSER] Browser was closed by user');
             process.send && process.send({ type: 'browser-closed', scriptId: '${scriptId}' });
             process.exit(0);
           });
@@ -1163,7 +1165,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
           // Use executeScript from an external function
           if (typeof executeScript === 'function') {
             const result = await executeScript(scriptContext);
-            console.log('[SUCCESS] Backend script result:', result);
+            logger.log('[SUCCESS] Backend script result:', result);
 
             // Send success notification
             await sendTelegramNotification(
@@ -1177,7 +1179,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
           // module.exports
           else if (typeof module !== 'undefined' && module.exports && typeof module.exports === 'function') {
             const result = await module.exports(scriptContext);
-            console.log('[SUCCESS] Backend script result:', result);
+            logger.log('[SUCCESS] Backend script result:', result);
 
             // Send success notification
             await sendTelegramNotification(
@@ -1189,11 +1191,11 @@ ipcMain.handle("execute-script", async (_event, params) => {
             return result;
           }
           else {
-            console.log('[WARNING] Script does not export expected function, running as standalone');
+            logger.log('[WARNING] Script does not export expected function, running as standalone');
           }
 
         } catch (error) {
-          console.error('[ERROR] Script execution error:', error.message);
+          logger.error('[ERROR] Script execution error:', error.message);
 
           // Send error notification
           await sendTelegramNotification(
@@ -1208,7 +1210,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
           // Закрываем браузер в любом случае
           if (browser) {
             await browser.close();
-            console.log('[CLEANUP] Browser closed');
+            logger.log('[CLEANUP] Browser closed');
             browserInstance = null;
           }
         }
@@ -1219,36 +1221,36 @@ ipcMain.handle("execute-script", async (_event, params) => {
 
       // Safe close
       async function cleanup() {
-        console.log('[CLEANUP] Shutting down gracefully...');
+        logger.log('[CLEANUP] Shutting down gracefully...');
         if (browserInstance) {
           try {
             await browserInstance.close();
-            console.log('[CLEANUP] Browser closed successfully');
+            logger.log('[CLEANUP] Browser closed successfully');
           } catch (error) {
-            console.error('[CLEANUP] Error closing browser:', error.message);
+            logger.error('[CLEANUP] Error closing browser:', error.message);
           }
         }
       }
 
       // PROCESSING SIGNALS
       process.on('SIGTERM', async () => {
-        console.log('[SIGNAL] Received SIGTERM, shutting down...');
+        logger.log('[SIGNAL] Received SIGTERM, shutting down...');
         await cleanup();
         process.exit(0);
       });
 
       process.on('SIGINT', async () => {
-        console.log('[SIGNAL] Received SIGINT, shutting down...');
+        logger.log('[SIGNAL] Received SIGINT, shutting down...');
         await cleanup();
         process.exit(0);
       });
 
       // new function start
       main().then(() => {
-        console.log('[SUCCESS] Script completed successfully');
+        logger.log('[SUCCESS] Script completed successfully');
         process.exit(0);
       }).catch((error) => {
-        console.error('[ERROR] Script failed:', error.message);
+        logger.error('[ERROR] Script failed:', error.message);
         process.exit(1);
       });
     `;
@@ -1270,13 +1272,13 @@ ipcMain.handle("execute-script", async (_event, params) => {
           fs.unlinkSync(scriptPath);
         }
       } catch (cleanupError) {
-        console.error("⚠️ Failed to cleanup script file:", cleanupError);
+        logger.error("⚠️ Failed to cleanup script file:", cleanupError);
       }
     }, 10000);
 
     return { success: true, result, scriptId };
   } catch (error) {
-    console.error("❌ Script execution failed:", error);
+    logger.error("❌ Script execution failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Script execution failed",
@@ -1324,7 +1326,7 @@ function executePuppeteerScript(
 
       child.on("message", (message: any) => {
         if (message.type === "browser-closed") {
-          console.log(`🔴 Browser closed manually for script ${scriptId}`);
+          logger.log(`🔴 Browser closed manually for script ${scriptId}`);
 
           const script = activeScripts.get(scriptId);
           if (script) {
@@ -1360,7 +1362,7 @@ function executePuppeteerScript(
       child.stdout?.on("data", (data) => {
         const text = data.toString();
         output += text;
-        console.log(`[${scriptName}] ${text.trim()}`);
+        logger.log(`[${scriptName}] ${text.trim()}`);
 
         if (win) {
           win.webContents.send("script-output", {
@@ -1375,7 +1377,7 @@ function executePuppeteerScript(
       child.stderr?.on("data", (data) => {
         const text = data.toString();
         error += text;
-        console.error(`[${scriptName}] ERROR: ${text.trim()}`);
+        logger.error(`[${scriptName}] ERROR: ${text.trim()}`);
 
         if (win) {
           win.webContents.send("script-output", {
@@ -1420,7 +1422,7 @@ function executePuppeteerScript(
           activeScripts.set(scriptId, script);
         }
 
-        console.error(`❌ Script process error: ${err.message}`);
+        logger.error(`❌ Script process error: ${err.message}`);
 
         if (win) {
           const script = activeScripts.get(scriptId);
@@ -1437,14 +1439,14 @@ function executePuppeteerScript(
 
       setTimeout(() => {
         if (child.pid && !child.killed) {
-          console.log(
+          logger.log(
             `✅ Script ${scriptName} started successfully (PID: ${child.pid})`
           );
           resolve(`Script started successfully with PID: ${child.pid}`);
         }
       }, 5000);
     } catch (error) {
-      console.error("❌ Failed to start script process:", error);
+      logger.error("❌ Failed to start script process:", error);
       reject(error);
     }
   });
@@ -1463,7 +1465,7 @@ ipcMain.handle("get-active-scripts", async () => {
 
     return { success: true, scripts };
   } catch (error) {
-    console.error("❌ Failed to get active scripts:", error);
+    logger.error("❌ Failed to get active scripts:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -1477,7 +1479,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
     }
 
     if (script.process && !script.process.killed) {
-      console.log(
+      logger.log(
         `🛑 Stopping script ${script.name} (PID: ${script.process.pid})...`
       );
 
@@ -1487,9 +1489,9 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
           execSync(`taskkill /pid ${script.process.pid} /T /F`, {
             windowsHide: true,
           });
-          console.log(`✅ Killed process tree for PID ${script.process.pid}`);
+          logger.log(`✅ Killed process tree for PID ${script.process.pid}`);
         } catch (killError) {
-          console.error(
+          logger.error(
             `⚠️ taskkill failed, using fallback method:`,
             killError
           );
@@ -1507,10 +1509,10 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
       script.status = "completed";
       activeScripts.set(scriptId, script);
 
-      console.log(`🛑 Script ${script.name} stopped`);
+      logger.log(`🛑 Script ${script.name} stopped`);
       setTimeout(() => {
         activeScripts.delete(scriptId);
-        console.log(`🧹 Cleaned up script ${scriptId} from active scripts`);
+        logger.log(`🧹 Cleaned up script ${scriptId} from active scripts`);
       }, 1000);
 
       if (win) {
@@ -1527,7 +1529,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
       return { success: false, error: "Script is not running" };
     }
   } catch (error) {
-    console.error("❌ Failed to stop script:", error);
+    logger.error("❌ Failed to stop script:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -1540,7 +1542,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
  */
 ipcMain.handle("telegram-test-connection", async (_event, httpApi: string) => {
   try {
-    console.log("🤖 Testing Telegram bot connection...");
+    logger.log("🤖 Testing Telegram bot connection...");
 
     // Validate token format
     const tokenPattern = /^bot\d+:[A-Za-z0-9_-]+$/;
@@ -1604,7 +1606,7 @@ ipcMain.handle("telegram-test-connection", async (_event, httpApi: string) => {
       username: botInfoData.result.username,
     };
   } catch (error) {
-    console.error("❌ Telegram connection test failed:", error);
+    logger.error("❌ Telegram connection test failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -1619,7 +1621,7 @@ ipcMain.handle(
   "telegram-send-message",
   async (_event, httpApi: string, chatId: string, text: string) => {
     try {
-      console.log(`📤 Sending Telegram message to chat ${chatId}...`);
+      logger.log(`📤 Sending Telegram message to chat ${chatId}...`);
 
       const response = await fetch(
         `https://api.telegram.org/${httpApi}/sendMessage`,
@@ -1651,13 +1653,13 @@ ipcMain.handle(
         };
       }
 
-      console.log("✅ Telegram message sent successfully");
+      logger.log("✅ Telegram message sent successfully");
 
       return {
         success: true,
       };
     } catch (error) {
-      console.error("❌ Failed to send Telegram message:", error);
+      logger.error("❌ Failed to send Telegram message:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -1671,7 +1673,7 @@ ipcMain.handle(
  */
 ipcMain.handle("telegram-get-chat-id", async (_event, httpApi: string) => {
   try {
-    console.log("🔍 Fetching Telegram chat ID...");
+    logger.log("🔍 Fetching Telegram chat ID...");
 
     const response = await fetch(
       `https://api.telegram.org/${httpApi}/getUpdates`,
@@ -1713,14 +1715,14 @@ ipcMain.handle("telegram-get-chat-id", async (_event, httpApi: string) => {
 
     const chatId = firstMessage.message.chat.id.toString();
 
-    console.log(`✅ Found chat ID: ${chatId}`);
+    logger.log(`✅ Found chat ID: ${chatId}`);
 
     return {
       success: true,
       chatId,
     };
   } catch (error) {
-    console.error("❌ Failed to get chat ID:", error);
+    logger.error("❌ Failed to get chat ID:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -1745,11 +1747,11 @@ ipcMain.handle("select-folder", async () => {
     }
 
     const selectedPath = result.filePaths[0];
-    console.log("📁 Folder selected:", selectedPath);
+    logger.log("📁 Folder selected:", selectedPath);
 
     return selectedPath;
   } catch (error) {
-    console.error("❌ Folder selection failed:", error);
+    logger.error("❌ Folder selection failed:", error);
     return null;
   }
 });
@@ -1773,13 +1775,13 @@ ipcMain.handle(
 
       if (fs.existsSync(tweetsFile)) {
         fs.unlinkSync(tweetsFile);
-        console.log(`✅ Deleted processed tweets file: ${tweetsFile}`);
+        logger.log(`✅ Deleted processed tweets file: ${tweetsFile}`);
         return { success: true, message: "History cleared successfully" };
       }
 
       return { success: true, message: "No history file found" };
     } catch (error) {
-      console.error("❌ Error clearing profile history:", error);
+      logger.error("❌ Error clearing profile history:", error);
       return { success: false, message: (error as Error).message };
     }
   }

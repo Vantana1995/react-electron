@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 /**
  * Device Fingerprinting Service
  * TypeScript service for collecting unique device characteristics
@@ -10,16 +11,16 @@ import { DeviceFingerprint, DeviceData } from "../types";
  */
 export async function collectDeviceInfo(): Promise<DeviceData> {
   try {
-    console.log("🔍 Collecting device information...");
+    logger.log("🔍 Collecting device information...");
 
     // Get real system info from Electron main process (Node.js)
     let realSystemInfo: any = null;
     if (window.electronAPI?.getSystemInfo) {
       try {
         realSystemInfo = await window.electronAPI.getSystemInfo();
-        console.log("💻 Got real system info from Electron:", realSystemInfo);
+        logger.log("💻 Got real system info from Electron:", realSystemInfo);
       } catch (error) {
-        console.warn("⚠️ Could not get system info from Electron:", error);
+        logger.warn("⚠️ Could not get system info from Electron:", error);
       }
     }
 
@@ -78,14 +79,14 @@ export async function collectDeviceInfo(): Promise<DeviceData> {
         fingerprint.browser.webgl = webglFingerprint;
       }
     } catch (e) {
-      console.warn("⚠️ Could not get WebGL info:", e);
+      logger.warn("⚠️ Could not get WebGL info:", e);
     }
 
     // Try to get Canvas fingerprint
     try {
       fingerprint.browser.canvas = getCanvasFingerprint();
     } catch (e) {
-      console.warn("⚠️ Could not get Canvas fingerprint:", e);
+      logger.warn("⚠️ Could not get Canvas fingerprint:", e);
     }
     
 
@@ -95,15 +96,15 @@ export async function collectDeviceInfo(): Promise<DeviceData> {
       timestamp: Date.now(),
     };
 
-    console.log("✅ Device information collected successfully");
-    console.log(
+    logger.log("✅ Device information collected successfully");
+    logger.log(
       `📱 Device: ${fingerprint.system.platform} ${fingerprint.system.architecture}`
     );
-    console.log(`💾 CPU Cores: ${fingerprint.cpu.cores}`);
+    logger.log(`💾 CPU Cores: ${fingerprint.cpu.cores}`);
 
     return deviceData;
   } catch (error) {
-    console.error("❌ Failed to collect device info:", error);
+    logger.error("❌ Failed to collect device info:", error);
     throw error;
   }
 }
