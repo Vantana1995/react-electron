@@ -45,10 +45,9 @@ interface ListenerStatus {
 export class DynamicNFTListenerManager {
   private listeners: Map<string, NFTContractListener> = new Map();
   private isRunning: boolean = false;
-  private refreshInterval: NodeJS.Timeout | null = null;
-  private readonly REFRESH_INTERVAL = 60000; // 1 minute
   private readonly MAX_RECONNECT_ATTEMPTS = 10;
   private readonly RECONNECT_DELAY = 5000; // 5 seconds
+  private readonly ERROR_RETRY_DELAY = 10000; // 10 seconds - only retry on error
 
   constructor() {
     console.log("🎨 Dynamic NFT Listener Manager initialized");
@@ -56,6 +55,7 @@ export class DynamicNFTListenerManager {
 
   /**
    * Start the manager and all required listeners
+   * Listeners will run continuously via WebSocket
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -67,12 +67,10 @@ export class DynamicNFTListenerManager {
     this.isRunning = true;
 
     // Start initial listeners based on current scripts
+    // Listeners will remain active continuously
     await this.refreshListeners();
 
-    // Start periodic refresh
-    this.startRefreshInterval();
-
-    console.log("✅ Dynamic NFT Listener Manager started successfully");
+    console.log("✅ Dynamic NFT Listener Manager started - listeners running continuously");
   }
 
   /**
@@ -87,12 +85,6 @@ export class DynamicNFTListenerManager {
     console.log("🛑 Stopping Dynamic NFT Listener Manager...");
     this.isRunning = false;
 
-    // Stop refresh interval
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
-
     // Stop all listeners
     await this.stopAllListeners();
 
@@ -101,10 +93,15 @@ export class DynamicNFTListenerManager {
 
   /**
    * Refresh listeners based on current active scripts
+   * NOTE: This runs continuously via WebSocket - listeners stay active until stopped
+   * Only called on:
+   * - Initial startup
+   * - Manual refresh request
+   * - Error recovery (auto-reconnect)
    */
   async refreshListeners(): Promise<void> {
     try {
-      console.log("🔄 Refreshing NFT listeners based on active scripts...");
+      console.log("🔄 Syncing NFT listeners with active scripts...");
 
       const db = getDBConnection();
       const scriptModel = new ScriptModel(db);
@@ -116,7 +113,7 @@ export class DynamicNFTListenerManager {
         `📋 Found ${nftAddresses.length} unique NFT contract(s) in active scripts`
       );
 
-      // Start listeners for new contracts
+      // Start listeners for new contracts (will run continuously)
       for (const contractAddress of nftAddresses) {
         if (!this.listeners.has(contractAddress)) {
           await this.startListener(contractAddress);
@@ -135,10 +132,13 @@ export class DynamicNFTListenerManager {
       }
 
       console.log(
-        `✅ Listener refresh complete: ${this.listeners.size} active listeners`
+        `✅ Listener sync complete: ${this.listeners.size} continuous listeners active`
+      );
+      console.log(
+        `📡 WebSocket connections: ${this.listeners.size} (max ~10 per provider recommended)`
       );
     } catch (error) {
-      console.error("❌ Error refreshing listeners:", error);
+      console.error("❌ Error syncing listeners:", error);
     }
   }
 
@@ -399,16 +399,15 @@ export class DynamicNFTListenerManager {
   }
 
   /**
-   * Start periodic refresh interval
+   * Manually refresh listeners (called on demand, not periodic)
+   * Used when:
+   * - New script added
+   * - Script removed
+   * - Manual trigger needed
    */
-  private startRefreshInterval(): void {
-    this.refreshInterval = setInterval(() => {
-      this.refreshListeners();
-    }, this.REFRESH_INTERVAL);
-
-    console.log(
-      `⏰ Started refresh interval: ${this.REFRESH_INTERVAL / 1000}s`
-    );
+  async manualRefresh(): Promise<void> {
+    console.log("🔄 Manual refresh triggered");
+    await this.refreshListeners();
   }
 
   /**
