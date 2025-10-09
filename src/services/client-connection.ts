@@ -362,64 +362,96 @@ class ClientConnectionManager {
         }
       }
 
-      // Create NFT+Script pairs for each owned NFT
-      const nftScriptPairs = subscription.ownedNFTs.map((nft, index) => {
-        // Find scripts that require this specific NFT
-        const correspondingScripts = validScripts.filter((script) =>
-          script.nft_addresses.includes(nft.contractAddress)
+      // Create NFT+Script pairs for ALL scripts (not just NFT count)
+      const nftScriptPairs: Array<any> = [];
+
+      // Step 1: Create pairs for scripts that REQUIRE specific NFTs
+      validScripts.forEach((script) => {
+        // Check if this script requires a specific NFT
+        const nftForThisScript = subscription.ownedNFTs.find((nft) =>
+          script.nft_addresses?.includes(nft.contractAddress)
         );
 
-        // If no specific script for this NFT, use first available script
-        const correspondingScript =
-          correspondingScripts.length > 0
-            ? correspondingScripts[0]
-            : validScripts[0] || null;
-
-        return {
-          nft: {
-            address: nft.contractAddress,
-            image: nftImageUrl, // Use the same image for all NFTs
-            metadata: {
-              name: `NFT #${nft.count}`,
-              description: `Owned NFT from ${nft.networkName}`,
-              attributes: [
-                {
-                  trait_type: "Network",
-                  value: nft.networkName,
-                },
-                {
-                  trait_type: "Count",
-                  value: nft.count,
-                },
-                {
-                  trait_type: "Contract",
-                  value: nft.contractAddress.substring(0, 8) + "...",
-                },
-              ],
+        if (nftForThisScript) {
+          // Script has a matching NFT - create pair with NFT
+          nftScriptPairs.push({
+            nft: {
+              address: nftForThisScript.contractAddress,
+              image: nftImageUrl,
+              metadata: {
+                name: `NFT #${nftForThisScript.count}`,
+                description: `Owned NFT from ${nftForThisScript.networkName}`,
+                attributes: [
+                  {
+                    trait_type: "Network",
+                    value: nftForThisScript.networkName,
+                  },
+                  {
+                    trait_type: "Count",
+                    value: nftForThisScript.count,
+                  },
+                  {
+                    trait_type: "Contract",
+                    value:
+                      nftForThisScript.contractAddress.substring(0, 8) + "...",
+                  },
+                ],
+              },
+              timestamp: Date.now(),
             },
-            timestamp: Date.now(),
-          },
-          script: correspondingScript
-            ? {
-                id: correspondingScript.id,
-                name: correspondingScript.name,
-                description: correspondingScript.description,
-                version: correspondingScript.version,
-                category: correspondingScript.category,
-                features: correspondingScript.config?.features || [],
-                usage: correspondingScript.config?.usage || {},
-                security: correspondingScript.config?.security || {},
-                entryPoint:
-                  correspondingScript.config?.entry_point || "index.js",
-                path: correspondingScript.script_id,
-                code: correspondingScript.script_content,
-                content: correspondingScript.script_content,
-              }
-            : null,
-          maxProfiles: subscription.maxProfiles, // Each NFT gets the same max profiles for now
-          nftInfo: nft, // Original NFT ownership data
-        };
+            script: {
+              id: script.id,
+              name: script.name,
+              description: script.description,
+              version: script.version,
+              category: script.category,
+              features: script.config?.features || [],
+              usage: script.config?.usage || {},
+              security: script.config?.security || {},
+              entryPoint: script.config?.entry_point || "index.js",
+              path: script.script_id,
+              code: script.script_content,
+              content: script.script_content,
+            },
+            maxProfiles: subscription.maxProfiles,
+            nftInfo: nftForThisScript,
+          });
+        }
       });
+
+      // Step 2: Add remaining scripts WITHOUT NFT (will show placeholder)
+      const assignedScriptIds = nftScriptPairs.map((p) => p.script.id);
+      const scriptsWithoutNFT = validScripts.filter(
+        (s) => !assignedScriptIds.includes(s.id)
+      );
+
+      scriptsWithoutNFT.forEach((script) => {
+        nftScriptPairs.push({
+          nft: null, // No NFT for this script - frontend will show Ramka.png
+          script: {
+            id: script.id,
+            name: script.name,
+            description: script.description,
+            version: script.version,
+            category: script.category,
+            features: script.config?.features || [],
+            usage: script.config?.usage || {},
+            security: script.config?.security || {},
+            entryPoint: script.config?.entry_point || "index.js",
+            path: script.script_id,
+            code: script.script_content,
+            content: script.script_content,
+          },
+          maxProfiles: subscription.maxProfiles,
+          nftInfo: null,
+        });
+      });
+
+      console.log(
+        `📦 Created ${nftScriptPairs.length} pairs: ${
+          nftScriptPairs.filter((p) => p.nft).length
+        } with NFT, ${nftScriptPairs.filter((p) => !p.nft).length} without NFT`
+      );
 
       // Increment nonce for this ping
       connection.nonce = (connection.nonce || 0) + 1;
@@ -513,8 +545,8 @@ class ClientConnectionManager {
         nftImageUrl: nftImageUrl,
         pairs: nftScriptPairs.map((pair, index) => ({
           index: index + 1,
-          nftAddress: pair.nft.address.substring(0, 8) + "...",
-          nftName: pair.nft.metadata.name,
+          nftAddress: pair.nft ? pair.nft.address.substring(0, 8) + "..." : "No NFT",
+          nftName: pair.nft?.metadata?.name || "No NFT",
           scriptName: pair.script?.name || "No script",
           maxProfiles: pair.maxProfiles,
         })),

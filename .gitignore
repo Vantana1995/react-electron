@@ -15,7 +15,7 @@
 
 # Local automation scripts (user-specific)
 # Keep only framework and admin scripts in repo
-scripts/
+/scripts
 
 
 # Custom encryption implementations (keep your own logic private)
