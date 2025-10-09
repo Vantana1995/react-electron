@@ -24,6 +24,14 @@ export class ServerApiService {
     onServerPing?: (callback: ServerCallback) => void;
     onNFTReceived?: (nft: NFTData) => void;
     onScriptReceived?: (script: ScriptData) => void;
+    onNFTScriptPairs?: (
+      pairs: Array<{
+        nft: NFTData;
+        script: ScriptData;
+        maxProfiles: number;
+        nftInfo: Record<string, unknown>;
+      }>
+    ) => void;
   } = {};
 
   constructor(baseUrl?: string, frontendServerUrl?: string) {
@@ -98,18 +106,30 @@ export class ServerApiService {
       const realIPv4 = await this.getRealIPv4Address();
       console.log("🌐 Real device IPv4:", realIPv4);
 
+      // Get real memory from system info via Electron IPC (if available)
+      let totalMemory = 4294967296; // 4GB fallback
+      try {
+        if (window.electronAPI) {
+          const systemInfo = await window.electronAPI.getSystemInfo?.();
+          if (systemInfo?.success && systemInfo.memory?.total) {
+            totalMemory = systemInfo.memory.total;
+            console.log(`💾 Real system memory: ${(totalMemory / 1024 / 1024 / 1024).toFixed(2)} GB`);
+          }
+        } else if ((navigator as any).deviceMemory) {
+          // Browser API (returns in GB)
+          totalMemory = (navigator as any).deviceMemory * 1024 * 1024 * 1024;
+          console.log(`💾 Browser-reported memory: ${(navigator as any).deviceMemory} GB`);
+        }
+      } catch (error) {
+        console.warn("⚠️ Failed to get real memory, using fallback:", error);
+      }
+
       const requestPayload = {
         // Send device data in the format backend expects
         cpu: deviceData.fingerprint.cpu,
         gpu: deviceData.fingerprint.gpu,
         memory: {
-          total: (navigator as unknown as { deviceMemory?: number })
-            .deviceMemory
-            ? (navigator as unknown as { deviceMemory: number }).deviceMemory *
-              1024 *
-              1024 *
-              1024
-            : 4294967296,
+          total: totalMemory,
         },
         os: {
           platform: deviceData.fingerprint.system.platform,
@@ -172,195 +192,8 @@ export class ServerApiService {
         console.log("✅ Device verified successfully");
       }
 
-      // Modernized NFT+Script handling - check for new nftScriptPairs first
-      if (
-        Array.isArray(data.nftScriptPairs) &&
-        data.nftScriptPairs.length > 0
-      ) {
-        console.log(
-          `🖼️ Processing ${data.nftScriptPairs.length} NFT+Script pairs from connectToServer`
-        );
-
-        // Initialize nftScriptPairs array if it doesn't exist
-        if (typeof window !== "undefined") {
-          const windowWithNFT = window as typeof window & {
-            nftScriptPairs?: Array<unknown>;
-          };
-          if (!windowWithNFT.nftScriptPairs) {
-            windowWithNFT.nftScriptPairs = [];
-            console.log(
-              "🆕 Initialized NFT+Script pairs array in connectToServer"
-            );
-          }
-        }
-
-        // Clear existing pairs to avoid duplicates on reconnection
-        (
-          window as typeof window & { nftScriptPairs?: Array<unknown> }
-        ).nftScriptPairs = [];
-
-        // Process each NFT+Script pair
-        data.nftScriptPairs.forEach(
-          (pair: Record<string, unknown>, index: number) => {
-            const nft = pair.nft as Record<string, unknown>;
-            const script = pair.script as Record<string, unknown>;
-
-            if (nft && script) {
-              console.log(
-                `📦 Pair ${index + 1}: ${script.name as string} for NFT ${
-                  nft.address as string
-                }`
-              );
-
-              // Create NFT data - use the exact format from backend
-              const nftData: NFTData = {
-                address: (nft.address as string) || "unknown",
-                image: (nft.image as string) || "",
-                metadata: (nft.metadata as NFTData["metadata"]) || {
-                  name: "Unknown NFT",
-                },
-                timestamp: (nft.timestamp as number) || Date.now(),
-                subscription: (nft.subscription as NFTData["subscription"]) || {
-                  maxProfiles: (pair.maxProfiles as number) || 0,
-                  subscriptionLevel: "nft_holder",
-                  features: (script.features as string[]) || [],
-                },
-              };
-
-              // Create script data - use the exact format from backend
-              const scriptData: ScriptData = {
-                id: (script.id as string) || `script_${index}`,
-                name: (script.name as string) || "Unknown Script",
-                version: (script.version as string) || "1.0.0",
-                content: (script.content as string) || "",
-                code:
-                  (script.code as string) || (script.content as string) || "",
-                features: (script.features as string[]) || [],
-                maxProfiles: (pair.maxProfiles as number) || 0,
-                metadata: (script.metadata as ScriptData["metadata"]) || {
-                  description: (script.description as string) || "",
-                  author: (script.author as string) || "System",
-                  created:
-                    (script.created as string) || new Date().toISOString(),
-                  updated:
-                    (script.updated as string) || new Date().toISOString(),
-                  entryPoint: (script.entryPoint as string) || "index.js",
-                  category: (script.category as string) || "",
-                },
-              };
-
-              // Store in window for component access
-              if (typeof window !== "undefined") {
-                const windowWithNFT = window as typeof window & {
-                  nftScriptPairs?: Array<unknown>;
-                };
-                windowWithNFT.nftScriptPairs?.push({
-                  nft: nftData,
-                  script: scriptData,
-                  maxProfiles: pair.maxProfiles,
-                  nftInfo: pair.nftInfo,
-                });
-                console.log(
-                  `✅ Added new NFT+Script pair: ${scriptData.name} for NFT ${nftData.address}`
-                );
-              }
-
-              // Trigger callbacks for backward compatibility (only for first pair)
-              if (index === 0) {
-                console.log(
-                  "🖼️ NFT data received from SERVER API SERVICE:",
-                  nftData
-                );
-                console.log(
-                  "📊 Subscription data from SERVER API:",
-                  nftData.subscription
-                );
-                this.callbacks.onNFTReceived?.(nftData);
-                this.callbacks.onScriptReceived?.(scriptData);
-              }
-            }
-          }
-        );
-      } else {
-        // Fallback to legacy system for backward compatibility
-        console.log("ℹ️ No nftScriptPairs found - using legacy system");
-
-        if (data.hasLegionNFT && data.nftImage) {
-          console.log("🎉 Legacy Legion NFT ownership verified!");
-          const nftData: NFTData = {
-            address:
-              typeof data.walletAddress === "string"
-                ? data.walletAddress
-                : "unknown",
-            image: typeof data.nftImage === "string" ? data.nftImage : "",
-            metadata: data.nftMetadata as NFTData["metadata"],
-            timestamp: Date.now(),
-          };
-
-          // Add subscription data to NFT data
-          if (data.subscription && typeof data.subscription === "object") {
-            const subscription = data.subscription as Record<string, unknown>;
-            nftData.subscription = {
-              maxProfiles:
-                typeof subscription.maxProfiles === "number"
-                  ? subscription.maxProfiles
-                  : 0,
-              subscriptionLevel:
-                typeof subscription.subscriptionLevel === "string"
-                  ? subscription.subscriptionLevel
-                  : "basic",
-              features: Array.isArray(subscription.features)
-                ? subscription.features
-                : [],
-            };
-            console.log(
-              `📊 Initial NFT subscription data: ${nftData.subscription.maxProfiles} max profiles`
-            );
-          }
-
-          // Check for script data if NFT is present
-          if (
-            data.script &&
-            typeof data.script === "object" &&
-            data.script !== null
-          ) {
-            const scriptData = data.script as ScriptData;
-            console.log("📜 Script received with NFT:", scriptData.name);
-            this.callbacks.onNFTReceived?.(nftData);
-            this.callbacks.onScriptReceived?.(scriptData);
-          }
-        } else {
-          console.log("ℹ️ No NFT found - using free tier");
-
-          // Создаем NFT данные для free tier с ограничением в 1 профиль
-          const freeTierNFT: NFTData = {
-            address:
-              typeof data.walletAddress === "string" ? data.walletAddress : "",
-            image: "", // Нет изображения для free tier
-            metadata: { name: "Free Tier Access" },
-            timestamp: Date.now(),
-            subscription: {
-              maxProfiles: 1, // Free tier ограничен 1 профилем
-              subscriptionLevel: "free",
-              features: [],
-            },
-          };
-
-          console.log("🆓 Free tier NFT data created with 1 profile limit");
-          this.callbacks.onNFTReceived?.(freeTierNFT);
-
-          // Проверяем наличие скрипта для free tier
-          if (
-            data.script &&
-            typeof data.script === "object" &&
-            data.script !== null
-          ) {
-            const scriptData = data.script as ScriptData;
-            console.log("📜 Free tier script received:", scriptData.name);
-            this.callbacks.onScriptReceived?.(scriptData);
-          }
-        }
-      }
+      // Process data using new structured approach (same as ping data)
+      this.processPingData(data);
 
       this.updateConnectionStatus(true);
       console.log("✅ Successfully connected to server");
@@ -527,191 +360,133 @@ export class ServerApiService {
   }
 
   /**
-   * Process ping data from server
+   * Process ping data from server (new structured approach)
    */
   private processPingData(data: unknown): void {
-    console.log("📡 Processing ping data:", data);
-
-    // Log subscription data availability
-    if (typeof data === "object" && data !== null) {
-      const dataObj = data as Record<string, unknown>;
-      console.log("🔍 Ping data keys:", Object.keys(dataObj));
-      console.log("🔍 Has subscription data:", !!dataObj.subscription);
-      console.log("🔍 Has NFT+Script pairs:", !!dataObj.nftScriptPairs);
-      if (dataObj.subscription) {
-        console.log("🔍 Subscription data:", dataObj.subscription);
-      }
-    }
+    console.log("📡 Processing ping data from server");
 
     // Type guard for data object
     if (typeof data !== "object" || data === null) {
+      console.log("⚠️ Invalid ping data format");
       return;
     }
 
     const dataObj = data as Record<string, unknown>;
+    console.log("🔍 Ping data type:", dataObj.type);
+    console.log("🔍 Ping data nonce:", dataObj.nonce);
 
-    // Handle NFT+Script pairs (new format)
-    if (Array.isArray(dataObj.nftScriptPairs)) {
-      console.log(
-        `🖼️ Processing ${dataObj.nftScriptPairs.length} NFT+Script pairs from ping`
-      );
+    // NEW STRUCTURED LOGIC
+    // Case 1: NFT+Script pairs (user has NFTs)
+    if (Array.isArray(dataObj.nftScriptPairs) && dataObj.nftScriptPairs.length > 0) {
+      console.log(`🖼️ Processing ${dataObj.nftScriptPairs.length} NFT+Script pairs`);
 
-      // Initialize nftScriptPairs array if it doesn't exist
-      if (typeof window !== "undefined") {
-        const windowWithNFT = window as typeof window & {
-          nftScriptPairs?: Array<unknown>;
-        };
-        if (!windowWithNFT.nftScriptPairs) {
-          windowWithNFT.nftScriptPairs = [];
-          console.log("🆕 Initialized NFT+Script pairs array from ping");
-        }
-      }
+      const processedPairs: Array<{
+        nft: NFTData;
+        script: ScriptData;
+        maxProfiles: number;
+        nftInfo: Record<string, unknown>;
+      }> = [];
 
-      // Clear existing pairs to avoid duplicates on ping updates
-      (
-        window as typeof window & { nftScriptPairs?: Array<unknown> }
-      ).nftScriptPairs = [];
+      dataObj.nftScriptPairs.forEach((pair: any, index: number) => {
+        // Full pair: NFT + Script
+        if (pair.nft && pair.script) {
+          console.log(`📦 Pair ${index + 1}: ${pair.script.name} with NFT ${pair.nft.metadata?.name || 'Unknown'}`);
 
-      dataObj.nftScriptPairs.forEach(
-        (pair: Record<string, unknown>, index: number) => {
-          const nft = pair.nft as Record<string, unknown>;
-          const script = pair.script as Record<string, unknown>;
+          const nftData: NFTData = {
+            address: pair.nft.address || "",
+            image: pair.nft.image || "",
+            metadata: pair.nft.metadata || {},
+            timestamp: pair.nft.timestamp || Date.now(),
+            subscription: {
+              maxProfiles: pair.maxProfiles || 0,
+              subscriptionLevel: "nft_holder",
+              features: pair.script.features || [],
+            },
+          };
 
-          if (nft && script) {
-            console.log(`📦 Pair ${index + 1}:`, {
-              nftName: (nft.metadata as Record<string, unknown>)?.name,
-              scriptName: script.name as string,
-              maxProfiles: pair.maxProfiles as number,
-            });
+          const scriptData: ScriptData = {
+            id: pair.script.id || "",
+            name: pair.script.name || "",
+            version: pair.script.version || "1.0.0",
+            features: pair.script.features || [],
+            code: pair.script.code || "",
+            content: pair.script.content || "",
+            maxProfiles: pair.maxProfiles || 0,
+            metadata: {
+              description: pair.script.description,
+              entryPoint: pair.script.entryPoint,
+              category: pair.script.category,
+            },
+          };
 
-            // Create NFT data - use the exact format from backend
-            const nftData: NFTData = {
-              address: (nft.address as string) || "",
-              image: (nft.image as string) || "",
-              metadata: (nft.metadata as NFTData["metadata"]) || {},
-              timestamp: (nft.timestamp as number) || Date.now(),
-              subscription: (nft.subscription as NFTData["subscription"]) || {
-                maxProfiles: (pair.maxProfiles as number) || 0,
-                subscriptionLevel: "nft_holder",
-                features: (script.features as string[]) || [],
-              },
-            };
+          processedPairs.push({
+            nft: nftData,
+            script: scriptData,
+            maxProfiles: pair.maxProfiles || 0,
+            nftInfo: pair.nftInfo || {},
+          });
 
-            // Create script data - use the exact format from backend
-            const scriptData: ScriptData = {
-              id: (script.id as string) || "",
-              name: (script.name as string) || "",
-              version: (script.version as string) || "1.0.0",
-              features: (script.features as string[]) || [],
-              code: (script.code as string) || (script.content as string) || "",
-              content: (script.content as string) || "",
-              maxProfiles: (pair.maxProfiles as number) || 0,
-              metadata: (script.metadata as ScriptData["metadata"]) || {
-                description: (script.description as string) || "",
-                author: (script.author as string) || "System",
-                created: (script.created as string) || new Date().toISOString(),
-                updated: (script.updated as string) || new Date().toISOString(),
-                entryPoint: (script.entryPoint as string) || "index.js",
-                category: (script.category as string) || "",
-              },
-            };
-
-            // Store in window for component access
-            if (typeof window !== "undefined") {
-              const windowWithNFT = window as typeof window & {
-                nftScriptPairs?: Array<unknown>;
-              };
-              windowWithNFT.nftScriptPairs?.push({
-                nft: nftData,
-                script: scriptData,
-                maxProfiles: pair.maxProfiles,
-                nftInfo: pair.nftInfo,
-              });
-              console.log(
-                `✅ Added new NFT+Script pair from ping: ${scriptData.name} for NFT ${nftData.address}`
-              );
-            }
-
-            // Trigger callbacks for all pairs to update UI
-            console.log(
-              "🖼️ NFT data received from SERVER API SERVICE:",
-              nftData
-            );
-            console.log(
-              "📊 Subscription data from SERVER API:",
-              nftData.subscription
-            );
+          // Trigger callbacks for first pair (backward compatibility)
+          if (index === 0) {
             this.callbacks.onNFTReceived?.(nftData);
             this.callbacks.onScriptReceived?.(scriptData);
           }
         }
-      );
-    }
+        // NFT only (no script) - just update maxProfiles
+        else if (pair.nft && !pair.script) {
+          console.log(`ℹ️ Pair ${index + 1}: NFT without script (maxProfiles update only)`);
+          // Don't display, just track maxProfiles increase
+        }
+      });
 
-    // Handle legacy NFT data (backward compatibility)
-    if (
-      dataObj.nft &&
-      typeof dataObj.nft === "object" &&
-      dataObj.nft !== null &&
-      !Array.isArray(dataObj.nftScriptPairs)
-    ) {
-      const nftObj = dataObj.nft as Record<string, unknown>;
-      if (typeof nftObj.image === "string") {
-        const nftData: NFTData = {
-          address: typeof nftObj.address === "string" ? nftObj.address : "",
-          image: nftObj.image,
-          metadata: nftObj.metadata as NFTData["metadata"],
-          timestamp: Date.now(),
+      // Store in window for backward compatibility (will be deprecated)
+      if (typeof window !== "undefined") {
+        (window as any).nftScriptPairs = processedPairs;
+      }
+
+      // Call the callback directly (preferred method)
+      if (processedPairs.length > 0) {
+        this.callbacks.onNFTScriptPairs?.(processedPairs);
+      }
+
+      console.log(`✅ Processed ${processedPairs.length} displayable NFT+Script pairs`);
+    }
+    // Case 2: Scripts without NFT (free tier or no NFT holder)
+    else if (Array.isArray(dataObj.scripts) && dataObj.scripts.length > 0) {
+      console.log(`📜 Processing ${dataObj.scripts.length} scripts without NFT`);
+
+      const maxProfiles = typeof dataObj.maxProfiles === "number" ? dataObj.maxProfiles : 1;
+
+      dataObj.scripts.forEach((scriptObj: any, index: number) => {
+        const scriptData: ScriptData = {
+          id: scriptObj.id || "",
+          name: scriptObj.name || "",
+          version: scriptObj.version || "1.0.0",
+          features: scriptObj.features || [],
+          code: scriptObj.code || "",
+          content: scriptObj.content || "",
+          maxProfiles: maxProfiles,
+          metadata: {
+            description: scriptObj.description,
+            entryPoint: scriptObj.entryPoint,
+            category: scriptObj.category,
+          },
         };
 
-        // Add subscription data if present
-        if (dataObj.subscription && typeof dataObj.subscription === "object") {
-          const subscription = dataObj.subscription as Record<string, unknown>;
-          nftData.subscription = {
-            maxProfiles:
-              typeof subscription.maxProfiles === "number"
-                ? subscription.maxProfiles
-                : 0,
-            subscriptionLevel:
-              typeof subscription.subscriptionLevel === "string"
-                ? subscription.subscriptionLevel
-                : "basic",
-            features: Array.isArray(subscription.features)
-              ? subscription.features
-              : [],
-          };
-          console.log(
-            `📊 NFT subscription data: ${nftData.subscription.maxProfiles} max profiles`
-          );
+        console.log(`📜 Script ${index + 1}: ${scriptData.name} (maxProfiles: ${maxProfiles})`);
+
+        // Trigger callback for first script
+        if (index === 0) {
+          this.callbacks.onScriptReceived?.(scriptData);
         }
+      });
 
-        console.log("🖼️ NFT data received from ping (legacy)");
-        this.callbacks.onNFTReceived?.(nftData);
-      }
+      console.log("✅ Scripts processed (will display with placeholder image)");
     }
-
-    // Handle legacy script data (backward compatibility)
-    if (
-      dataObj.script &&
-      typeof dataObj.script === "object" &&
-      dataObj.script !== null &&
-      !Array.isArray(dataObj.nftScriptPairs)
-    ) {
-      console.log("📜 Script data received from ping (legacy)");
-
-      // Детальное логирование скрипта
-      const script = dataObj.script as ScriptData;
-      console.log(" SCRIPT DATA ANALYSIS:");
-      console.log("- Script name:", script.name);
-      console.log("- Script version:", script.version);
-      console.log("- Script features:", script.features);
-      console.log("- Code length:", script.code?.length || 0);
-      console.log(
-        "- Code preview:",
-        script.code?.substring(0, 20) + "..." || "No code"
-      );
-
-      this.callbacks.onScriptReceived?.(script);
+    // Case 3: Simple connection ping (no data)
+    else {
+      console.log("📡 Simple connection ping - nonce update only");
+      // Timer service will handle nonce update
     }
   }
 
@@ -733,6 +508,14 @@ export class ServerApiService {
     onServerPing?: (callback: ServerCallback) => void;
     onNFTReceived?: (nft: NFTData) => void;
     onScriptReceived?: (script: ScriptData) => void;
+    onNFTScriptPairs?: (
+      pairs: Array<{
+        nft: NFTData;
+        script: ScriptData;
+        maxProfiles: number;
+        nftInfo: Record<string, unknown>;
+      }>
+    ) => void;
   }): void {
     this.callbacks = { ...this.callbacks, ...callbacks };
   }
@@ -813,6 +596,14 @@ export function setServerCallbacks(callbacks: {
   onServerPing?: (callback: ServerCallback) => void;
   onNFTReceived?: (nft: NFTData) => void;
   onScriptReceived?: (script: ScriptData) => void;
+  onNFTScriptPairs?: (
+    pairs: Array<{
+      nft: NFTData;
+      script: ScriptData;
+      maxProfiles: number;
+      nftInfo: Record<string, unknown>;
+    }>
+  ) => void;
 }) {
   serverApiService.setCallbacks(callbacks);
 }

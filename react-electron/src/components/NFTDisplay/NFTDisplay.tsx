@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { NFTData, UserProfile, ScriptData } from "../../types";
 import { useLanguage } from "../../contexts/LanguageContext";
+import RamkaPlaceholder from "../../assets/Ramka.png";
 import "./NFTDisplay.css";
 
 interface NFTDisplayProps {
@@ -48,10 +49,9 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
 }) => {
   const { t } = useLanguage();
 
-  // Ключ для сохранения состояния в localStorage
+  
   const STORAGE_KEY = "nft-display-state";
 
-  // Функция загрузки состояния из localStorage
   const loadState = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -65,7 +65,6 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     return null;
   };
 
-  // Функция сохранения состояния в localStorage
   const saveState = (state: any) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -97,9 +96,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [scriptLogs, setScriptLogs] = useState<string[]>([]);
   const [runningScriptId, setRunningScriptId] = useState<string | null>(null);
-  const [showConfigForm, setShowConfigForm] = useState<boolean>(false);
 
-  // Конфигурационные поля
   const [regexTags, setRegexTags] = useState<string[]>(
     savedState?.regexTags ?? ["crypto", "web3", "ticker", "memecoin"]
   );
@@ -117,7 +114,6 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     savedState?.navigationUrl ?? ""
   );
 
-  // Множественные запущенные скрипты
   interface RunningScript {
     scriptId: string;
     profileId: string;
@@ -133,7 +129,6 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       setImageError(false);
       console.log("🖼️ NFT data received:", nft.address);
     } else if (scriptData) {
-      // Показываем компонент даже без NFT, если есть скрипт
       setShowNFT(true);
       console.log("📜 Script data received without NFT:", scriptData.name);
     } else {
@@ -146,14 +141,13 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     console.log("🔍 NFTDisplay maxProfiles value:", maxProfiles);
   }, [maxProfiles, profiles]);
 
-  // Синхронизируем внешний navigationUrl с внутренним состоянием
   useEffect(() => {
     if (externalNavigationUrl && externalNavigationUrl !== navigationUrl) {
       setNavigationUrl(externalNavigationUrl);
     }
   }, [externalNavigationUrl]);
 
-  // Сохраняем состояние при изменении
+  
   useEffect(() => {
     saveState({
       isExpanded,
@@ -180,7 +174,6 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     navigationUrl,
   ]);
 
-  // Синхронизируем выбранный профиль с актуальным списком
   useEffect(() => {
     if (savedState?.selectedProfile && profiles.length > 0) {
       const matchingProfile = profiles.find(
@@ -192,7 +185,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     }
   }, [profiles]);
 
-  // Слушаем события скрипта (логи, остановка)
+  // Listening event from scripts
   useEffect(() => {
     if (!window.electronAPI) return;
 
@@ -203,12 +196,10 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     };
 
     const handleScriptStopped = (data: any) => {
-      // Удаляем из списка запущенных скриптов
       setRunningScripts((prev) =>
         prev.filter((s) => s.scriptId !== data.scriptId)
       );
 
-      // Если это текущий выполняющийся скрипт
       if (data.scriptId === runningScriptId) {
         setIsExecuting(false);
         setRunningScriptId(null);
@@ -221,12 +212,11 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     };
 
     const handleScriptFinished = (data: any) => {
-      // Удаляем из списка запущенных скриптов
+
       setRunningScripts((prev) =>
         prev.filter((s) => s.scriptId !== data.scriptId)
       );
 
-      // Если это текущий выполняющийся скрипт
       if (data.scriptId === runningScriptId) {
         setIsExecuting(false);
         setRunningScriptId(null);
@@ -337,10 +327,6 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       );
       return;
     }
-
-    console.log(`🚀 Executing script: ${currentScript.name}`);
-    console.log(`📋 Profile: ${selectedProfile.name}`);
-    console.log(`⚙️ Headless: ${headlessMode}`);
 
     setIsExecuting(true);
     try {
@@ -460,10 +446,6 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     }
   };
 
-  const getActiveProfilesCount = () => {
-    return profiles.filter((p) => p.isActive).length;
-  };
-
   const handleSelectFolder = async () => {
     if (window.electronAPI?.selectFolder) {
       const folderPath = await window.electronAPI.selectFolder();
@@ -567,10 +549,12 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
                     </>
                   ) : (
                     <div className="script-placeholder">
-                      <div className="script-icon">Script</div>
-                      <div className="script-name">
-                        {scriptData?.name || "Script"}
-                      </div>
+                      <img
+                        src={RamkaPlaceholder}
+                        alt={scriptData?.name || "Script"}
+                        className="nft-image"
+                        style={{ display: "block", width: "100%", height: "100%" }}
+                      />
                     </div>
                   )}
                 </div>

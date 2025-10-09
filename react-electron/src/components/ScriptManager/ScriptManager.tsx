@@ -1,6 +1,5 @@
 /**
  * ScriptManager Component
- * Управление выполнением и мониторинг Puppeteer скриптов
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -88,48 +87,25 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({ scriptData }) => {
     [scriptNFTMappings]
   );
 
-  // Execute script for specific NFT
-  const executeScriptForNFT = useCallback(
-    async (
-      nftImage: string,
-      profileSettings?: { proxyAddress?: string; [key: string]: unknown }
-    ) => {
+  // Execute script (independent of NFT)
+  const executeScript = useCallback(
+    async (profileSettings?: {
+      proxyAddress?: string;
+      [key: string]: unknown;
+    }) => {
       if (!scriptData) {
         console.error("❌ No script data available for execution");
         return;
       }
 
-      console.log("🔍 Looking for mapping...", {
-        nftImage,
-        mappingsCount: scriptNFTMappings.length,
-        mappings: scriptNFTMappings,
-      });
+      console.log(`🚀 Executing script: ${scriptData.name}`);
+      console.log(`⚙️ Profile settings:`, profileSettings);
+      console.log(`📜 Script has code:`, !!(scriptData.code || scriptData.content));
 
-      const mapping = scriptNFTMappings.find((m) => m.image === nftImage);
-      if (!mapping) {
-        console.error(`❌ No script mapping found for NFT image ${nftImage}`);
-        console.error("Available mappings:", scriptNFTMappings);
-
-        // Try to auto-associate if we have the current NFT
-        const currentNFT = getCurrentNFT();
-        if (currentNFT?.image === nftImage) {
-          console.log("🔄 Attempting auto-association...");
-          associateScriptWithNFT(nftImage);
-          // Wait for state update and retry
-          setTimeout(() => executeScriptForNFT(nftImage, profileSettings), 100);
-          return;
-        }
+      if (!scriptData.code && !scriptData.content) {
+        console.error("❌ Script has no executable code");
         return;
       }
-
-      console.log(
-        `🚀 Executing script ${scriptData.name} for NFT image ${nftImage}`
-      );
-      console.log(`⚙️ Profile settings:`, profileSettings);
-      console.log(`📜 Script content length:`, scriptData.content?.length || 0);
-
-      // TODO: Implement actual Puppeteer script execution here
-      // This should connect to the main Electron process for browser automation
 
       try {
         // Send execution request to main process via IPC
@@ -154,7 +130,7 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({ scriptData }) => {
         } else {
           console.log("📝 Script would execute with:", {
             scriptName: scriptData.name,
-            nftImage,
+            scriptId: scriptData.id,
             profileSettings,
           });
         }
@@ -162,7 +138,7 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({ scriptData }) => {
         console.error("❌ Script execution failed:", error);
       }
     },
-    [scriptData, scriptNFTMappings, getCurrentNFT, associateScriptWithNFT]
+    [scriptData]
   );
 
   // Expose functions for parent components to use
@@ -171,26 +147,23 @@ export const ScriptManager: React.FC<ScriptManagerProps> = ({ scriptData }) => {
       (
         window as typeof window & {
           scriptManager?: {
+            executeScript: (profileSettings?: {
+              proxyAddress?: string;
+              [key: string]: unknown;
+            }) => Promise<void>;
             associateScriptWithNFT: (nftImage: string) => void;
-            executeScriptForNFT: (
-              nftImage: string,
-              profileSettings?: {
-                proxyAddress?: string;
-                [key: string]: unknown;
-              }
-            ) => Promise<void>;
             getAssociatedNFT: (
               scriptId: string
             ) => ScriptNFTMapping | undefined;
           };
         }
       ).scriptManager = {
+        executeScript,
         associateScriptWithNFT,
-        executeScriptForNFT,
         getAssociatedNFT,
       };
     }
-  }, [associateScriptWithNFT, executeScriptForNFT, getAssociatedNFT]);
+  }, [executeScript, associateScriptWithNFT, getAssociatedNFT]);
 
   return (
     <div className="script-manager">

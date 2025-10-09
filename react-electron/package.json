@@ -82,6 +82,7 @@
       "!**/*.map"
     ],
     "mac": {
+      "icon": "build/icon.icns",
       "category": "public.app-category.productivity",
       "target": [
         {
@@ -95,6 +96,7 @@
       "artifactName": "${productName}-Mac-${version}-${arch}.${ext}"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -112,6 +114,7 @@
       "deleteAppDataOnUninstall": false
     },
     "linux": {
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "AppImage",

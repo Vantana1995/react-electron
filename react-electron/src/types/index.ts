@@ -274,6 +274,12 @@ export interface LogEntry {
 export interface ElectronAPI {
   // Device data
   setDeviceData: (deviceData: DeviceData) => Promise<{ success: boolean }>;
+  getSystemInfo?: () => Promise<{
+    success: boolean;
+    memory?: { total: number };
+    cpu?: { model: string; cores: number; architecture: string };
+    os?: { platform: string; release: string; architecture: string };
+  }>;
 
   // Wallet authentication
   startWalletAuth: () => Promise<AuthResult>;
@@ -593,6 +599,7 @@ export interface UserProfile {
   cookies: ProfileCookie[];
   navigationUrl?: string; // Search query URL configured for this profile
   telegram?: TelegramBotConfig; // Optional Telegram bot configuration
+  viewport?: { width: number; height: number }; // Browser viewport size
   createdAt: number;
   updatedAt: number;
   isActive: boolean;

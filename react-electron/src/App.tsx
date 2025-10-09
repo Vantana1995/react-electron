@@ -109,86 +109,65 @@ const AppContent: React.FC = () => {
     }
   }, [currentNFT, currentScript]);
 
-  // Sync with window.nftScriptPairs from serverApiService
-  useEffect(() => {
-    const checkForNFTPairs = () => {
-      if (
-        typeof window !== "undefined" &&
-        (window as typeof window & { nftScriptPairs?: Array<unknown> })
-          .nftScriptPairs
-      ) {
-        const windowWithNFT = window as typeof window & {
-          nftScriptPairs: Array<{
-            nft: NFTData;
-            script: ScriptData;
-            maxProfiles: number;
-            nftInfo: Record<string, unknown>;
-          }>;
-        };
-        const pairs = windowWithNFT.nftScriptPairs;
-        if (Array.isArray(pairs)) {
-          console.log("🔄 Syncing NFT+Script pairs from window:", pairs.length);
-
-          // Always update with latest pairs (they may have been added dynamically)
-          console.log("🔄 Updating NFT+Script pairs state");
-          setNftScriptPairs(pairs);
-
-          // Update max profiles for each script and calculate global max
-          const newScriptMaxProfiles = new Map<string, number>();
-          let globalMaxProfiles = 0;
-
-          pairs.forEach((pair) => {
-            if (pair.script && pair.script.id) {
-              const scriptId = pair.script.id;
-              const currentMax = newScriptMaxProfiles.get(scriptId) || 0;
-              const newMax = pair.maxProfiles || 0;
-
-              // Use the higher value
-              const finalMax = Math.max(currentMax, newMax);
-              newScriptMaxProfiles.set(scriptId, finalMax);
-
-              // Update global max profiles (use the highest value from all scripts)
-              globalMaxProfiles = Math.max(globalMaxProfiles, finalMax);
-
-              console.log(
-                `📊 Script ${scriptId}: maxProfiles = ${finalMax} (was ${currentMax}, new ${newMax})`
-              );
-            }
-          });
-
-          setScriptMaxProfiles(newScriptMaxProfiles);
-
-          // Set global max profiles for the application
-          if (globalMaxProfiles > 0) {
-            console.log(
-              `🌍 Setting global maxProfiles to ${globalMaxProfiles}`
-            );
-            setAppState((prev) => ({
-              ...prev,
-              profiles: {
-                ...prev.profiles,
-                maxProfiles: globalMaxProfiles,
-              },
-            }));
-          }
-
-          // Set first pair as current for backward compatibility
-          if (pairs[0]) {
-            setCurrentNFT(pairs[0].nft);
-            setCurrentScript(pairs[0].script);
-          }
-        }
+  // Handle NFT+Script pairs from server callbacks (no more window synchronization)
+  const handleNFTScriptPairs = useCallback(
+    (
+      pairs: Array<{
+        nft: NFTData;
+        script: ScriptData;
+        maxProfiles: number;
+        nftInfo: Record<string, unknown>;
+      }>
+    ) => {
+      if (!Array.isArray(pairs) || pairs.length === 0) {
+        return;
       }
-    };
 
-    // Check immediately
-    checkForNFTPairs();
+      console.log("🔄 Processing NFT+Script pairs:", pairs.length);
 
-    // Set up interval to check for updates (more frequent for dynamic updates)
-    const interval = setInterval(checkForNFTPairs, 500); // Check every 500ms
+      // Update NFT+Script pairs state
+      setNftScriptPairs(pairs);
 
-    return () => clearInterval(interval);
-  }, []);
+      // Update max profiles for each script
+      const newScriptMaxProfiles = new Map<string, number>();
+      let globalMaxProfiles = 0;
+
+      pairs.forEach((pair) => {
+        if (pair.script && pair.script.id) {
+          const scriptId = pair.script.id;
+          const currentMax = newScriptMaxProfiles.get(scriptId) || 0;
+          const newMax = pair.maxProfiles || 0;
+
+          // Use the higher value
+          const finalMax = Math.max(currentMax, newMax);
+          newScriptMaxProfiles.set(scriptId, finalMax);
+
+          // Update global max profiles (use the highest value from all scripts)
+          globalMaxProfiles = Math.max(globalMaxProfiles, finalMax);
+
+          console.log(
+            `📊 Script ${scriptId}: maxProfiles = ${finalMax} (was ${currentMax}, new ${newMax})`
+          );
+        }
+      });
+
+      setScriptMaxProfiles(newScriptMaxProfiles);
+
+      // Set first pair as current for backward compatibility
+      if (pairs[0]) {
+        setCurrentNFT(pairs[0].nft);
+        setCurrentScript(pairs[0].script);
+        setAppState((prev) => ({
+          ...prev,
+          profiles: {
+            ...prev.profiles,
+            maxProfiles: globalMaxProfiles, // Use global max for backward compatibility
+          },
+        }));
+      }
+    },
+    []
+  );
 
   /**
    * Initialize the application
@@ -284,17 +263,12 @@ const AppContent: React.FC = () => {
           }
 
           // Показываем секцию профилей сразу после успешного подключения
-          // even if there's no NFT - user can get script without NFT
-          // Check for global maxProfiles because it can be setup early from NFT+Script pairs
-          const currentMaxProfiles = appState.profiles.maxProfiles;
-          const newMaxProfiles =
-            currentMaxProfiles > 0 ? currentMaxProfiles : 1; // Minimum 1 profile for free tier
-
+          // даже если нет NFT - пользователь может получить скрипт без NFT
           setAppState((prev) => ({
             ...prev,
             profiles: {
               ...prev.profiles,
-              maxProfiles: newMaxProfiles,
+              maxProfiles: prev.profiles.maxProfiles || 1, // Минимум 1 профиль для free tier
             },
           }));
         } else {
@@ -311,11 +285,7 @@ const AppContent: React.FC = () => {
         setIsInitialized(false);
       }
     },
-    [
-      isInitialized,
-      appState.wallet.status.walletAddress,
-      appState.profiles.maxProfiles,
-    ]
+    [isInitialized, appState.wallet.status.walletAddress]
   );
 
   /**
@@ -335,46 +305,57 @@ const AppContent: React.FC = () => {
       onNFTReceived: (nft: NFTData) => {
         console.log("🖼️ NFT data received from SERVER API SERVICE:", nft);
         console.log("📊 Subscription data from SERVER API:", nft.subscription);
-        // More robust duplicate detection - check if it's the same NFT data
+
+        // Check if we already have this NFT to avoid duplicates
         const isSameNFT =
           currentNFT &&
           (currentNFT.address === nft.address ||
             (currentNFT.image === nft.image && nft.image && nft.image !== ""));
+
         if (isSameNFT) {
           console.log("🖼️ NFT already received, skipping duplicate");
-
-          console.log("- New address:", nft.address);
           return;
         }
 
-        setCurrentNFT(nft);
-        setAppState((prev) => ({
-          ...prev,
-          nft: {
-            data: nft,
-            visible: true,
-            loading: false,
-          },
-          profiles: {
-            ...prev.profiles,
-            maxProfiles: nft.subscription?.maxProfiles || 0,
-          },
-        }));
+        // For legacy single NFT handling (when no pairs are available)
+        if (nftScriptPairs.length === 0) {
+          setCurrentNFT(nft);
+          setAppState((prev) => ({
+            ...prev,
+            nft: {
+              data: nft,
+              visible: true,
+              loading: false,
+            },
+            profiles: {
+              ...prev.profiles,
+              maxProfiles: nft.subscription?.maxProfiles || 0,
+            },
+          }));
 
-        // Load profiles when NFT is received (verification complete)
-        loadProfiles();
+          // Load profiles when NFT is received (verification complete)
+          loadProfiles();
+        }
       },
 
       onScriptReceived: (script: ScriptData) => {
-        // Сохраняем скрипт в состояние для отображения кнопки
-        setCurrentScript(script);
-        setAppState((prev) => ({
-          ...prev,
-          script: {
-            data: script,
-            available: true,
-          },
-        }));
+        // For legacy single script handling (when no pairs are available)
+        if (nftScriptPairs.length === 0) {
+          setCurrentScript(script);
+          setAppState((prev) => ({
+            ...prev,
+            script: {
+              data: script,
+              available: true,
+            },
+          }));
+        }
+      },
+
+      // NEW: Direct callback for NFT+Script pairs
+      onNFTScriptPairs: (pairs) => {
+        console.log("🔗 NFT+Script pairs received via callback:", pairs.length);
+        handleNFTScriptPairs(pairs);
       },
     });
 
@@ -387,7 +368,9 @@ const AppContent: React.FC = () => {
       window.electronAPI.removeAllListeners("script-received");
 
       window.electronAPI.onServerPingReceived?.((data) => {
-        // Обработка ping данных
+        console.log("📡 IPC ping received, processing data...");
+
+        // 1. Update nonce and timer
         if (
           data.data &&
           typeof data.data === "object" &&
@@ -396,6 +379,50 @@ const AppContent: React.FC = () => {
         ) {
           timerService.updateNonce(data.data.nonce);
           timerService.resetPingTimer();
+        }
+
+        // 2. Process NFT+Script pairs (already decrypted in main.ts)
+        if (data.data?.nftScriptPairs && Array.isArray(data.data.nftScriptPairs) && data.data.nftScriptPairs.length > 0) {
+          console.log(`🔗 Processing ${data.data.nftScriptPairs.length} NFT+Script pairs from IPC`);
+          handleNFTScriptPairs(data.data.nftScriptPairs);
+        }
+        // 3. Process scripts without NFT
+        else if (data.data?.scripts && Array.isArray(data.data.scripts) && data.data.scripts.length > 0) {
+          console.log(`📜 Processing ${data.data.scripts.length} scripts without NFT from IPC`);
+          const maxProfiles = data.data.maxProfiles || 1;
+
+          // Use first script
+          if (data.data.scripts[0]) {
+            const script = data.data.scripts[0];
+            setCurrentScript({
+              id: script.id || "",
+              name: script.name || "",
+              version: script.version || "1.0.0",
+              features: script.features || [],
+              code: script.code || script.content || "",
+              content: script.content || script.code || "",
+              maxProfiles: maxProfiles,
+              metadata: {
+                description: script.description,
+                entryPoint: script.entryPoint,
+                category: script.category,
+              },
+            });
+
+            setAppState((prev) => ({
+              ...prev,
+              script: {
+                available: true,
+              },
+              profiles: {
+                ...prev.profiles,
+                maxProfiles: maxProfiles,
+              },
+            }));
+
+            // Load profiles when script is received
+            loadProfiles();
+          }
         }
       });
 
@@ -411,25 +438,15 @@ const AppContent: React.FC = () => {
       });
 
       window.electronAPI.onNFTReceived?.((data) => {
-        console.log(
-          "🖼️ NFT IPC data received from ELECTRON MAIN PROCESS:",
-          data
-        );
-        console.log(
-          "📊 Subscription data from ELECTRON:",
-          (data as Record<string, unknown>).subscription
-        );
-
         const nftData: NFTData = {
           address: data.address,
           image: data.image,
           metadata: data.metadata,
           timestamp: data.timestamp || Date.now(),
-          subscription: (data as Record<string, unknown>)
-            .subscription as NFTData["subscription"], // Include subscription data from IPC
+          subscription: (data as any).subscription as NFTData["subscription"], // Include subscription data from IPC
         };
 
-        // More robust duplicate detection - check if it's the same NFT data
+        // Check if we already have this NFT to avoid duplicates
         const isSameNFT =
           currentNFT &&
           currentNFT.image === nftData.image &&
@@ -443,22 +460,25 @@ const AppContent: React.FC = () => {
           return;
         }
 
-        setCurrentNFT(nftData);
-        setAppState((prev) => ({
-          ...prev,
-          nft: {
-            data: nftData,
-            visible: true,
-            loading: false,
-          },
-          profiles: {
-            ...prev.profiles,
-            maxProfiles: nftData.subscription?.maxProfiles || 0,
-          },
-        }));
+        // For legacy single NFT handling (when no pairs are available)
+        if (nftScriptPairs.length === 0) {
+          setCurrentNFT(nftData);
+          setAppState((prev) => ({
+            ...prev,
+            nft: {
+              data: nftData,
+              visible: true,
+              loading: false,
+            },
+            profiles: {
+              ...prev.profiles,
+              maxProfiles: nftData.subscription?.maxProfiles || 0,
+            },
+          }));
 
-        // Load profiles when NFT is received (verification complete)
-        loadProfiles();
+          // Load profiles when NFT is received (verification complete)
+          loadProfiles();
+        }
       });
 
       window.electronAPI.onScriptReceived?.((data) => {
@@ -473,14 +493,17 @@ const AppContent: React.FC = () => {
           metadata: data.script.metadata,
         };
 
-        setCurrentScript(scriptData);
-        setAppState((prev) => ({
-          ...prev,
-          script: {
-            data: scriptData,
-            available: true,
-          },
-        }));
+        // For legacy single script handling (when no pairs are available)
+        if (nftScriptPairs.length === 0) {
+          setCurrentScript(scriptData);
+          setAppState((prev) => ({
+            ...prev,
+            script: {
+              data: scriptData,
+              available: true,
+            },
+          }));
+        }
       });
 
       // Listen for script execution events
@@ -650,7 +673,7 @@ const AppContent: React.FC = () => {
       console.log("🧹 App cleanup");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scriptMaxProfiles]); // Include scriptMaxProfiles to update when script limits change
+  }, [scriptMaxProfiles, handleNFTScriptPairs]); // Include dependencies
 
   // Load profiles from localStorage once on mount
   useEffect(() => {

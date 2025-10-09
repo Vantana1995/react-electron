@@ -325,10 +325,7 @@ class CallbackServer {
         // CORS headers
         this.app.use((req: Request, res: Response, next: NextFunction) => {
           res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader(
-            "Access-Control-Allow-Methods",
-            "GET, POST, PUT, DELETE, OPTIONS"
-          );
+          res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
           res.setHeader(
             "Access-Control-Allow-Headers",
             "Content-Type, Authorization"
@@ -353,80 +350,25 @@ class CallbackServer {
                 data.instruction?.action
               );
 
-              // Детальное логирование полученных данных
-              console.log("🔍 RAW CALLBACK DATA:");
-              console.log("=".repeat(50));
-              console.log(
-                "Full callback object:",
-                JSON.stringify(data, null, 2)
-              );
-              console.log("=".repeat(50));
-
               if (data.instruction?.data) {
-                console.log("📋 INSTRUCTION DATA:");
-                console.log("- Action:", data.instruction.action);
-                console.log("- Data keys:", Object.keys(data.instruction.data));
-
-                // Проверяем, есть ли зашифрованные данные
                 if (data.instruction.data.encrypted) {
-                  console.log("🔐 ENCRYPTED DATA DETECTED:");
-                  console.log(
-                    "- Encrypted data type:",
-                    data.instruction.data.type
-                  );
-                  console.log("- Has hash:", !!data.instruction.data.hash);
-                  console.log(
-                    "- Encrypted data length:",
-                    data.instruction.data.encrypted.length
-                  );
-                  console.log(
-                    "- Encrypted data preview:",
-                    data.instruction.data.encrypted.substring(0, 100) + "..."
-                  );
-
-                  // Попытка расшифровки данных
                   try {
-                    // Импортируем функции расшифровки
                     const encryptionModule = await import(
                       "../src/utils/encryption"
                     );
                     const { decryptData, generateDeviceKey, verifyData } =
                       encryptionModule;
 
-                    // Генерируем ключ устройства используя те же значения что и бэкенд
-                    // Backend теперь получает реальный IPv4 из clientIPv4 поля
                     const cpuModel =
                       globalDeviceData?.fingerprint?.cpu?.model || "unknown";
 
-                    // Получаем реальный IPv4 из локального хранилища (был отправлен при подключении)
                     const realIPv4 =
-                      globalDeviceData?.clientIPv4 || "192.168.1.1";
-
-                    console.log("🔑 FRONTEND ENCRYPTION KEY GENERATION:");
-                    console.log("- Using CPU model:", cpuModel);
-                    console.log("- Using IP address (IPv4):", realIPv4);
-
+                      globalDeviceData?.clientIPv4 || "192.168.1.1"; // !! what is here
                     const deviceKey = generateDeviceKey(cpuModel, realIPv4);
-                    const deviceKeyHex = Buffer.isBuffer(deviceKey)
-                      ? deviceKey.toString("hex")
-                      : deviceKey;
-                    console.log(
-                      "🔑 Generated device key (hex):",
-                      deviceKeyHex.substring(0, 16) + "..."
-                    );
-                    console.log(
-                      "🔑 Full device key for comparison:",
-                      deviceKeyHex
-                    );
-
-                    // Расшифровываем данные
                     const decryptedData = decryptData(
                       data.instruction.data.encrypted,
                       deviceKey
                     );
-                    console.log("✅ DECRYPTION SUCCESSFUL!");
-                    console.log("🔍 DECRYPTED DATA:");
-                    console.log("=".repeat(50));
                     // Log only summary data without full script code
                     const dataSummary = {
                       ...decryptedData,
@@ -494,20 +436,6 @@ class CallbackServer {
                     console.log(JSON.stringify(dataSummary, null, 2));
                     console.log("=".repeat(50));
 
-                    // Проверяем целостность данных
-                    if (data.instruction.data.hash) {
-                      const isValid = verifyData(
-                        decryptedData,
-                        data.instruction.data.hash,
-                        deviceKey
-                      );
-                      console.log(
-                        "🔒 Data integrity check:",
-                        isValid ? "✅ VALID" : "❌ INVALID"
-                      );
-                    }
-
-                    // Обновляем data.instruction.data с расшифрованными данными
                     data.instruction.data = {
                       ...data.instruction.data,
                       ...decryptedData,
@@ -562,33 +490,14 @@ class CallbackServer {
                         features: data.instruction.data.script.features || [],
                         code: data.instruction.data.script.code,
                         content: data.instruction.data.script.code, // For compatibility
-                        subscriptionRequired: "legion", // Default value
                         metadata: {
                           description: data.instruction.data.script.description,
                           author: "Twitter Automation Platform",
-                          created: new Date().toISOString(),
-                          updated: new Date().toISOString(),
                         },
                       },
                       timestamp: Date.now(),
                     });
                   }
-                }
-
-                if (data.instruction.data.nft) {
-                  console.log("- NFT data present:");
-                  console.log(
-                    "  - Address:",
-                    data.instruction.data.nft.address
-                  );
-                  console.log(
-                    "  - Image URL:",
-                    data.instruction.data.nft.image
-                  );
-                  console.log(
-                    "  - Has metadata:",
-                    !!data.instruction.data.nft.metadata
-                  );
                 }
               }
 
@@ -616,38 +525,11 @@ class CallbackServer {
                 if (data.instruction?.data?.nft) {
                   win.webContents.send("nft-received", {
                     action: "nft_data",
-                    address: data.instruction.data.nft.address,
                     image: data.instruction.data.nft.image,
                     metadata: data.instruction.data.nft.metadata,
                     subscription: data.instruction.data.nft.subscription,
                     timestamp: Date.now(),
                   });
-                } else if (data.instruction?.data?.nftImage) {
-                  // Handle legacy format where nftImage and nftMetadata are separate fields
-                  const nftData = {
-                    action: "nft_data",
-                    address: data.instruction.data.walletAddress || "unknown", // Fallback address
-                    image: data.instruction.data.nftImage,
-                    metadata: data.instruction.data.nftMetadata,
-                    subscription: data.instruction.data.subscription, // subscription is at root level
-                    timestamp: Date.now(),
-                  };
-
-                  console.log(
-                    "🖼️ Sending NFT data to renderer (legacy format):"
-                  );
-                  console.log("- Address:", nftData.address);
-                  console.log(
-                    "- Image:",
-                    nftData.image?.substring(0, 50) + "..."
-                  );
-                  console.log("- Subscription:", nftData.subscription);
-                  console.log(
-                    "- MaxProfiles:",
-                    nftData.subscription?.maxProfiles
-                  );
-
-                  win.webContents.send("nft-received", nftData);
                 }
               }
 
@@ -782,11 +664,6 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 
-  // DevTools disabled for security
-  // if (process.env.NODE_ENV === "development") {
-  //   win.webContents.openDevTools();
-  // }
-
   // Handle window closed
   win.on("closed", () => {
     win = null;
@@ -846,7 +723,6 @@ app.on("before-quit", () => {
     callbackServer.stopCallbackServer();
   }
 
-  // Закрываем все активные скрипты
   activeScripts.forEach((script) => {
     if (script.process && !script.process.killed) {
       script.process.kill();
@@ -904,10 +780,6 @@ ipcMain.handle("get-system-info", async () => {
 
 ipcMain.handle("set-device-data", async (_event, deviceData) => {
   globalDeviceData = deviceData;
-  console.log("📱 Device data received from renderer:", {
-    cpuModel: deviceData?.fingerprint?.cpu?.model,
-    platform: deviceData?.fingerprint?.system?.platform,
-  });
   return { success: true };
 });
 
@@ -951,12 +823,15 @@ ipcMain.handle("disconnect-wallet", async (_event, sessionToken) => {
       return { success: false, error: "Auth flow not initialized" };
     }
 
-    if (sessionToken) {
-      authFlow.getWalletAddress(sessionToken); // This will remove it from internal maps
-      // Note: In a real implementation, you'd have proper disconnect methods
-    }
+    // Properly cleanup authentication and cache
+    authFlow.cleanup();
 
-    return { success: true, message: "Wallet disconnected" };
+    // Clear global device data
+    globalDeviceData = null;
+
+    console.log("🧹 Wallet disconnected and all cache cleared");
+
+    return { success: true, message: "Wallet disconnected and cache cleared" };
   } catch (error) {
     console.error("❌ Disconnect wallet failed:", error);
     return { success: false, error: (error as Error).message };
@@ -1043,37 +918,30 @@ ipcMain.handle("close-app", async () => {
   }
 });
 
-// Обновленный обработчик выполнения скриптов с поддержкой Puppeteer
 ipcMain.handle("execute-script", async (_event, params) => {
   try {
     console.log(
       "🚀 Executing Puppeteer script:",
       params.script?.name || "Unknown"
     );
-    console.log("📋 Profile:", params.settings?.profile?.name || "No profile");
-    console.log("⚙️ Headless:", params.settings?.headless);
 
-    // Создаем временную директорию для скриптов в системной temp папке (без пробелов)
     const tmpDir = os.tmpdir();
     const scriptsDir = path.join(tmpDir, "twitter-app-scripts");
     if (!fs.existsSync(scriptsDir)) {
       fs.mkdirSync(scriptsDir, { recursive: true });
     }
 
-    // Генерируем уникальный ID для скрипта
     const scriptId = `script-${Date.now()}-${Math.random()
       .toString(36)
       .substr(2, 9)}`;
     const scriptPath = path.join(scriptsDir, `${scriptId}.js`);
     console.log("📄 Script path:", scriptPath);
 
-    // Получаем данные из параметров
     const scriptContent = params.script?.content || params.script?.code || "";
     const profile = params.settings?.profile || {};
     const customData = params.settings?.customData || "";
     const headless = params.settings?.headless !== false; // default true
 
-    // Парсим customData если это JSON
     let parsedCustomData = {};
     try {
       if (customData && customData.trim()) {
@@ -1083,306 +951,310 @@ ipcMain.handle("execute-script", async (_event, params) => {
       console.warn("⚠️ Failed to parse customData as JSON, using as string");
     }
 
-    // Создаем Puppeteer скрипт с переданными параметрами и интеграцией backend скрипта
     const puppeteerScript = `
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+      const puppeteer = require('puppeteer-extra');
+      const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
-// Добавляем stealth плагин
-puppeteer.use(StealthPlugin());
+      puppeteer.use(StealthPlugin());
 
-// Параметры переданные от приложения
-const profile = ${JSON.stringify(profile)};
-const customData = ${JSON.stringify(parsedCustomData)};
-const headlessMode = ${headless};
-const telegramConfig = ${JSON.stringify(profile.telegram || null)};
+      const profile = ${JSON.stringify(profile)};
+      const customData = ${JSON.stringify(parsedCustomData)};
+      const headlessMode = ${headless};
+      const telegramConfig = ${JSON.stringify(profile.telegram || null)};
 
-console.log('[SCRIPT] Starting Puppeteer script execution...');
-console.log('[SCRIPT] Profile:', profile.name);
-console.log('[SCRIPT] Headless mode:', headlessMode);
-console.log('[SCRIPT] Telegram bot:', telegramConfig ? 'Connected' : 'Not configured');
+      console.log('[SCRIPT] Starting Puppeteer script execution...');
+      console.log('[SCRIPT] Profile:', profile.name);
+      console.log('[SCRIPT] Headless mode:', headlessMode);
+      console.log('[SCRIPT] Telegram bot:', telegramConfig ? 'Connected' : 'Not configured');
 
-// ============================================
-// TELEGRAM NOTIFICATION HELPER
-// ============================================
-/**
- * Send a notification to Telegram if bot is configured
- * @param {string} message - Message to send
- * @returns {Promise<boolean>} - Success status
- */
-async function sendTelegramNotification(message) {
-  if (!telegramConfig || !telegramConfig.connected) {
-    console.log('[TELEGRAM] Bot not configured, skipping notification');
-    return false;
-  }
+      // ============================================
+      // TELEGRAM NOTIFICATION HELPER
+      // ============================================
+      /**
+       * Send a notification to Telegram if bot is configured
+       * @param {string} message - Message to send
+       * @returns {Promise<boolean>} - Success status
+       */
+      async function sendTelegramNotification(message) {
+        if (!telegramConfig || !telegramConfig.connected) {
+          console.log('[TELEGRAM] Bot not configured, skipping notification');
+          return false;
+        }
 
-  try {
-    const url = \`https://api.telegram.org/\${telegramConfig.httpApi}/sendMessage\`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: telegramConfig.chatId,
-        text: message,
-        parse_mode: 'HTML'
-      }),
-    });
+        try {
+          const url = \`https://api.telegram.org/\${telegramConfig.httpApi}/sendMessage\`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chat_id: telegramConfig.chatId,
+              text: message,
+              parse_mode: 'HTML'
+            }),
+          });
 
-    const data = await response.json();
+          const data = await response.json();
 
-    if (!data.ok) {
-      console.error('[TELEGRAM] Failed to send message:', data.description);
-      return false;
-    }
+          if (!data.ok) {
+            console.error('[TELEGRAM] Failed to send message:', data.description);
+            return false;
+          }
 
-    console.log('[TELEGRAM] Notification sent successfully');
-    return true;
-  } catch (error) {
-    console.error('[TELEGRAM] Error sending notification:', error.message);
-    return false;
-  }
-}
-
-// ============================================
-// ФУНКЦИЯ ЗАПУСКА БРАУЗЕРА С ПРОФИЛЕМ
-// ============================================
-async function launchBrowserWithProfile() {
-  const browserArgs = [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-  ];
-
-  // Добавляем прокси если есть
-  // profile.proxy это объект: {login, password, ip, port}
-  if (profile.proxy && profile.proxy.ip && profile.proxy.port) {
-    const proxyServer = \`\${profile.proxy.ip}:\${profile.proxy.port}\`;
-    browserArgs.push(\`--proxy-server=\${proxyServer}\`);
-    console.log(\`[PROXY] Proxy server: \${proxyServer}\`);
-  }
-
-  // Если не headless - добавляем maximized
-  if (!headlessMode) {
-    browserArgs.push("--start-maximized");
-  }
-
-  console.log('[BROWSER] Launching browser with args:', browserArgs);
-
-  const browser = await puppeteer.launch({
-    headless: headlessMode,
-    args: browserArgs,
-    userDataDir: \`./puppeteer_profile_\${profile.id}\`,
-  });
-
-  const page = await browser.newPage();
-
-  // Если прокси требует аутентификацию
-  if (profile.proxy && profile.proxy.login && profile.proxy.password) {
-    await page.authenticate({
-      username: profile.proxy.login,
-      password: profile.proxy.password
-    });
-    console.log(\`[AUTH] Proxy auth: \${profile.proxy.login}\`);
-  }
-
-  // Очистка кеша
-  const client = await page.createCDPSession();
-  await client.send("Network.clearBrowserCache");
-  console.log('[CACHE] Browser cache cleared');
-
-  // Установка viewport
-  await page.setViewport({ width: 1920, height: 1080 });
-
-  // Установка куков из профиля если есть
-  if (profile.cookies && profile.cookies.length > 0) {
-    try {
-      await page.setCookie(...profile.cookies);
-      console.log(\`[COOKIES] Set \${profile.cookies.length} cookies from profile\`);
-    } catch (error) {
-      console.warn('[COOKIES] Failed to set some cookies:', error.message);
-    }
-  }
-
-  return { browser, page };
-}
-
-// ============================================
-// КОНФИГУРАЦИЯ СКРИПТА ИЗ РЕАЛЬНЫХ НАСТРОЕК NFTDISPLAY
-// ============================================
-const config = {
-  // URL для навигации (или дефолтный Twitter)
-  navigationUrl: ${JSON.stringify(
-    params.settings?.navigationUrl || ""
-  )} || "https://x.com",
-
-  // Regex паттерн (или дефолтный)
-  regexPattern: ${JSON.stringify(
-    params.settings?.regexPattern || ""
-  )} || "\\b(crypto|web3|ticker|memecoin)\\b",
-
-  // Шаблоны комментариев (или пустой массив)
-  commentTemplates: ${JSON.stringify(params.settings?.commentTemplates || [])},
-  regexTags: ${JSON.stringify(params.settings?.regexTags || [])},
-  saveImagesFolder: ${JSON.stringify(params.settings?.saveImagesFolder || "")},
-  enableScreenshots: ${JSON.stringify(
-    params.settings?.enableScreenshots || false
-  )},
-  delayBetweenActions: ${JSON.stringify(
-    params.settings?.delayBetweenActions || 3000
-  )},
-
-  // Дополнительные параметры
-  ...customData
-};
-
-console.log('[CONFIG] Script config:', JSON.stringify(config, null, 2));
-
-// ============================================
-// ОСНОВНАЯ ФУНКЦИЯ ВЫПОЛНЕНИЯ
-// ============================================
-async function main() {
-  let browser, page;
-
-  try {
-    console.log('[MAIN] Starting script execution...');
-
-    // Send startup notification
-    await sendTelegramNotification(
-      \`🚀 <b>Script Started</b>\\n\\n\` +
-      \`📋 Profile: <code>\${profile.name}</code>\\n\` +
-      \`⏰ Time: \${new Date().toLocaleString()}\\n\` +
-      \`🔧 Mode: \${headlessMode ? 'Headless' : 'Visible'}\`
-    );
-
-    // Запускаем браузер с настройками профиля
-    ({ browser, page } = await launchBrowserWithProfile());
-
-    // Сохраняем инстанс браузера для graceful shutdown
-    browserInstance = browser;
-
-    // Отслеживаем закрытие браузера пользователем
-    browser.on('disconnected', () => {
-      console.log('[BROWSER] Browser was closed by user');
-      process.send && process.send({ type: 'browser-closed', scriptId: '${scriptId}' });
-      process.exit(0);
-    });
-
-    // Импортируем и выполняем функцию из backend скрипта
-    ${scriptContent}
-
-    // Передаем page и config в backend скрипт
-    const scriptContext = {
-      page,
-      browser,
-      config,
-      profile,
-      telegram: {
-        sendNotification: sendTelegramNotification,
-        isConfigured: telegramConfig && telegramConfig.connected,
-        config: telegramConfig
+          console.log('[TELEGRAM] Notification sent successfully');
+          return true;
+        } catch (error) {
+          console.error('[TELEGRAM] Error sending notification:', error.message);
+          return false;
+        }
       }
-    };
 
-    // Если скрипт экспортирует функцию executeScript, используем её
-    if (typeof executeScript === 'function') {
-      const result = await executeScript(scriptContext);
-      console.log('[SUCCESS] Backend script result:', result);
+      // ============================================
+      // BROWSER WITH PROFILE
+      // ============================================
+      async function launchBrowserWithProfile() {
+        const browserArgs = [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+        ];
 
-      // Send success notification
-      await sendTelegramNotification(
-        \`✅ <b>Script Completed Successfully</b>\\n\\n\` +
-        \`📋 Profile: <code>\${profile.name}</code>\\n\` +
-        \`⏰ Time: \${new Date().toLocaleString()}\`
-      );
+        // ADDING PROXY
+        // profile.proxy its an object: {login, password, ip, port}
+        if (profile.proxy && profile.proxy.ip && profile.proxy.port) {
+          const proxyServer = \`\${profile.proxy.ip}:\${profile.proxy.port}\`;
+          browserArgs.push(\`--proxy-server=\${proxyServer}\`);
+          console.log(\`[PROXY] Proxy server: \${proxyServer}\`);
+        }
 
-      return result;
-    }
-    // Если скрипт экспортирует объект module.exports
-    else if (typeof module !== 'undefined' && module.exports && typeof module.exports === 'function') {
-      const result = await module.exports(scriptContext);
-      console.log('[SUCCESS] Backend script result:', result);
+        // If not headless start maximized
+        if (!headlessMode) {
+          browserArgs.push("--start-maximized");
+        }
 
-      // Send success notification
-      await sendTelegramNotification(
-        \`✅ <b>Script Completed Successfully</b>\\n\\n\` +
-        \`📋 Profile: <code>\${profile.name}</code>\\n\` +
-        \`⏰ Time: \${new Date().toLocaleString()}\`
-      );
+        console.log('[BROWSER] Launching browser with args:', browserArgs);
 
-      return result;
-    }
-    else {
-      console.log('[WARNING] Script does not export expected function, running as standalone');
-    }
+        const browser = await puppeteer.launch({
+          headless: headlessMode,
+          args: browserArgs,
+          userDataDir: \`./puppeteer_profile_\${profile.id}\`,
+        });
 
-  } catch (error) {
-    console.error('[ERROR] Script execution error:', error.message);
+        const page = await browser.newPage();
 
-    // Send error notification
-    await sendTelegramNotification(
-      \`❌ <b>Script Error</b>\\n\\n\` +
-      \`📋 Profile: <code>\${profile.name}</code>\\n\` +
-      \`⚠️ Error: <code>\${error.message}</code>\\n\` +
-      \`⏰ Time: \${new Date().toLocaleString()}\`
-    );
+        // Auth for proxy
+        if (profile.proxy && profile.proxy.login && profile.proxy.password) {
+          await page.authenticate({
+            username: profile.proxy.login,
+            password: profile.proxy.password
+          });
+          console.log(\`[AUTH] Proxy auth: \${profile.proxy.login}\`);
+        }
 
-    throw error;
-  } finally {
-    // Закрываем браузер в любом случае
-    if (browser) {
-      await browser.close();
-      console.log('[CLEANUP] Browser closed');
-      browserInstance = null;
-    }
-  }
-}
+        // Cache cleaning
+        const client = await page.createCDPSession();
+        await client.send("Network.clearBrowserCache");
+        console.log('[CACHE] Browser cache cleared');
 
-// Graceful shutdown handler
-let browserInstance = null;
+        // Viewport setting - auto-detect from profile or use defaults
+        const viewport = profile.viewport || {
+          width: 1920,
+          height: 1080
+        };
+        await page.setViewport(viewport);
+        console.log(\`[VIEWPORT] Set to \${viewport.width}x\${viewport.height}\`);
 
-// Функция для безопасного закрытия браузера
-async function cleanup() {
-  console.log('[CLEANUP] Shutting down gracefully...');
-  if (browserInstance) {
-    try {
-      await browserInstance.close();
-      console.log('[CLEANUP] Browser closed successfully');
-    } catch (error) {
-      console.error('[CLEANUP] Error closing browser:', error.message);
-    }
-  }
-}
+        // Cookie 
+        if (profile.cookies && profile.cookies.length > 0) {
+          try {
+            await page.setCookie(...profile.cookies);
+            console.log(\`[COOKIES] Set \${profile.cookies.length} cookies from profile\`);
+          } catch (error) {
+            console.warn('[COOKIES] Failed to set some cookies:', error.message);
+          }
+        }
 
-// Обработка сигналов остановки
-process.on('SIGTERM', async () => {
-  console.log('[SIGNAL] Received SIGTERM, shutting down...');
-  await cleanup();
-  process.exit(0);
-});
+        return { browser, page };
+      }
 
-process.on('SIGINT', async () => {
-  console.log('[SIGNAL] Received SIGINT, shutting down...');
-  await cleanup();
-  process.exit(0);
-});
+      // ============================================
+      // SCRIPT CONFIG NFTDISPLAY
+      // ============================================
+      const config = {
+        // URL to navigate
+        navigationUrl: ${JSON.stringify(
+          params.settings?.navigationUrl || ""
+        )} || "https://x.com",
 
-// Запускаем основную функцию
-main().then(() => {
-  console.log('[SUCCESS] Script completed successfully');
-  process.exit(0);
-}).catch((error) => {
-  console.error('[ERROR] Script failed:', error.message);
-  process.exit(1);
-});
+        // Regex
+        regexPattern: ${JSON.stringify(
+          params.settings?.regexPattern || ""
+        )} || "\\b(crypto|web3|ticker|memecoin)\\b",
+
+        // Templates
+        commentTemplates: ${JSON.stringify(
+          params.settings?.commentTemplates || []
+        )},
+        regexTags: ${JSON.stringify(params.settings?.regexTags || [])},
+        saveImagesFolder: ${JSON.stringify(
+          params.settings?.saveImagesFolder || ""
+        )},
+        enableScreenshots: ${JSON.stringify(
+          params.settings?.enableScreenshots || false
+        )},
+        delayBetweenActions: ${JSON.stringify(
+          params.settings?.delayBetweenActions || 3000
+        )},
+
+        // Custom data
+        ...customData
+      };
+
+      console.log('[CONFIG] Script config:', JSON.stringify(config, null, 2));
+
+      // ============================================
+      // Main func
+      // ============================================
+      async function main() {
+        let browser, page;
+
+        try {
+          console.log('[MAIN] Starting script execution...');
+
+          // Send startup notification
+          await sendTelegramNotification(
+            \`🚀 <b>Script Started</b>\\n\\n\` +
+            \`📋 Profile: <code>\${profile.name}</code>\\n\` +
+            \`⏰ Time: \${new Date().toLocaleString()}\\n\` +
+            \`🔧 Mode: \${headlessMode ? 'Headless' : 'Visible'}\`
+          );
+
+          // Запускаем браузер с настройками профиля
+          ({ browser, page } = await launchBrowserWithProfile());
+
+          // Сохраняем инстанс браузера для graceful shutdown
+          browserInstance = browser;
+
+          // Отслеживаем закрытие браузера пользователем
+          browser.on('disconnected', () => {
+            console.log('[BROWSER] Browser was closed by user');
+            process.send && process.send({ type: 'browser-closed', scriptId: '${scriptId}' });
+            process.exit(0);
+          });
+
+          // Импортируем и выполняем функцию из backend скрипта
+          ${scriptContent}
+
+          // Передаем page и config в backend скрипт
+          const scriptContext = {
+            page,
+            browser,
+            config,
+            profile,
+            telegram: {
+              sendNotification: sendTelegramNotification,
+              isConfigured: telegramConfig && telegramConfig.connected,
+              config: telegramConfig
+            }
+          };
+
+          // Use executeScript from an external function
+          if (typeof executeScript === 'function') {
+            const result = await executeScript(scriptContext);
+            console.log('[SUCCESS] Backend script result:', result);
+
+            // Send success notification
+            await sendTelegramNotification(
+              \`✅ <b>Script Completed Successfully</b>\\n\\n\` +
+              \`📋 Profile: <code>\${profile.name}</code>\\n\` +
+              \`⏰ Time: \${new Date().toLocaleString()}\`
+            );
+
+            return result;
+          }
+          // module.exports
+          else if (typeof module !== 'undefined' && module.exports && typeof module.exports === 'function') {
+            const result = await module.exports(scriptContext);
+            console.log('[SUCCESS] Backend script result:', result);
+
+            // Send success notification
+            await sendTelegramNotification(
+              \`✅ <b>Script Completed Successfully</b>\\n\\n\` +
+              \`📋 Profile: <code>\${profile.name}</code>\\n\` +
+              \`⏰ Time: \${new Date().toLocaleString()}\`
+            );
+
+            return result;
+          }
+          else {
+            console.log('[WARNING] Script does not export expected function, running as standalone');
+          }
+
+        } catch (error) {
+          console.error('[ERROR] Script execution error:', error.message);
+
+          // Send error notification
+          await sendTelegramNotification(
+            \`❌ <b>Script Error</b>\\n\\n\` +
+            \`📋 Profile: <code>\${profile.name}</code>\\n\` +
+            \`⚠️ Error: <code>\${error.message}</code>\\n\` +
+            \`⏰ Time: \${new Date().toLocaleString()}\`
+          );
+
+          throw error;
+        } finally {
+          // Закрываем браузер в любом случае
+          if (browser) {
+            await browser.close();
+            console.log('[CLEANUP] Browser closed');
+            browserInstance = null;
+          }
+        }
+      }
+
+      // Graceful shutdown handler
+      let browserInstance = null;
+
+      // Safe close
+      async function cleanup() {
+        console.log('[CLEANUP] Shutting down gracefully...');
+        if (browserInstance) {
+          try {
+            await browserInstance.close();
+            console.log('[CLEANUP] Browser closed successfully');
+          } catch (error) {
+            console.error('[CLEANUP] Error closing browser:', error.message);
+          }
+        }
+      }
+
+      // PROCESSING SIGNALS
+      process.on('SIGTERM', async () => {
+        console.log('[SIGNAL] Received SIGTERM, shutting down...');
+        await cleanup();
+        process.exit(0);
+      });
+
+      process.on('SIGINT', async () => {
+        console.log('[SIGNAL] Received SIGINT, shutting down...');
+        await cleanup();
+        process.exit(0);
+      });
+
+      // new function start
+      main().then(() => {
+        console.log('[SUCCESS] Script completed successfully');
+        process.exit(0);
+      }).catch((error) => {
+        console.error('[ERROR] Script failed:', error.message);
+        process.exit(1);
+      });
     `;
 
-    // Записываем скрипт в файл с явным указанием кодировки UTF-8
     fs.writeFileSync(scriptPath, puppeteerScript, { encoding: "utf-8" });
 
-    // Выполняем скрипт через child_process
     const profileId =
       params.settings?.profileId || params.settings?.profile?.id;
     const result = await executePuppeteerScript(
@@ -1392,17 +1264,15 @@ main().then(() => {
       profileId
     );
 
-    // Удаляем временный файл через 30 секунд (даем время скрипту запуститься)
     setTimeout(() => {
       try {
         if (fs.existsSync(scriptPath)) {
           fs.unlinkSync(scriptPath);
-          console.log(`🧹 Cleaned up script file: ${scriptPath}`);
         }
       } catch (cleanupError) {
         console.error("⚠️ Failed to cleanup script file:", cleanupError);
       }
-    }, 30000);
+    }, 10000);
 
     return { success: true, result, scriptId };
   } catch (error) {
@@ -1414,7 +1284,7 @@ main().then(() => {
   }
 });
 
-// Функция для выполнения Puppeteer скрипта
+
 function executePuppeteerScript(
   scriptPath: string,
   scriptId: string,
@@ -1423,41 +1293,35 @@ function executePuppeteerScript(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
-      console.log(`🔄 Starting script process: ${scriptName}`);
-
-      // Проверяем наличие Node.js
       const nodeCommand = process.platform === "win32" ? "node.exe" : "node";
 
       const child = spawn(nodeCommand, [scriptPath], {
         cwd: path.join(__dirname, ".."),
         env: {
           ...process.env,
-          // Добавляем node_modules пути для puppeteer и других зависимостей
           NODE_PATH: [
-            path.join(__dirname, "..", "node_modules"), // react-electron/node_modules
-            path.join(__dirname, "..", "..", "node_modules"), // root node_modules
+            path.join(__dirname, "..", "node_modules"),
+            path.join(__dirname, "..", "..", "node_modules"),
           ].join(process.platform === "win32" ? ";" : ":"),
         },
-        stdio: ["pipe", "pipe", "pipe", "ipc"], // Добавляем IPC канал
+        stdio: ["pipe", "pipe", "pipe", "ipc"],
         shell: process.platform === "win32",
       });
 
       let output = "";
       let error = "";
 
-      // Сохраняем информацию о скрипте
       const scriptInfo: ActiveScript = {
         id: scriptId,
         name: scriptName,
         process: child,
         startTime: Date.now(),
         status: "running",
-        profileId: profileId, // Сохраняем ID профиля
+        profileId: profileId, 
       };
 
       activeScripts.set(scriptId, scriptInfo);
 
-      // Обработчик сообщений от дочернего процесса (например, browser-closed)
       child.on("message", (message: any) => {
         if (message.type === "browser-closed") {
           console.log(`🔴 Browser closed manually for script ${scriptId}`);
@@ -1468,7 +1332,6 @@ function executePuppeteerScript(
             activeScripts.set(scriptId, script);
           }
 
-          // Уведомляем renderer о закрытии браузера (как при остановке скрипта)
           if (win) {
             win.webContents.send("script-stopped", {
               scriptId,
@@ -1488,7 +1351,6 @@ function executePuppeteerScript(
             });
           }
 
-          // Удаляем из активных скриптов
           setTimeout(() => {
             activeScripts.delete(scriptId);
           }, 1000);
@@ -1500,7 +1362,6 @@ function executePuppeteerScript(
         output += text;
         console.log(`[${scriptName}] ${text.trim()}`);
 
-        // Отправляем обновления в renderer процесс
         if (win) {
           win.webContents.send("script-output", {
             scriptId,
@@ -1516,7 +1377,6 @@ function executePuppeteerScript(
         error += text;
         console.error(`[${scriptName}] ERROR: ${text.trim()}`);
 
-        // Отправляем ошибки в renderer процесс
         if (win) {
           win.webContents.send("script-output", {
             scriptId,
@@ -1533,10 +1393,6 @@ function executePuppeteerScript(
           script.status = code === 0 ? "completed" : "error";
           activeScripts.set(scriptId, script);
         }
-
-        console.log(`📊 Script ${scriptName} finished with code: ${code}`);
-
-        // Уведомляем renderer о завершении
         if (win) {
           const script = activeScripts.get(scriptId);
           win.webContents.send("script-finished", {
@@ -1579,8 +1435,6 @@ function executePuppeteerScript(
         reject(err);
       });
 
-      // Автоматически резолвим через 5 секунд, если скрипт успешно запустился
-      // (так как Puppeteer скрипты могут работать долго)
       setTimeout(() => {
         if (child.pid && !child.killed) {
           console.log(
@@ -1596,7 +1450,6 @@ function executePuppeteerScript(
   });
 }
 
-// Обработчик для получения списка активных скриптов
 ipcMain.handle("get-active-scripts", async () => {
   try {
     const scripts = Array.from(activeScripts.values()).map((script) => ({
@@ -1615,7 +1468,6 @@ ipcMain.handle("get-active-scripts", async () => {
   }
 });
 
-// Обработчик для остановки скрипта
 ipcMain.handle("stop-script", async (_event, scriptId) => {
   try {
     const script = activeScripts.get(scriptId);
@@ -1629,10 +1481,9 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
         `🛑 Stopping script ${script.name} (PID: ${script.process.pid})...`
       );
 
-      // В Windows нужно убить все дочерние процессы
+    
       if (process.platform === "win32") {
         try {
-          // Используем taskkill для убийства всего дерева процессов
           execSync(`taskkill /pid ${script.process.pid} /T /F`, {
             windowsHide: true,
           });
@@ -1645,10 +1496,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
           script.process.kill("SIGKILL");
         }
       } else {
-        // В Unix/Mac используем стандартный kill
         script.process.kill("SIGTERM");
-
-        // Даем 3 секунды на graceful shutdown, потом принудительно убиваем
         setTimeout(() => {
           if (script.process && !script.process.killed) {
             script.process.kill("SIGKILL");
@@ -1660,8 +1508,6 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
       activeScripts.set(scriptId, script);
 
       console.log(`🛑 Script ${script.name} stopped`);
-
-      // Удаляем из списка активных скриптов
       setTimeout(() => {
         activeScripts.delete(scriptId);
         console.log(`🧹 Cleaned up script ${scriptId} from active scripts`);
@@ -1750,10 +1596,6 @@ ipcMain.handle("telegram-test-connection", async (_event, httpApi: string) => {
         chatId = firstMessage.message.chat.id.toString();
       }
     }
-
-    console.log(
-      `✅ Telegram bot connected: ${botInfoData.result.first_name} (@${botInfoData.result.username})`
-    );
 
     return {
       success: true,

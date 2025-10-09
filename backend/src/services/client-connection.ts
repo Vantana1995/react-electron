@@ -424,26 +424,54 @@ class ClientConnectionManager {
       // Increment nonce for this ping
       connection.nonce = (connection.nonce || 0) + 1;
 
-      // Prepare data to encrypt
-      const pingData = {
-        timestamp: Date.now(),
-        serverTime: new Date().toISOString(),
-        // New structure: array of NFT+Script pairs
-        nftScriptPairs: nftScriptPairs,
-        // Legacy support
-        scripts: scriptsData,
-        script: scriptsData[0], // Keep first script for backward compatibility
-        nft: nftScriptPairs.length > 0 ? nftScriptPairs[0].nft : null, // First NFT for backward compatibility
-        subscription: {
-          level: subscription.subscriptionLevel,
+      // Prepare data to encrypt - send only necessary structure
+      let pingData: Record<string, unknown>;
+
+      if (nftScriptPairs.length > 0) {
+        // User has NFTs - send NFT+Script pairs
+        pingData = {
+          timestamp: Date.now(),
+          serverTime: new Date().toISOString(),
+          nonce: connection.nonce,
+          nftScriptPairs: nftScriptPairs,
+          subscription: {
+            level: subscription.subscriptionLevel,
+            maxProfiles: subscription.maxProfiles,
+            ownedNFTs: subscription.ownedNFTs,
+            accessibleScripts: subscription.accessibleScripts,
+            nftCount: subscription.ownedNFTs.length,
+            scriptCount: subscription.accessibleScripts.length,
+          },
+          type: "user_scripts_with_nft",
+        };
+        console.log(`📦 Sending ${nftScriptPairs.length} NFT+Script pairs`);
+      } else if (validScripts.length > 0) {
+        // User has scripts but no NFTs - send scripts array
+        pingData = {
+          timestamp: Date.now(),
+          serverTime: new Date().toISOString(),
+          nonce: connection.nonce,
+          scripts: scriptsData,
           maxProfiles: subscription.maxProfiles,
-          ownedNFTs: subscription.ownedNFTs,
-          accessibleScripts: subscription.accessibleScripts,
-          nftCount: subscription.ownedNFTs.length,
-          scriptCount: subscription.accessibleScripts.length,
-        },
-        type: "user_scripts",
-      };
+          subscription: {
+            level: subscription.subscriptionLevel,
+            maxProfiles: subscription.maxProfiles,
+            accessibleScripts: subscription.accessibleScripts,
+            scriptCount: subscription.accessibleScripts.length,
+          },
+          type: "user_scripts_no_nft",
+        };
+        console.log(`📦 Sending ${scriptsData.length} scripts without NFT`);
+      } else {
+        // Simple ping without data
+        pingData = {
+          timestamp: Date.now(),
+          serverTime: new Date().toISOString(),
+          nonce: connection.nonce,
+          type: "connection_ping",
+        };
+        console.log("📡 Sending connection ping only");
+      }
 
       // Generate encryption key from device data
       const cpuModelForKey = connection.deviceData?.cpuModel || "unknown";
@@ -506,20 +534,6 @@ class ClientConnectionManager {
       console.error("Failed to send user scripts:", error);
       return false;
     }
-  }
-
-  /**
-   * @deprecated Use sendUserScripts() instead
-   * Legacy method for backward compatibility
-   */
-  async sendPingWithNFTData(
-    deviceHash: string,
-    nftContractAddress: string
-  ): Promise<boolean> {
-    console.warn(
-      "⚠️ sendPingWithNFTData is deprecated, use sendUserScripts instead"
-    );
-    return this.sendUserScripts(deviceHash);
   }
 
   /**
