@@ -428,13 +428,37 @@ This is a private project. For authorized contributors:
 
 ## 📄 License
 
-This project is proprietary and confidential. Unauthorized copying, distribution, or use is strictly prohibited.
+**MIT License**
+
+Copyright (c) 2025 Vantana1995
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+### Contributing
+
+This is an open-source project. You are free to:
+
+- ✅ Use, modify, and distribute this software
+- ✅ Create your own versions and forks
+- ✅ Use it for commercial purposes
+
+**However:**
+
+- The official version remains under the original repository
+- To contribute improvements to the official version, please submit pull requests
+- Your fork is your own - do what you want with it!
 
 ---
 
 ## 🆘 Support
 
 For issues or questions:
+
+- Check console logs (F12 in desktop app)
 - Review API error messages in backend logs
 - Consult detailed READMEs in component directories
 - Contact development team
@@ -464,4 +488,4 @@ For issues or questions:
 ---
 
 **Last Updated:** October 2025  
-**Version:** 0.1.0  
+**Version:** 0.1.0 
