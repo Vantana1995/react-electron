@@ -57,7 +57,7 @@ const ERC721_ABI = [
 
 // Configuration
 const SEPOLIA_RPC =
-  process.env.SEPOLIA_RPC || "https://eth-sepolia.g.alchemy.com/v2/OrVnzsLq4Nnt8B0SIP5471lFMfw0OnYA";
+  process.env.SEPOLIA_RPC;
 const NETWORK_NAME = "Sepolia Testnet";
 
 export interface NFTOwnershipResult {
