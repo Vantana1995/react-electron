@@ -655,7 +655,7 @@ function createWindow() {
       plugins: false,
       backgroundThrottling: false,
     },
-    icon: path.join(process.env.VITE_PUBLIC!, "electron-vite.svg"),
+    icon: path.join(__dirname, "..", "src", "assets", "logo.png"),
     title: "Twitter Automation Platform",
   });
 

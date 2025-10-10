@@ -25,14 +25,13 @@ import { ProfileManager } from "./components/ProfileManager";
 import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryBuilder";
 import { ThemeToggle } from "./components/ThemeToggle";
 import LanguageSwitcher from "./components/LanguageSwitcher/LanguageSwitcher";
-import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import { timerService } from "./services/timerService";
-import logoImage from "./assets/logo.png";
+import { logger } from "./utils/logger";
 import "./App.css";
 
 // Internal component that uses hooks
 const AppContent: React.FC = () => {
-  const { t } = useLanguage();
   const [appState, setAppState] = useState<AppState>({
     wallet: {
       status: { isConnected: false },
@@ -1017,12 +1016,6 @@ const AppContent: React.FC = () => {
       </div>
       {!showSearchBuilder ? (
         <div className="main-content">
-          <div className="app-header">
-            <img src={logoImage} alt="Logo" className="app-logo" />
-            <h1>{t("app.title")}</h1>
-            <p>{t("app.subtitle")}</p>
-          </div>
-
           <div className="app-main">
             <div className="main-grid">
               {/* Wallet Section - скрывается после успешного подключения */}

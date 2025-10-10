@@ -13,3 +13,6 @@ backend/nul
 .claude
 .cursor
 .vscode
+
+SCRIPT_UPLOAD_GUIDE.md
+SCRIPT_JSON_TEMPLATE.md
