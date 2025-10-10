@@ -75,15 +75,13 @@ export async function POST(request: NextRequest) {
       }`
     );
 
-    // Get client IP address - prefer clientIPv4 from request body (real device IP)
-    const clientIP = fingerprintData.clientIPv4 || getClientIP(request);
+    // Separate device IP (for fingerprint) and public IP (for callbacks)
+    const deviceIP = fingerprintData.clientIPv4 || "unknown";
+    const publicIP = getClientIP(request);
 
-    console.log(" Client IP for fingerprint:", clientIP);
-    console.log(
-      "  - From request body (clientIPv4):",
-      fingerprintData.clientIPv4 || "not provided"
-    );
-    console.log("  - From request headers:", getClientIP(request));
+    console.log("📍 IP addresses:");
+    console.log("  - Device IP (for fingerprint):", deviceIP);
+    console.log("  - Public IP (for callbacks):", publicIP);
 
     // Step 1: Generate hash from primary characteristics (cpu.model + gpu.renderer + os.architecture + webgl)
 
@@ -102,8 +100,8 @@ export async function POST(request: NextRequest) {
       os: { platform: fingerprintData.os.platform },
     });
 
-    // Step 3: Generate final device hash combining step1 + step2 + IP
-    const deviceHash = generateFinalDeviceHash(step1Hash, step2Hash, clientIP);
+    // Step 3: Generate final device hash combining step1 + step2 + device IP
+    const deviceHash = generateFinalDeviceHash(step1Hash, step2Hash, deviceIP);
 
     // Check database for existing user
     const db = getDBConnection();
@@ -158,7 +156,7 @@ export async function POST(request: NextRequest) {
         [
           step1Hash,
           deviceHash,
-          clientIP,
+          deviceIP,
           0, // Start nonce at 0
           JSON.stringify(fingerprintData),
           fingerprintData.walletAddress,
@@ -272,11 +270,11 @@ export async function POST(request: NextRequest) {
     try {
       await clientConnectionManager.registerConnection(
         deviceHash,
-        clientIP,
+        publicIP,
         0, // Start with nonce 0, will be managed by server
         {
           cpuModel: fingerprintData.cpu.model || "unknown",
-          ipAddress: clientIP,
+          ipAddress: deviceIP,
         }
       );
       console.log("✅ Connection registered with client manager");
