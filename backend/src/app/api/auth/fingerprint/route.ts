@@ -316,8 +316,8 @@ export async function POST(request: NextRequest) {
         : "Device verified successfully",
       // Optional: return some non-sensitive info for debugging
       debug: {
-        clientIP:
-          clientIP === "unknown" ? "Could not determine IP" : "IP detected",
+        deviceIP: deviceIP,
+        publicIP: publicIP,
         step1Length: step1Hash.length,
         step2Length: step2Hash.length,
         finalHashLength: deviceHash.length,
