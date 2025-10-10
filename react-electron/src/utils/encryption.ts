@@ -57,7 +57,7 @@ export function decryptData(encryptedData: string, key: string): any {
 
     // Decrypt data using AES-256-CBC
     const decrypted = CryptoJS.AES.decrypt(
-      { ciphertext: encryptedWordArray },
+      { ciphertext: encryptedWordArray } as any,
       keyWordArray,
       {
         iv: iv,

@@ -13,7 +13,7 @@ import {
 import { logger } from "../utils/logger";
 
 export class ServerApiService {
-  private baseUrl: string = "http://localhost:3000";
+  private baseUrl: string = "https://api.picule.xyz";
   private frontendServerUrl: string = "http://localhost:3001";
   private deviceHash: string | null = null;
   private sessionToken: string | null = null;
