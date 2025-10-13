@@ -11,6 +11,22 @@ export default defineConfig({
       main: {
         // Shortcut of `build.lib.entry`.
         entry: "electron/main.ts",
+        vite: {
+          build: {
+            commonjsOptions: {
+              ignoreDynamicRequires: true,
+            },
+            rollupOptions: {
+              external: [
+                'nat-api',
+                'electron',
+                'electron/main',
+                'electron/renderer',
+                'electron/common',
+              ],
+            },
+          },
+        },
       },
       preload: {
         // Shortcut of `build.rollupOptions.input`.

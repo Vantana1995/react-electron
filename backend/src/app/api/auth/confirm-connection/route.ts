@@ -50,9 +50,6 @@ export async function POST(request: NextRequest) {
 
     const db = getDBConnection();
     const userModel = new UserModel(db);
-    const scriptModel = new ScriptModel(db);
-    const nftCacheManager = new NFTCacheManager(db, 30 * 24); // 30 days cache
-    const subscriptionManager = new SubscriptionManager(db);
 
     // Find user by device hash
     const user = await userModel.findByDeviceHash(deviceHash);
@@ -138,11 +135,15 @@ export async function POST(request: NextRequest) {
         isCached: isCachedResult,
       },
       message: "Connection confirmed successfully",
-      // Start monitoring after confirmation
-      monitoring: {
+      // Tunnel connection info
+      tunnel: {
         enabled: true,
-        pingInterval: 30000, // 30 seconds
-        maxMissedPings: 3,
+        endpoint: process.env.TUNNEL_ENDPOINT || `ws://localhost:3000/tunnel`,
+        protocol: "socket.io",
+        heartbeat: {
+          pingInterval: 30000, // 30 seconds
+          timeout: 40000, // 40 seconds
+        },
       },
     });
   } catch (error) {

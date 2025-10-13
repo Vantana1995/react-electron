@@ -1,30 +1,73 @@
 {
-  "name": "Twitter Automation Platform",
-  "description": "Subscription-based Twitter automation with crypto payments and IPFS script delivery",
-  "version": "1.0.0",
-
+  "name": "Socials Automation Platform - Tunnel Architecture Migration",
+  "description": "Subscription-based  Socials automation platform migrating from direct client-server communication to secure tunnel-based architecture with WebSocket support",
+  "version": "2.0.0-tunnel-migration",
+  
   "projectType": "monorepo",
   "primaryLanguages": ["TypeScript", "JavaScript"],
   "frameworks": [
     "React",
-    "TypeScript",
+    "TypeScript", 
     "Electron",
     "Next.js",
     "Puppeteer",
-    "Web3.js"
+    "ether.js",
+    "Socket.io"
   ],
 
   "architecture": {
-    "frontend": "React + TypeScript + Electron (Vite bundler) with Puppeteer automation",
-    "backend": "Next.js API server with PostgreSQL and WebSocket",
-    "blockchain": "Ethereum smart contracts for payments",
-    "storage": "IPFS for decentralized script delivery"
+    "frontend": "Electron + React + TypeScript (Vite) with Puppeteer automation and tunnel client",
+    "backend": "Next.js API server with PostgreSQL, WebSocket tunnel server",
+    "blockchain": "Ethereum smart contracts for subscription payments",
+    "storage": "Local storage",
+    "communication": "Bidirectional tunnel-based architecture with WebSocket fallback"
   },
 
   "currentPriority": {
-    "focus": "Script execution system",
-    "problem": "Scripts arrive from server but don't execute",
-    "goal": "Configure Puppeteer browsers with user settings in memory-only environment"
+    "phase": "Testing & Integration",
+    "focus": "Tunnel-based communication testing and optimization",
+    "problem": "Migration to tunnel architecture complete, need to test and optimize",
+    "goal": "Ensure tunnel system works reliably in all network conditions",
+    "tasks": [
+      "✅ Implement WebSocket tunnel server on backend",
+      "✅ Create tunnel client in Electron app",
+      "✅ Migrate script delivery from direct fetch to tunnel push",
+      "✅ Update ping/keepalive system to work through tunnel",
+      "✅ Remove deprecated direct connection code",
+      "Test bidirectional communication through tunnel",
+      "Test in various network conditions (NAT, firewall, etc)",
+      "Performance optimization and monitoring"
+    ]
+  },
+
+  "technicalRequirements": {
+    "tunnel": {
+      "protocol": "WebSocket with custom tunneling layer",
+      "features": [
+        "Persistent bidirectional connection",
+        "Automatic reconnection with exponential backoff",
+        "Message queuing during disconnection",
+        "Heartbeat/ping system (30s interval)",
+        "Connection monitoring (40s timeout)",
+        "Device fingerprint authentication",
+        "Encrypted message payload"
+      ],
+      "libraries": ["socket.io", "socket.io-client", "ws"]
+    },
+    "migration": {
+      "deprecated": [
+        "Direct HTTP polling for script updates",
+        "REST API endpoints for real-time data",
+        "Client-initiated periodic checks",
+        "Old WebSocket direct connection code"
+      ],
+      "new": [
+        "Tunnel-based script push system",
+        "Server-initiated updates through tunnel",
+        "Event-driven architecture",
+        "Centralized tunnel connection manager"
+      ]
+    }
   },
 
   "codeStyle": {
@@ -32,56 +75,218 @@
     "quotes": "single",
     "semicolons": true,
     "trailingComma": "es5",
+    "maxLineLength": 100,
     "typescript": {
       "strict": true,
       "noImplicitAny": true,
-      "interfaces": "PascalCase",
-      "types": "PascalCase"
+      "strictNullChecks": true,
+      "noUnusedLocals": true,
+      "noUnusedParameters": true,
+      "interfaces": "PascalCase (prefix with 'I')",
+      "types": "PascalCase (prefix with 'T')",
+      "enums": "PascalCase"
     },
     "react": {
       "components": "PascalCase",
       "hooks": "camelCase with 'use' prefix",
-      "props": "camelCase"
+      "props": "camelCase",
+      "functionalComponents": "arrow functions with explicit return type"
+    },
+    "naming": {
+      "files": "kebab-case",
+      "functions": "camelCase",
+      "classes": "PascalCase", 
+      "constants": "UPPER_SNAKE_CASE",
+      "privateFields": "prefix with underscore (_privateField)"
     }
   },
 
-  "patterns": {
-    "fileNaming": "kebab-case",
-    "functions": "camelCase",
-    "classes": "PascalCase",
-    "constants": "UPPER_SNAKE_CASE"
+  "securityRequirements": {
+    "development": {
+      "antiDebug": false,
+      "devTools": true,
+      "logging": "verbose",
+      "sourceMapss": true
+    },
+    "production": {
+      "antiDebug": true,
+      "devTools": false,
+      "logging": "error only",
+      "sourceMaps": false,
+      "measures": [
+        "Memory-only script execution",
+        "Anti-debugging detection (0.5s app quit)",
+        "DevTools blocking (F12, Ctrl+Shift+I)",
+        "Device fingerprint validation on each tunnel message",
+        "Encrypted tunnel communications (AES-256)",
+        "WebSocket connection monitoring",
+        "Automatic disconnect on security violation"
+      ]
+    },
+    "authentication": {
+      "method": "Device fingerprint-based",
+      "components": ["CPU", "GPU", "Screen", "Timezone", "IP", "OS"],
+      "hashing": "farmhash + SHA-256 (backend only)",
+      "backup": "5 email addresses for recovery"
+    }
   },
-
-  "securityRequirements": [
-    "Memory-only script execution",
-    "Anti-debugging measures only for production, ar developing with debug",
-    "Device fingerprint validation",
-    "Encrypted communications",
-    "WebSocket monitoring"
-  ],
 
   "technologies": {
     "frontend": [
-      "React",
-      "TypeScript",
-      "Electron",
-      "Vite",
-      "vite-plugin-electron/simple",
-      "Puppeteer",
+      "React 18",
+      "TypeScript 5.x",
+      "Electron 28+",
+      "Vite 5.x",
+      "vite-plugin-electron",
+      "Puppeteer 21+",
       "puppeteer-extra",
+      "puppeteer-extra-plugin-stealth",
       "ghost-cursor",
-      "Web3.js",
-      "Socket.io-client"
+      "socket.io-client 4.x",
+      "crypto-js"
     ],
-    "backend": ["Next.js", "PostgreSQL", "Socket.io", "Web3.js", "IPFS"]
+    "backend": [
+      "Next.js 14 (App Router)",
+      "PostgreSQL 15+",
+      "socket.io 4.x",
+      "ws",
+      "ethers.js",
+      "farmhash",
+      "bcryptjs",
+      "joi",
+      "helmet",
+      "express-rate-limit",
+      "winston",
+      "node-cron"
+    ],
+    "development": [
+      "ESLint",
+      "Prettier",
+      "Husky",
+      "TypeScript ESLint",
+      "Jest",
+      "Supertest"
+    ]
+  },
+
+
+  "testingStrategy": {
+    "unit": [
+      "Fingerprint generation",
+      "Tunnel message serialization",
+      "Script validation",
+      "Encryption/decryption"
+    ],
+    "integration": [
+      "Tunnel connection establishment",
+      "Script delivery through tunnel",
+      "Ping/pong heartbeat system",
+      "Reconnection logic",
+      "Device authentication flow"
+    ],
+    "e2e": [
+      "Complete user journey with tunnel",
+      "Payment verification",
+      "Script execution in Puppeteer",
+      "Connection failure recovery"
+    ]
+  },
+
+  "migrationChecklist": [
+    "✓ Design tunnel protocol and message format",
+    "✓ Implement tunnel server (backend/src/services/tunnel-server.ts)",
+    "✓ Implement tunnel client (react-electron/electron/tunnel-client.ts)",
+    "✓ Migrate ping system to tunnel-based",
+    "✓ Migrate script delivery to tunnel push",
+    "✓ Update device authentication for tunnel",
+    "✓ Add reconnection logic with backoff",
+    "✓ Remove old HTTP callback code (CallbackServer)",
+    "✓ Remove UPnP and firewall setup code",
+    "✓ Update main.ts to use TunnelClient",
+    "✓ Update confirm-connection route with tunnel info",
+    "✓ Create migration documentation (TUNNEL_MIGRATION.md)",
+    "⏳ Test bidirectional communication",
+    "⏳ Deploy and test in production environment"
+  ],
+
+  "developmentGuidelines": {
+    "tunnel_implementation": {
+      "message_format": {
+        "type": "event type (string)",
+        "payload": "encrypted data (object)",
+        "timestamp": "ISO 8601 timestamp",
+        "signature": "HMAC signature for verification"
+      },
+      "connection_flow": [
+        "1. Client connects to tunnel endpoint",
+        "2. Client sends device fingerprint",
+        "3. Server validates fingerprint against database",
+        "4. Server associates socket with user_id",
+        "5. Server sends authentication confirmation",
+        "6. Bidirectional tunnel established",
+        "7. Ping/pong every 30 seconds",
+        "8. Disconnect if no pong for 40 seconds"
+      ],
+      "error_handling": [
+        "Invalid fingerprint → close connection",
+        "Expired subscription → notify and close",
+        "Connection timeout → exponential backoff retry",
+        "Message parsing error → log and ignore",
+        "Server overload → queue messages"
+      ]
+    },
+    "code_cleanup": {
+      "remove": [
+        "Old WebSocket handlers not using tunnel",
+        "HTTP polling functions",
+        "Deprecated API endpoints",
+        "Unused middleware",
+        "Legacy authentication code"
+      ],
+      "refactor": [
+        "Consolidate tunnel logic in single module",
+        "Centralize error handling",
+        "Unify message serialization",
+        "Simplify reconnection logic"
+      ]
+    }
+  },
+
+  "performanceTargets": {
+    "tunnel": {
+      "connection_time": "< 2 seconds",
+      "ping_latency": "< 500ms",
+      "message_delivery": "< 1 second",
+      "reconnection_time": "< 5 seconds"
+    },
+    "script_execution": {
+      "delivery_time": "< 3 seconds",
+      "load_to_memory": "< 1 second",
+      "execution_start": "< 2 seconds"
+    }
   },
 
   "excludeFromContext": [
     "node_modules/",
     "dist/",
     "build/",
+    "out/",
+    ".next/",
     "*.log",
     ".env*",
-    "coverage/"
-  ]
+    "coverage/",
+    ".vscode/",
+    ".idea/",
+    "*.min.js",
+    "*.map"
+  ],
+
+  "documentationLinks": {
+    "socket_io": "https://socket.io/docs/v4/",
+    "puppeteer": "https://pptr.dev/",
+    "electron": "https://www.electronjs.org/docs/latest/",
+    "next_js": "https://nextjs.org/docs",
+    "web3_js": "https://web3js.readthedocs.io/",
+    "ipfs": "https://docs.ipfs.tech/"
+  }
 }

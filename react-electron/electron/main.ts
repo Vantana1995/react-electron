@@ -1,5 +1,5 @@
 /**
- * Twitter Automation Platform - Electron Main Process
+ * Social Automation Platform - Electron Main Process
  * TypeScript version with Puppeteer script execution support
  */
 
@@ -14,6 +14,8 @@ import { spawn, execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import { logger } from "./logger";
+import { TunnelClient } from "./tunnel-client";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The built directory structure
@@ -38,16 +40,15 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 let win: BrowserWindow | null;
 let authFlow: AuthFlow | null = null;
-let callbackServer: CallbackServer | null = null;
+let tunnelClient: TunnelClient | null = null;
 
-// Хранилище активных скриптов
 interface ActiveScript {
   id: string;
   name: string;
   process: import("child_process").ChildProcess;
   startTime: number;
   status: "running" | "completed" | "error";
-  profileId?: string; // ID профиля для связи скрипта с профилем
+  profileId?: string;
 }
 
 const activeScripts = new Map<string, ActiveScript>();
@@ -142,7 +143,7 @@ class AuthFlow {
             </head>
             <body>
               <div class="container">
-                <h1>🔗 Connect Wallet</h1>
+                <h1> Connect Wallet</h1>
                 <p>Connect your MetaMask wallet to continue</p>
                 <button onclick="connectWallet()">Connect MetaMask</button>
               </div>
@@ -213,13 +214,6 @@ class AuthFlow {
               walletAddress: address,
               connectedAt: Date.now(),
             });
-
-            logger.log(
-              `💰 Wallet connected: ${address.substring(
-                0,
-                6
-              )}...${address.substring(address.length - 4)}`
-            );
 
             // Notify renderer process
             if (win) {
@@ -307,334 +301,7 @@ class AuthFlow {
   }
 }
 
-/**
- * Callback Server Manager
- */
-class CallbackServer {
-  private app: express.Application | null = null;
-  private server: Server | null = null;
-  private port: number = 3001;
-
-  async startCallbackServer(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        this.app = express();
-
-        this.app.use(express.json({ limit: "1mb" }));
-        this.app.use(express.urlencoded({ extended: true, limit: "1mb" }));
-
-        // CORS headers
-        this.app.use((req: Request, res: Response, next: NextFunction) => {
-          res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-          res.setHeader(
-            "Access-Control-Allow-Headers",
-            "Content-Type, Authorization"
-          );
-
-          if (req.method === "OPTIONS") {
-            res.writeHead(200);
-            res.end();
-            return;
-          }
-          next();
-        });
-
-        // API endpoint to receive server callbacks/pings
-        this.app.post(
-          "/api/server-callback",
-          async (req: Request, res: Response) => {
-            try {
-              const data = req.body;
-              logger.log(
-                "📞 Server callback received:",
-                data.instruction?.action
-              );
-
-              if (data.instruction?.data) {
-                if (data.instruction.data.encrypted) {
-                  try {
-                    const encryptionModule = await import(
-                      "../src/utils/encryption"
-                    );
-                    const { decryptData, generateDeviceKey, verifyData } =
-                      encryptionModule;
-
-                    const cpuModel =
-                      globalDeviceData?.fingerprint?.cpu?.model || "unknown";
-
-                    const realIPv4 =
-                      globalDeviceData?.clientIPv4 || "192.168.1.1"; // !! what is here
-                    const deviceKey = generateDeviceKey(cpuModel, realIPv4);
-                    const decryptedData = decryptData(
-                      data.instruction.data.encrypted,
-                      deviceKey
-                    );
-                    // Log only summary data without full script code
-                    const dataSummary = {
-                      ...decryptedData,
-                      script: decryptedData.script
-                        ? {
-                            ...decryptedData.script,
-                            code: decryptedData.script.code
-                              ? `${decryptedData.script.code.substring(
-                                  0,
-                                  20
-                                )}... (${
-                                  decryptedData.script.code.length
-                                } chars)`
-                              : undefined,
-                            content: decryptedData.script.content
-                              ? `${decryptedData.script.content.substring(
-                                  0,
-                                  20
-                                )}... (${
-                                  decryptedData.script.content.length
-                                } chars)`
-                              : undefined,
-                          }
-                        : undefined,
-                      scripts: decryptedData.scripts
-                        ? decryptedData.scripts.map((s: any) => ({
-                            ...s,
-                            code: s.code
-                              ? `${s.code.substring(0, 20)}... (${
-                                  s.code.length
-                                } chars)`
-                              : undefined,
-                            content: s.content
-                              ? `${s.content.substring(0, 20)}... (${
-                                  s.content.length
-                                } chars)`
-                              : undefined,
-                          }))
-                        : undefined,
-                      nftScriptPairs: decryptedData.nftScriptPairs
-                        ? decryptedData.nftScriptPairs.map((pair: any) => ({
-                            ...pair,
-                            script: pair.script
-                              ? {
-                                  ...pair.script,
-                                  code: pair.script.code
-                                    ? `${pair.script.code.substring(
-                                        0,
-                                        20
-                                      )}... (${pair.script.code.length} chars)`
-                                    : undefined,
-                                  content: pair.script.content
-                                    ? `${pair.script.content.substring(
-                                        0,
-                                        20
-                                      )}... (${
-                                        pair.script.content.length
-                                      } chars)`
-                                    : undefined,
-                                }
-                              : undefined,
-                          }))
-                        : undefined,
-                    };
-                    logger.log(JSON.stringify(dataSummary, null, 2));
-                    logger.log("=".repeat(50));
-
-                    data.instruction.data = {
-                      ...data.instruction.data,
-                      ...decryptedData,
-                    };
-                  } catch (decryptError) {
-                    logger.error("❌ DECRYPTION FAILED:", decryptError);
-                    logger.log("⚠️ Data remains encrypted");
-                  }
-                }
-
-                if (data.instruction.data.nonce !== undefined) {
-                  logger.log("- Nonce:", data.instruction.data.nonce);
-                }
-
-                if (data.instruction.data.script) {
-                  logger.log("- Script data present:");
-                  logger.log(
-                    "  - Script name:",
-                    data.instruction.data.script.name
-                  );
-                  logger.log(
-                    "  - Script version:",
-                    data.instruction.data.script.version
-                  );
-                  logger.log(
-                    "  - Script features:",
-                    data.instruction.data.script.features
-                  );
-                  logger.log(
-                    "  - Has code:",
-                    !!data.instruction.data.script.code
-                  );
-                  logger.log(
-                    "  - Code length:",
-                    data.instruction.data.script.code?.length || 0
-                  );
-                  logger.log(
-                    "  - Code preview:",
-                    data.instruction.data.script.code?.substring(0, 20) +
-                      "..." || "No code"
-                  );
-
-                  // Forward script data to React component
-                  if (win && data.instruction.data.script.code) {
-                    logger.log("📜 Forwarding script to React component");
-                    win.webContents.send("script-received", {
-                      action: "script_data",
-                      script: {
-                        id: data.instruction.data.script.id,
-                        name: data.instruction.data.script.name,
-                        version: data.instruction.data.script.version,
-                        features: data.instruction.data.script.features || [],
-                        code: data.instruction.data.script.code,
-                        content: data.instruction.data.script.code, // For compatibility
-                        metadata: {
-                          description: data.instruction.data.script.description,
-                          author: "Twitter Automation Platform",
-                        },
-                      },
-                      timestamp: Date.now(),
-                    });
-                  }
-                }
-              }
-
-              logger.log("=".repeat(50));
-
-              // Handle server callbacks and notify renderer (matching frontend pattern)
-              if (win) {
-                // Handle counter updates first
-                if (data.instruction?.data?.nonce !== undefined) {
-                  win.webContents.send("ping-counter-update", {
-                    action: "update_counter",
-                    nonce: data.instruction.data.nonce,
-                    timestamp: Date.now(),
-                  });
-                }
-
-                // Then notify about ping data
-                win.webContents.send("server-ping-received", {
-                  action: "ping_data",
-                  data: data.instruction?.data,
-                  timestamp: Date.now(),
-                });
-
-                // Handle NFT data if present (check both nft object and separate nftImage)
-                if (data.instruction?.data?.nft) {
-                  win.webContents.send("nft-received", {
-                    action: "nft_data",
-                    image: data.instruction.data.nft.image,
-                    metadata: data.instruction.data.nft.metadata,
-                    subscription: data.instruction.data.nft.subscription,
-                    timestamp: Date.now(),
-                  });
-                }
-              }
-
-              res.json({
-                success: true,
-                verified: true,
-                timestamp: Date.now(),
-                message: "Connection verified",
-              });
-            } catch (error) {
-              logger.error("❌ Callback processing error:", error);
-              res
-                .status(500)
-                .json({ success: false, error: "Internal server error" });
-            }
-          }
-        );
-
-        // API endpoint to set session data from frontend
-        this.app.post("/api/set-session", (_req: Request, res: Response) => {
-          try {
-            logger.log("📱 Session data updated from frontend");
-            res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: true }));
-          } catch (error) {
-            logger.error("❌ Set session error:", error);
-            res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(
-              JSON.stringify({ success: false, error: "Internal server error" })
-            );
-          }
-        });
-
-        // API endpoint to check for new callbacks
-        this.app.get("/api/callback-status", (_req: Request, res: Response) => {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              hasNewCallback: false, // Simplified for now
-              lastCallback: null,
-            })
-          );
-        });
-
-        // API endpoint to clear callback flag
-        this.app.post("/api/clear-callback", (_req: Request, res: Response) => {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: true }));
-        });
-
-        // API endpoint to check for counter updates
-        this.app.get("/api/counter-status", (_req: Request, res: Response) => {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              hasCounterUpdate: false, // Simplified for now
-              lastCounterUpdate: null,
-            })
-          );
-        });
-
-        // API endpoint to clear counter update flag
-        this.app.post("/api/clear-counter", (_req: Request, res: Response) => {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: true }));
-        });
-
-        // Start server
-        this.server = this.app.listen(this.port, "localhost", () => {
-          logger.log(`🚀 Callback server started on port ${this.port}`);
-          resolve();
-        });
-
-        this.server.on("error", (error: Error) => {
-          logger.error("❌ Callback server error:", error);
-          reject(error);
-        });
-      } catch (error) {
-        logger.error("❌ Failed to start callback server:", error);
-        reject(error);
-      }
-    });
-  }
-
-  stopCallbackServer(): void {
-    try {
-      if (this.server) {
-        this.server.close();
-        this.server = null;
-        logger.log("🛑 Callback server stopped");
-      }
-
-      if (this.app) {
-        this.app = null;
-      }
-    } catch (error) {
-      logger.error("❌ Error stopping callback server:", error);
-    }
-  }
-
-  getPort(): number {
-    return this.port;
-  }
-}
+// Callback Server removed - replaced with TunnelClient
 
 function createWindow() {
   win = new BrowserWindow({
@@ -656,7 +323,7 @@ function createWindow() {
       backgroundThrottling: false,
     },
     icon: path.join(__dirname, "..", "src", "assets", "logo.png"),
-    title: "Twitter Automation Platform",
+    title: "Social manager Automation Platform",
   });
 
   // Load the app
@@ -686,20 +353,17 @@ function createWindow() {
   });
 }
 
+// UPnP and Windows Firewall setup removed - no longer needed with tunnel architecture
+
 // App initialization
 app.whenReady().then(async () => {
   createWindow();
 
-  // Initialize auth flow and callback server
+  // Initialize auth flow and tunnel client
   authFlow = new AuthFlow();
-  callbackServer = new CallbackServer();
-
-  // Start callback server for receiving pings from backend
-  try {
-    await callbackServer.startCallbackServer();
-    logger.log("✅ Callback server ready for backend pings");
-  } catch (error) {
-    logger.error("❌ Failed to start callback server:", error);
+  if (win) {
+    tunnelClient = new TunnelClient(win);
+    logger.log("✅ Tunnel client initialized");
   }
 
   app.on("activate", () => {
@@ -717,12 +381,12 @@ app.on("window-all-closed", () => {
 });
 
 // Cleanup on app quit
-app.on("before-quit", () => {
+app.on("before-quit", async () => {
   if (authFlow) {
     authFlow.cleanup();
   }
-  if (callbackServer) {
-    callbackServer.stopCallbackServer();
+  if (tunnelClient) {
+    tunnelClient.disconnect();
   }
 
   activeScripts.forEach((script) => {
@@ -840,52 +504,49 @@ ipcMain.handle("disconnect-wallet", async (_event, sessionToken) => {
   }
 });
 
-// Callback server IPC handlers
-ipcMain.handle("get-callback-server-status", async () => {
+// Tunnel client IPC handlers
+ipcMain.handle("connect-tunnel", async (_event, config: { serverUrl: string; deviceHash: string; deviceData?: any }) => {
   try {
+    if (!tunnelClient) {
+      return { success: false, error: "Tunnel client not initialized" };
+    }
+
+    const success = await tunnelClient.connect(config);
     return {
-      success: true,
-      isRunning: callbackServer !== null,
-      port: callbackServer ? callbackServer.getPort() : null,
+      success,
+      message: success ? "Connected to tunnel" : "Failed to connect to tunnel",
     };
   } catch (error) {
-    logger.error("❌ Get callback server status failed:", error);
+    logger.error("❌ Tunnel connect failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
 
-ipcMain.handle("start-callback-server", async () => {
+ipcMain.handle("disconnect-tunnel", async () => {
   try {
-    if (callbackServer) {
-      return {
-        success: true,
-        message: "Callback server already running",
-        port: callbackServer.getPort(),
-      };
+    if (tunnelClient) {
+      tunnelClient.disconnect();
     }
-
-    callbackServer = new CallbackServer();
-    await callbackServer.startCallbackServer();
-    return {
-      success: true,
-      message: "Callback server started",
-      port: callbackServer.getPort(),
-    };
+    return { success: true, message: "Disconnected from tunnel" };
   } catch (error) {
-    logger.error("❌ Start callback server failed:", error);
+    logger.error("❌ Tunnel disconnect failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
 
-ipcMain.handle("stop-callback-server", async () => {
+ipcMain.handle("get-tunnel-status", async () => {
   try {
-    if (callbackServer) {
-      callbackServer.stopCallbackServer();
-      callbackServer = null;
+    if (!tunnelClient) {
+      return { success: false, error: "Tunnel client not initialized" };
     }
-    return { success: true, message: "Callback server stopped" };
+
+    const status = tunnelClient.getStatus();
+    return {
+      success: true,
+      ...status,
+    };
   } catch (error) {
-    logger.error("❌ Stop callback server failed:", error);
+    logger.error("❌ Get tunnel status failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -902,9 +563,9 @@ ipcMain.handle("close-app", async () => {
       window.close();
     });
 
-    // Stop servers
-    if (callbackServer) {
-      callbackServer.stopCallbackServer();
+    // Stop tunnel and cleanup
+    if (tunnelClient) {
+      tunnelClient.disconnect();
     }
     if (authFlow) {
       authFlow.cleanup();
@@ -1286,7 +947,6 @@ ipcMain.handle("execute-script", async (_event, params) => {
   }
 });
 
-
 function executePuppeteerScript(
   scriptPath: string,
   scriptId: string,
@@ -1319,7 +979,7 @@ function executePuppeteerScript(
         process: child,
         startTime: Date.now(),
         status: "running",
-        profileId: profileId, 
+        profileId: profileId,
       };
 
       activeScripts.set(scriptId, scriptInfo);
@@ -1483,7 +1143,6 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
         `🛑 Stopping script ${script.name} (PID: ${script.process.pid})...`
       );
 
-    
       if (process.platform === "win32") {
         try {
           execSync(`taskkill /pid ${script.process.pid} /T /F`, {
@@ -1491,10 +1150,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
           });
           logger.log(`✅ Killed process tree for PID ${script.process.pid}`);
         } catch (killError) {
-          logger.error(
-            `⚠️ taskkill failed, using fallback method:`,
-            killError
-          );
+          logger.error(`⚠️ taskkill failed, using fallback method:`, killError);
           script.process.kill("SIGKILL");
         }
       } else {

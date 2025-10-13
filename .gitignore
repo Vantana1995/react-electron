@@ -3,6 +3,7 @@ node_modules/
 dist/
 build/
 instructions/
+.z
 
 # Electron build files
 react-electron/dist-electron/

@@ -436,11 +436,6 @@ This platform serves users who need secure, scalable Twitter automation with cry
 - Automatic app termination if connection lost for 40+ seconds
 - Connection failure recovery mechanisms
 
-### IPFS Integration
-- Web3.Storage for decentralized script delivery
-- Email-based authentication for IPFS access
-- Content addressing for script integrity verification
-- Modular feature deployment via IPFS hashes
 
 ### Anti-Detection Measures
 ```javascript

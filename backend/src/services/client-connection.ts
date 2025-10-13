@@ -1,12 +1,11 @@
-import http from "http";
 import { getDBConnection } from "@/config/database";
 import { UserModel } from "@/database/models/User";
-import { generateClientVerificationHash } from "@/utils/crypto";
 import {
   generateDeviceKey,
   encryptData,
   createVerificationHash,
 } from "@/utils/encryption";
+import { tunnelServer } from "./tunnel-server";
 
 interface ActiveConnection {
   userId: number;
@@ -89,99 +88,41 @@ class ClientConnectionManager {
   }
 
   /**
-   * Send direct call to client application
+   * Send message through tunnel to client
    */
-  private async sendDirectCallToClient(
+  private async sendThroughTunnel(
     connection: ActiveConnection,
-    instruction: ClientInstruction
+    messageType: "ping" | "script-delivery" | "update",
+    data: any
   ): Promise<boolean> {
     try {
-      // Generate verification hash for client to verify server authenticity
-      const db = getDBConnection();
-      const userModel = new UserModel(db);
-      const user = await userModel.findByDeviceHash(connection.deviceHash);
-
-      if (!user) {
+      // Check if client is connected to tunnel
+      const tunnelConnection = tunnelServer.getConnection(connection.deviceHash);
+      if (!tunnelConnection) {
+        console.log(`❌ Client not connected to tunnel: ${connection.deviceHash.substring(0, 8)}...`);
         return false;
       }
 
-      const deviceInfo = user.device_info as StoredDeviceInfo;
-      const verificationHash = generateClientVerificationHash({
-        cpu: { cores: deviceInfo.cpu.cores },
-        gpu: { vendor: deviceInfo.gpu.vendor },
-        memory: { total: deviceInfo.memory.total },
-        nonce: connection.nonce,
+      // Send through tunnel
+      const success = await tunnelServer.sendToClient(connection.deviceHash, {
+        type: messageType,
+        payload: {
+          timestamp: Date.now(),
+          ...data,
+        },
       });
 
-      // Prepare payload for client
-      const payload = {
-        verificationHash, // Client verifies this using own data
-        timestamp: Date.now(),
-        instruction,
-        nonce: connection.nonce,
-      };
-
-      // Send HTTP request directly to client's IP
-      // const clientUrl = `http://${connection.ipAddress}:${this.CLIENT_PORT}/server-callback`;
-
-      return new Promise((resolve) => {
-        const data = JSON.stringify(payload);
-
-        const options = {
-          hostname: "localhost",
-          port: 3001,
-          path: "/api/server-callback",
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Content-Length": Buffer.byteLength(data),
-            "X-Server-Auth": verificationHash.substring(0, 16), // Partial hash for quick verification
-          },
-          timeout: 5000, // 5 second timeout
-        };
-
-        const req = http.request(options, (res) => {
-          let responseData = "";
-
-          res.on("data", (chunk) => {
-            responseData += chunk;
-          });
-
-          res.on("end", () => {
-            if (res.statusCode === 200) {
-              try {
-                const response = JSON.parse(responseData);
-                // Client should respond with confirmation hash
-                resolve(response.verified === true);
-              } catch {
-                resolve(false);
-              }
-            } else {
-              resolve(false);
-            }
-          });
-        });
-
-        req.on("error", () => {
-          resolve(false);
-        });
-
-        req.on("timeout", () => {
-          req.destroy();
-          resolve(false);
-        });
-
-        req.write(data);
-        req.end();
-      });
+      return success;
     } catch (error) {
-      console.error("Direct call to client failed:", error);
+      console.error("Tunnel send failed:", error);
       return false;
     }
   }
 
   /**
-   * Ping all active connections
+   * Ping all active connections through tunnel
+   * Note: Actual pinging is handled by tunnelServer's heartbeat system
+   * This method is kept for compatibility and monitoring
    */
   private async pingActiveConnections(): Promise<void> {
     const currentTime = Date.now();
@@ -189,48 +130,35 @@ class ClientConnectionManager {
 
     for (const [deviceHash, connection] of this.activeConnections) {
       try {
-        // Increment nonce for this ping
-        connection.nonce = (connection.nonce || 0) + 1;
+        // Check if client is still connected to tunnel
+        const tunnelConnection = tunnelServer.getConnection(deviceHash);
 
-        // Send verification ping to client with data and nonce
-        const success = await this.sendDirectCallToClient(connection, {
-          action: "verify_connection",
-          priority: "normal",
-          data: {
-            timestamp: currentTime,
-            serverTime: new Date().toISOString(),
-            nonce: connection.nonce, // Include nonce in ping data
-            // Add any additional data here
-          },
-        });
-
-        if (success) {
-          // Reset connection state
-          connection.lastPing = currentTime;
-          connection.missedPings = 0;
+        if (!tunnelConnection) {
           console.log(
-            `✅ Client ping successful: ${deviceHash.substring(
-              0,
-              8
-            )}... (nonce: ${connection.nonce})`
+            `❌ Client not in tunnel: ${deviceHash.substring(0, 8)}...`
           );
-        } else {
-          // Connection failed - client either disconnected or will close after 40s
-          console.log(
-            `❌ Client ping failed: ${deviceHash.substring(0, 8)}...`
-          );
-
-          // Immediately handle connection loss (no multiple attempts)
           await this.handleConnectionLost(connection);
           connectionsToRemove.push(deviceHash);
+          continue;
         }
+
+        // Update connection state from tunnel
+        connection.lastPing = tunnelConnection.lastPing;
+        connection.missedPings = tunnelConnection.missedPings;
+        connection.nonce = tunnelConnection.nonce;
+
+        console.log(
+          `✅ Client connected via tunnel: ${deviceHash.substring(
+            0,
+            8
+          )}... (nonce: ${connection.nonce})`
+        );
       } catch (error) {
         console.error(
-          `Error pinging client ${deviceHash.substring(0, 8)}...:`,
+          `Error checking client ${deviceHash.substring(0, 8)}...:`,
           error
         );
 
-        // Connection error - handle immediately
         await this.handleConnectionLost(connection);
         connectionsToRemove.push(deviceHash);
       }
@@ -552,15 +480,11 @@ class ClientConnectionManager {
         })),
       });
 
-      return await this.sendDirectCallToClient(connection, {
-        action: "verify_connection",
-        priority: "normal",
-        data: {
-          encrypted: encryptedData,
-          hash: verificationHash,
-          type: "encrypted_ping",
-          nonce: connection.nonce,
-        },
+      return await this.sendThroughTunnel(connection, "script-delivery", {
+        encrypted: encryptedData,
+        hash: verificationHash,
+        type: "encrypted_ping",
+        nonce: connection.nonce,
       });
     } catch (error) {
       console.error("Failed to send user scripts:", error);

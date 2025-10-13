@@ -23,6 +23,8 @@
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
+const https = require("https");
+require('dotenv').config();
 
 // ============================================
 // Configuration
@@ -379,7 +381,8 @@ function sendRequest(payload, method = "POST") {
       `Sending ${method} request to http://${API_HOST}:${API_PORT}${API_ENDPOINT}`
     );
 
-    const req = http.request(options, (res) => {
+    const protocol = API_PORT == 443 ? https : http;
+    const req = protocol.request(options, (res) => {
       let responseData = "";
 
       res.on("data", (chunk) => {
