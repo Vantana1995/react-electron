@@ -65,14 +65,12 @@ export function getCorsHeaders(request: NextRequest): Record<string, string> {
 
   // Handle origin
   if (origin) {
-    // For admin IPs, allow any origin
+    // Allow any origin for all requests (required for development and Electron app)
+    headers["Access-Control-Allow-Origin"] = origin;
+
+    // Allow credentials for admin IPs
     if (isAdminIP(clientIP)) {
-      headers["Access-Control-Allow-Origin"] = origin;
       headers["Access-Control-Allow-Credentials"] = "true";
-    } else {
-      // For regular users, you might want to restrict origins
-      // For now, we'll allow any origin but you can customize this
-      headers["Access-Control-Allow-Origin"] = origin;
     }
   } else {
     // No origin header (direct API calls)
