@@ -122,7 +122,7 @@ export class DynamicNFTListenerManager {
 
       // Stop listeners for contracts no longer needed
       const activeAddresses = new Set(nftAddresses);
-      for (const [contractAddress, listener] of this.listeners) {
+      for (const [contractAddress] of this.listeners) {
         if (!activeAddresses.has(contractAddress)) {
           console.log(
             `🗑️ Stopping listener for unused contract: ${contractAddress}`
@@ -282,8 +282,13 @@ export class DynamicNFTListenerManager {
       return;
     }
 
-    // Get WebSocket instance
-    const websocket = (listener.provider as any)._websocket;
+    // Get WebSocket instance (accessing private ethers.js property)
+    interface WebSocketLike {
+      on(event: "error", handler: (error: Error) => void): void;
+      on(event: "close", handler: (code: number, reason: string) => void): void;
+      on(event: "ping", handler: () => void): void;
+    }
+    const websocket = (listener.provider as { _websocket?: WebSocketLike })._websocket;
 
     if (websocket) {
       websocket.on("error", (error: Error) => {

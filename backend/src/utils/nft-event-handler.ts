@@ -9,6 +9,7 @@ import { UserModel } from "@/database/models/User";
 import { ScriptModel } from "@/database/models/Script";
 import { NFTCacheManager } from "@/utils/nft-cache";
 import { SubscriptionManager } from "@/services/subscription-manager";
+import type { Log } from "ethers";
 
 /**
  * Handle NFT mint event
@@ -21,7 +22,7 @@ import { SubscriptionManager } from "@/services/subscription-manager";
 export async function handleNFTMint(
   walletAddress: string,
   tokenId: string,
-  event: any
+  event: { log: Log }
 ): Promise<void> {
   try {
     console.log("\n🎯 PROCESSING NFT MINT EVENT");
@@ -127,61 +128,5 @@ export async function handleNFTMint(
     console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.error(error);
     console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-  }
-}
-
-/**
- * Get user's active scripts based on subscription (dynamic NFT system)
- * This can be called when user connects to send their scripts
- *
- * @param userId - User ID
- * @param walletAddress - User's wallet address
- * @returns Array of scripts user has access to
- */
-export async function getUserAccessibleScripts(
-  userId: number,
-  walletAddress: string
-): Promise<any[]> {
-  try {
-    const db = getDBConnection();
-    const scriptModel = new ScriptModel(db);
-    const nftCacheManager = new NFTCacheManager(db, 30 * 24); // 30 days cache
-    const subscriptionManager = new SubscriptionManager(db);
-
-    // Get all NFT contracts from database
-    const allNFTAddresses = await scriptModel.getAllNFTAddresses();
-
-    if (allNFTAddresses.length === 0) {
-      console.log(`⚠️ No NFT contracts in database`);
-      // Return first public script for free tier
-      const firstScript = await scriptModel.getFirstPublicScript();
-      return firstScript ? [firstScript] : [];
-    }
-
-    // Verify all NFTs with cache
-    const nftResults = await nftCacheManager.verifyMultipleNFTsWithCache(
-      userId,
-      walletAddress,
-      allNFTAddresses,
-      false // Use cache
-    );
-
-    // Convert to NFTOwnership format
-    const ownedNFTs = nftResults.map((result) => ({
-      contractAddress: result.nftContract,
-      hasNFT: result.hasNFT,
-      count: result.nftCount,
-      networkName: result.networkName,
-      verifiedAt: result.verifiedAt,
-    }));
-
-    // Get accessible scripts based on ownership
-    const scripts = await subscriptionManager.getAccessibleScripts(ownedNFTs);
-
-    console.log(`✅ Found ${scripts.length} accessible script(s) for user ${userId}`);
-    return scripts;
-  } catch (error) {
-    console.error("Error getting user accessible scripts:", error);
-    return [];
   }
 }

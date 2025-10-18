@@ -140,39 +140,4 @@ export class UserModel {
     const result = await this.pool.query(query, [walletAddress]);
     return result.rows[0] || null;
   }
-
-  /**
-   * Get user's NFT cache
-   */
-  async getNFTCache(userId: number): Promise<{
-    has_nft: boolean;
-    wallet_address: string;
-    nft_contract: string;
-    verified_at: Date;
-  } | null> {
-    const query = `
-      SELECT * FROM user_nft_cache
-      WHERE user_id = $1
-      ORDER BY verified_at DESC
-      LIMIT 1
-    `;
-
-    const result = await this.pool.query(query, [userId]);
-    return result.rows[0] || null;
-  }
-
-  /**
-   * Get all users with active NFT ownership
-   */
-  async getAllNFTHolders(): Promise<User[]> {
-    const query = `
-      SELECT DISTINCT u.* FROM users u
-      INNER JOIN user_nft_cache c ON u.id = c.user_id
-      WHERE c.has_nft = true
-      ORDER BY u.created_at DESC
-    `;
-
-    const result = await this.pool.query(query);
-    return result.rows;
-  }
 }

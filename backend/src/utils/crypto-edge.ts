@@ -12,10 +12,15 @@ const FINGERPRINT_SALT =
   "0000000000000000000000000000000000000000000000000000000000000000";
 
 /**
- * Convert string to Uint8Array
+ * Convert string to Uint8Array (compatible with Web Crypto API)
  */
-function stringToUint8Array(str: string): Uint8Array {
-  return new TextEncoder().encode(str);
+function stringToUint8Array(str: string): Uint8Array<ArrayBuffer> {
+  const encoded = new TextEncoder().encode(str);
+  // Create a new ArrayBuffer and copy the data
+  const buffer = new ArrayBuffer(encoded.length);
+  const view = new Uint8Array(buffer);
+  view.set(encoded);
+  return view;
 }
 
 /**
@@ -28,10 +33,11 @@ function uint8ArrayToHex(buffer: Uint8Array): string {
 }
 
 /**
- * Convert hex string to Uint8Array
+ * Convert hex string to Uint8Array (compatible with Web Crypto API)
  */
-function hexToUint8Array(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
+function hexToUint8Array(hex: string): Uint8Array<ArrayBuffer> {
+  const buffer = new ArrayBuffer(hex.length / 2);
+  const bytes = new Uint8Array(buffer);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
   }
@@ -246,35 +252,6 @@ export function verifyNonce(
 }
 
 /**
- * Generate challenge for proof-of-work style verification
- */
-export function generateChallenge(): string {
-  const timestamp = Date.now();
-  const random = uint8ArrayToHex(crypto.getRandomValues(new Uint8Array(16)));
-  return `${timestamp}:${random}`;
-}
-
-/**
- * Verify challenge response (simple proof-of-work)
- */
-export async function verifyChallenge(
-  challenge: string,
-  response: string,
-  difficulty: number = 4
-): Promise<boolean> {
-  const expectedHash = await sha256(challenge + response);
-  return expectedHash.startsWith("0".repeat(difficulty));
-}
-
-/**
- * Generate CSRF token using Web Crypto API
- */
-export function generateCSRFToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...bytes));
-}
-
-/**
  * Secure compare strings (prevents timing attacks)
  */
 export function secureCompare(a: string, b: string): boolean {
@@ -299,9 +276,6 @@ const cryptoEdgeUtils = {
   generateRandomString,
   generateNonce,
   verifyNonce,
-  generateChallenge,
-  verifyChallenge,
-  generateCSRFToken,
   secureCompare,
 };
 

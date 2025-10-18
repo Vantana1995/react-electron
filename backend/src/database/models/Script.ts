@@ -10,8 +10,8 @@ export interface Script {
   nft_addresses: string[];
   category: string | null;
   is_active: boolean;
-  config: Record<string, any>;
-  metadata: Record<string, any>;
+  config: Record<string, unknown>;
+  metadata: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
 }
@@ -24,8 +24,8 @@ export interface CreateScriptData {
   script_content: string;
   nft_addresses: string[];
   category?: string;
-  config?: Record<string, any>;
-  metadata?: Record<string, any>;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateScriptData {
@@ -36,8 +36,8 @@ export interface UpdateScriptData {
   nft_addresses?: string[];
   category?: string;
   is_active?: boolean;
-  config?: Record<string, any>;
-  metadata?: Record<string, any>;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ScriptVersion {
@@ -209,7 +209,7 @@ export class ScriptModel {
     updateData: UpdateScriptData
   ): Promise<Script | null> {
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
     // Build dynamic update query

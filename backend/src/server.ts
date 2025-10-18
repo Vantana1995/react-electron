@@ -14,7 +14,7 @@ const app = next({
   dev,
   hostname,
   port,
-  dir: path.join(__dirname, '..'), // Явно указываем корень Next.js
+  dir: path.join(__dirname, '..'), // Next.js
 });
 const handle = app.getRequestHandler();
 

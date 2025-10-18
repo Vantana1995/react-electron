@@ -196,7 +196,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Build update data
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (version !== undefined) updateData.version = version;

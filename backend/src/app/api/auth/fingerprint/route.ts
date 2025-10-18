@@ -8,9 +8,7 @@ import {
 } from "@/utils/crypto";
 import { validateRequestBody, getClientIP } from "@/utils/validation";
 import { getDBConnection } from "@/config/database";
-import { ScriptModel } from "@/database/models/Script";
-import { NFTCacheManager } from "@/utils/nft-cache";
-import { SubscriptionManager } from "@/services/subscription-manager";
+import type { Script } from "@/database/models/Script";
 
 interface FingerprintData extends Record<string, unknown> {
   // CPU Information
@@ -215,7 +213,7 @@ export async function POST(request: NextRequest) {
 
     let subscriptionLevel = "free";
     let maxProfiles = 1;
-    let accessibleScripts: any[] = [];
+    let accessibleScripts: Script[] = [];
     let ownedNFTCount = 0;
 
     try {

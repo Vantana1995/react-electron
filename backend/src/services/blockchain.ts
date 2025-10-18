@@ -199,7 +199,7 @@ export async function getNFTBalance(
 export async function getNFTMetadata(
   contractAddress: string,
   tokenId: string
-): Promise<{ image: string; metadata: any } | null> {
+): Promise<{ image: string; metadata: Record<string, unknown> } | null> {
   try {
     console.log(`🔍 Getting metadata for NFT ${contractAddress}:${tokenId}`);
 
@@ -237,43 +237,6 @@ export async function getNFTMetadata(
 }
 
 /**
- * Get wallet balance in ETH
- * @param walletAddress - Ethereum wallet address
- * @returns Promise<string> - Balance in ETH
- */
-export async function getBalance(walletAddress: string): Promise<string> {
-  try {
-    const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
-    const balance = await provider.getBalance(walletAddress);
-    return ethers.formatEther(balance);
-  } catch (error) {
-    console.error("Error getting balance:", error);
-    return "0";
-  }
-}
-
-/**
- * Get network information
- * @returns Promise<{chainId: number, name: string}>
- */
-export async function getNetworkInfo(): Promise<{
-  chainId: number;
-  name: string;
-}> {
-  try {
-    const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
-    const network = await provider.getNetwork();
-    return {
-      chainId: Number(network.chainId),
-      name: network.name,
-    };
-  } catch (error) {
-    console.error("Error getting network info:", error);
-    return { chainId: 11155111, name: NETWORK_NAME };
-  }
-}
-
-/**
  * Validate Ethereum address format
  * @param address - Address to validate
  * @returns boolean - True if valid
@@ -293,38 +256,5 @@ export const blockchainService = {
   getNFTMetadata,
 
   // Utility functions
-  getBalance,
-  getNetworkInfo,
   isValidEthereumAddress,
-
-  // Constants
-  SEPOLIA_RPC,
-  NETWORK_NAME,
-  ERC721_ABI,
 };
-
-/**
- * DEPRECATED: Legacy functions for backward compatibility
- * These will be removed in future versions
- * Use checkNFTOwnership() instead
- */
-
-// For backward compatibility with existing code
-export async function hasLegionNFT(walletAddress: string): Promise<boolean> {
-  console.warn("⚠️ hasLegionNFT() is deprecated. Use checkNFTOwnership() instead.");
-  // This function is now useless without hardcoded contract
-  // Return false and log warning
-  return false;
-}
-
-export async function checkLegionNFTOwnership(walletAddress: string): Promise<NFTOwnershipResult> {
-  console.warn("⚠️ checkLegionNFTOwnership() is deprecated. Use checkNFTOwnership() instead.");
-  // Return empty result
-  return {
-    hasNFT: false,
-    userAddress: walletAddress,
-    contractAddress: "",
-    networkName: NETWORK_NAME,
-    nftCount: 0,
-  };
-}

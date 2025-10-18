@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import CryptoJS from "crypto-js";
 
 // Simple encryption keys for testing
 const ENCRYPTION_KEY =
@@ -158,36 +157,6 @@ export function verifySessionToken(token: string): {
 }
 
 /**
- * Encrypt sensitive data
- */
-export function encryptData(data: string): string {
-  try {
-    const encrypted = CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
-    return encrypted;
-  } catch {
-    throw new Error("Encryption failed");
-  }
-}
-
-/**
- * Decrypt sensitive data
- */
-export function decryptData(encryptedData: string): string {
-  try {
-    const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
-    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-
-    if (!decrypted) {
-      throw new Error("Decryption resulted in empty string");
-    }
-
-    return decrypted;
-  } catch {
-    throw new Error("Decryption failed");
-  }
-}
-
-/**
  * Generate secure random string
  */
 export function generateRandomString(length: number = 32): string {
@@ -216,68 +185,6 @@ export function verifyNonce(
 }
 
 /**
- * Generate challenge for proof-of-work style verification
- */
-export function generateChallenge(): string {
-  const timestamp = Date.now();
-  const random = crypto.randomBytes(16).toString("hex");
-  return `${timestamp}:${random}`;
-}
-
-/**
- * Verify challenge response (simple proof-of-work)
- */
-export function verifyChallenge(
-  challenge: string,
-  response: string,
-  difficulty: number = 4
-): boolean {
-  const expectedHash = crypto
-    .createHash("sha256")
-    .update(challenge + response)
-    .digest("hex");
-  return expectedHash.startsWith("0".repeat(difficulty));
-}
-
-/**
- * Hash password with bcrypt (if needed for admin users)
- */
-export function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .pbkdf2Sync(password, salt, 10000, 64, "sha512")
-    .toString("hex");
-
-  return `${salt}:${hash}`;
-}
-
-/**
- * Verify password hash
- */
-export function verifyPassword(
-  password: string,
-  hashedPassword: string
-): boolean {
-  try {
-    const [salt, hash] = hashedPassword.split(":");
-    const hashVerify = crypto
-      .pbkdf2Sync(password, salt, 10000, 64, "sha512")
-      .toString("hex");
-
-    return hash === hashVerify;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Generate API key
- */
-export function generateApiKey(): string {
-  return "pk_" + crypto.randomBytes(32).toString("hex");
-}
-
-/**
  * Secure compare strings (prevents timing attacks)
  */
 export function secureCompare(a: string, b: string): boolean {
@@ -288,13 +195,6 @@ export function secureCompare(a: string, b: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
-/**
- * Generate CSRF token
- */
-export function generateCSRFToken(): string {
-  return crypto.randomBytes(32).toString("base64");
-}
-
 const cryptoUtils = {
   generateStep1Hash,
   generateStep2Hash,
@@ -302,18 +202,10 @@ const cryptoUtils = {
   generateClientVerificationHash,
   generateSessionToken,
   verifySessionToken,
-  encryptData,
-  decryptData,
   generateRandomString,
   generateNonce,
   verifyNonce,
-  generateChallenge,
-  verifyChallenge,
-  hashPassword,
-  verifyPassword,
-  generateApiKey,
   secureCompare,
-  generateCSRFToken,
 };
 
 export default cryptoUtils;

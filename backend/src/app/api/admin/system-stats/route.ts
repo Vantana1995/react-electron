@@ -5,7 +5,6 @@
 
 import { NextRequest } from "next/server";
 import { ApiResponseBuilder } from "@/utils/api-response";
-import { getDBConnection } from "@/config/database";
 import { createDynamicNFTVerifier } from "@/services/dynamic-nft-verifier";
 
 /**

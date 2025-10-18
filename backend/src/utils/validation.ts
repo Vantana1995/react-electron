@@ -43,12 +43,6 @@ export function isValidIPFSHash(hash: string): boolean {
   return ipfsPattern.test(hash);
 }
 
-// Subscription type validation
-export function isValidSubscriptionType(type: string): boolean {
-  const validTypes = ["basic", "pro", "premium", "enterprise"];
-  return validTypes.includes(type?.toLowerCase());
-}
-
 // Request body validation
 export function validateRequestBody(
   body: unknown,
@@ -121,71 +115,16 @@ export function getClientIP(request: NextRequest): string {
   return "unknown";
 }
 
-// Sanitize user input
-export function sanitizeInput(input: string): string {
-  if (typeof input !== "string") return "";
-
-  return input
-    .trim()
-    .replace(/[<>]/g, "") // Remove potential HTML tags
-    .substring(0, 1000); // Limit length
-}
-
-// Validate pagination parameters
-export function validatePagination(
-  page?: string,
-  limit?: string
-): { page: number; limit: number; offset: number } {
-  const pageNum = Math.max(1, parseInt(page || "1", 10));
-  const limitNum = Math.min(100, Math.max(1, parseInt(limit || "20", 10))); // Max 100 items per page
-  const offset = (pageNum - 1) * limitNum;
-
-  return {
-    page: pageNum,
-    limit: limitNum,
-    offset,
-  };
-}
-
-// Validate script settings compatibility with notOlderThan
-export function validateScriptSettings(settings: {
-  notOlderThanHours?: number;
-  [key: string]: unknown;
-}): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  if (settings.notOlderThanHours !== undefined) {
-    const hours = Number(settings.notOlderThanHours);
-
-    if (isNaN(hours)) {
-      errors.push("notOlderThanHours must be a number");
-    } else if (hours < 1 || hours > 168) {
-      errors.push("notOlderThanHours must be between 1 and 168 hours (1 week)");
-    } else if (!Number.isInteger(hours)) {
-      errors.push("notOlderThanHours must be an integer");
-    }
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
-}
-
 const validationUtils = {
   isValidDeviceHash,
   isValidEmail,
   isValidEthereumAddress,
   isValidTxHash,
   isValidIPFSHash,
-  isValidSubscriptionType,
   validateRequestBody,
   extractDeviceHash,
   extractSessionToken,
   getClientIP,
-  sanitizeInput,
-  validatePagination,
-  validateScriptSettings,
 };
 
 export default validationUtils;

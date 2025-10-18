@@ -28,7 +28,7 @@ export function generateDeviceKey(cpuModel: string, ipAddress: string): Buffer {
  * @param key - Encryption key (from generateDeviceKey)
  * @returns string - Encrypted data as base64 string
  */
-export function encryptData(data: any, key: Buffer): string {
+export function encryptData(data: unknown, key: Buffer): string {
   try {
     // Convert data to JSON string
     const jsonData = JSON.stringify(data);
@@ -57,9 +57,9 @@ export function encryptData(data: any, key: Buffer): string {
  * Decrypt data using device key
  * @param encryptedData - Encrypted data as base64 string
  * @param key - Decryption key (from generateDeviceKey)
- * @returns any - Decrypted data
+ * @returns unknown - Decrypted data
  */
-export function decryptData(encryptedData: string, key: Buffer): any {
+export function decryptData(encryptedData: string, key: Buffer): unknown {
   try {
     // Decode base64
     const combined = Buffer.from(encryptedData, "base64").toString("utf8");
@@ -95,7 +95,7 @@ export function decryptData(encryptedData: string, key: Buffer): any {
  * @param key - Key for HMAC
  * @returns string - HMAC-SHA256 hash
  */
-export function createVerificationHash(data: any, key: Buffer): string {
+export function createVerificationHash(data: unknown, key: Buffer): string {
   const jsonData = JSON.stringify(data);
   const hmac = crypto.createHmac("sha256", key);
   hmac.update(jsonData);
@@ -109,7 +109,7 @@ export function createVerificationHash(data: any, key: Buffer): string {
  * @param key - Key for HMAC
  * @returns boolean - True if verification successful
  */
-export function verifyData(data: any, hash: string, key: Buffer): boolean {
+export function verifyData(data: unknown, hash: string, key: Buffer): boolean {
   try {
     const expectedHash = createVerificationHash(data, key);
     return crypto.timingSafeEqual(

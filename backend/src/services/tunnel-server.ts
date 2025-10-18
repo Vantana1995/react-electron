@@ -7,11 +7,17 @@ import {
   encryptData,
   createVerificationHash,
 } from '@/utils/encryption';
+import type { NFTOwnership } from '@/services/subscription-manager';
 
 /**
  * Tunnel Server - WebSocket-based bidirectional communication
  * New architecture: Scripts sent ONCE after authentication
  */
+
+interface DeviceData {
+  cpuModel: string;
+  ipAddress: string;
+}
 
 interface TunnelConnection {
   userId: number;
@@ -19,10 +25,36 @@ interface TunnelConnection {
   socketId: string;
   ipAddress: string;
   nonce: number;
-  deviceData?: {
-    cpuModel: string;
-    ipAddress: string;
+  deviceData?: DeviceData;
+}
+
+interface NFTScriptPair {
+  nft: {
+    address: string;
+    image: string;
+    metadata: {
+      name: string;
+      description: string;
+      attributes: Array<{ trait_type: string; value: string | number }>;
+    };
+    timestamp: number;
+  } | null;
+  script: {
+    id: number;
+    name: string;
+    description: string | null;
+    version: string;
+    category: string | null;
+    features: unknown[];
+    usage: Record<string, unknown>;
+    security: Record<string, unknown>;
+    entryPoint: string;
+    path: string;
+    code: string;
+    content: string;
   };
+  maxProfiles: number;
+  nftInfo: NFTOwnership | null;
 }
 
 interface TunnelMessage {
@@ -32,7 +64,7 @@ interface TunnelMessage {
     hash?: string;
     nonce?: number;
     timestamp: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   signature?: string;
 }
@@ -72,7 +104,7 @@ class TunnelServer {
     console.log(`🔌 New tunnel connection from ${clientIp} (socket: ${socket.id})`);
 
     // Authentication event - client sends deviceHash
-    socket.on('client:authenticate', async (data: { deviceHash: string; deviceData?: any }) => {
+    socket.on('client:authenticate', async (data: { deviceHash: string; deviceData?: DeviceData }) => {
       try {
         const { deviceHash, deviceData } = data;
 
@@ -225,7 +257,7 @@ class TunnelServer {
       }
 
       // Create NFT+Script pairs for ALL scripts
-      const nftScriptPairs: Array<any> = [];
+      const nftScriptPairs: NFTScriptPair[] = [];
 
       // Step 1: Create pairs for scripts that REQUIRE specific NFTs
       validScripts.forEach((script) => {
@@ -255,10 +287,10 @@ class TunnelServer {
               description: script.description,
               version: script.version,
               category: script.category,
-              features: script.config?.features || [],
-              usage: script.config?.usage || {},
-              security: script.config?.security || {},
-              entryPoint: script.config?.entry_point || 'index.js',
+              features: (script.config?.features as unknown[]) || [],
+              usage: (script.config?.usage as Record<string, unknown>) || {},
+              security: (script.config?.security as Record<string, unknown>) || {},
+              entryPoint: (script.config?.entry_point as string) || 'index.js',
               path: script.script_id,
               code: script.script_content,
               content: script.script_content,
@@ -284,10 +316,10 @@ class TunnelServer {
             description: script.description,
             version: script.version,
             category: script.category,
-            features: script.config?.features || [],
-            usage: script.config?.usage || {},
-            security: script.config?.security || {},
-            entryPoint: script.config?.entry_point || 'index.js',
+            features: (script.config?.features as unknown[]) || [],
+            usage: (script.config?.usage as Record<string, unknown>) || {},
+            security: (script.config?.security as Record<string, unknown>) || {},
+            entryPoint: (script.config?.entry_point as string) || 'index.js',
             path: script.script_id,
             code: script.script_content,
             content: script.script_content,
