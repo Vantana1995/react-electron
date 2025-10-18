@@ -16,10 +16,23 @@ interface ElectronAPI {
   getWalletStatus: (sessionToken: string) => Promise<any>;
   disconnectWallet: (sessionToken: string) => Promise<any>;
 
-  // Callback server management
-  getCallbackServerStatus: () => Promise<any>;
-  startCallbackServer: () => Promise<any>;
-  stopCallbackServer: () => Promise<any>;
+  // Tunnel management (WebSocket connection via Electron main process)
+  connectTunnel: (config: {
+    serverUrl: string;
+    deviceHash: string;
+    walletAddress?: string;
+    deviceData?: { cpuModel: string; ipAddress: string };
+  }) => Promise<{ success: boolean; message?: string; error?: string }>;
+
+  disconnectTunnel: () => Promise<{ success: boolean; message?: string }>;
+
+  getTunnelStatus: () => Promise<{
+    success: boolean;
+    connected: boolean;
+    authenticated: boolean;
+    reconnectAttempts: number;
+    queuedMessages: number;
+  }>;
 
   // Script execution and management
   executeScript: (params: {
@@ -63,10 +76,6 @@ interface ElectronAPI {
       data?: { nonce?: number; message?: string; [key: string]: unknown };
       timestamp: number;
     }) => void
-  ) => void;
-
-  onPingCounterUpdate?: (
-    callback: (data: { nonce: number; timestamp: number }) => void
   ) => void;
 
   onNFTReceived?: (
@@ -139,6 +148,24 @@ interface ElectronAPI {
       timestamp: number;
       reason?: string;
     }) => void
+  ) => void;
+
+  // Tunnel event listeners
+  onTunnelConnected?: (
+    callback: (data: {
+      success: boolean;
+      userId?: number;
+      deviceHash?: string;
+      timestamp: number;
+    }) => void
+  ) => void;
+
+  onTunnelDisconnected?: (
+    callback: (data: { reason: string; timestamp: number }) => void
+  ) => void;
+
+  onTunnelError?: (
+    callback: (data: { error: string; timestamp: number }) => void
   ) => void;
 
   removeAllListeners?: (channel: string) => void;

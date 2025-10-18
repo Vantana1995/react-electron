@@ -8,7 +8,6 @@ import {
 } from "@/utils/crypto";
 import { validateRequestBody, getClientIP } from "@/utils/validation";
 import { getDBConnection } from "@/config/database";
-import { clientConnectionManager } from "@/services/client-connection";
 import { ScriptModel } from "@/database/models/Script";
 import { NFTCacheManager } from "@/utils/nft-cache";
 import { SubscriptionManager } from "@/services/subscription-manager";
@@ -266,24 +265,7 @@ export async function POST(request: NextRequest) {
     // Generate session token
     const sessionToken = generateSessionToken(deviceHash);
 
-    // Register connection with client connection manager
-    // NOTE: Scripts will be sent AFTER tunnel authentication (not here)
-    try {
-      await clientConnectionManager.registerConnection(
-        deviceHash,
-        publicIP,
-        0, // Start with nonce 0, will be managed by server
-        {
-          cpuModel: fingerprintData.cpu.model || "unknown",
-          ipAddress: deviceIP,
-        }
-      );
-      console.log("✅ Connection registered with client manager");
-      console.log("⏳ Waiting for tunnel connection to send scripts...");
-    } catch (error) {
-      console.error("❌ Failed to register connection:", error);
-      // Don't fail the request, just log the error
-    }
+    console.log("✅ Fingerprint processed, waiting for tunnel connection...");
 
     // Return response with device hash and session token
     return ApiResponseBuilder.success({

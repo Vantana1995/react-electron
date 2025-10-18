@@ -1,5 +1,5 @@
 /**
- * Twitter Automation Platform - Preload Script
+ * Social Automation Platform - Preload Script
  * Exposes secure APIs to renderer process with TypeScript support including script execution
  */
 
@@ -20,11 +20,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
   disconnectWallet: (sessionToken: string) =>
     ipcRenderer.invoke("disconnect-wallet", sessionToken),
 
-  // Callback server management
-  getCallbackServerStatus: () =>
-    ipcRenderer.invoke("get-callback-server-status"),
-  startCallbackServer: () => ipcRenderer.invoke("start-callback-server"),
-  stopCallbackServer: () => ipcRenderer.invoke("stop-callback-server"),
+  // Tunnel management (WebSocket connection via Electron main process)
+  connectTunnel: (config: {
+    serverUrl: string;
+    deviceHash: string;
+    walletAddress?: string;
+    deviceData?: { cpuModel: string; ipAddress: string };
+  }) => ipcRenderer.invoke("connect-tunnel", config),
+  disconnectTunnel: () => ipcRenderer.invoke("disconnect-tunnel"),
+  getTunnelStatus: () => ipcRenderer.invoke("get-tunnel-status"),
 
   // Script execution and management
   executeScript: (params: {
@@ -60,12 +64,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }) => void
   ) => {
     ipcRenderer.on("server-ping-received", (_event, data) => callback(data));
-  },
-
-  onPingCounterUpdate: (
-    callback: (data: { nonce: number; timestamp: number }) => void
-  ) => {
-    ipcRenderer.on("ping-counter-update", (_event, data) => callback(data));
   },
 
   onNFTReceived: (
@@ -151,6 +149,30 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }) => void
   ) => {
     ipcRenderer.on("script-stopped", (_event, data) => callback(data));
+  },
+
+  // Tunnel event listeners
+  onTunnelConnected: (
+    callback: (data: {
+      success: boolean;
+      userId?: number;
+      deviceHash?: string;
+      timestamp: number;
+    }) => void
+  ) => {
+    ipcRenderer.on("tunnel-connected", (_event, data) => callback(data));
+  },
+
+  onTunnelDisconnected: (
+    callback: (data: { reason: string; timestamp: number }) => void
+  ) => {
+    ipcRenderer.on("tunnel-disconnected", (_event, data) => callback(data));
+  },
+
+  onTunnelError: (
+    callback: (data: { error: string; timestamp: number }) => void
+  ) => {
+    ipcRenderer.on("tunnel-error", (_event, data) => callback(data));
   },
 
   // Remove listeners

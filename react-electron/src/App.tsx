@@ -1,5 +1,5 @@
 /**
- * Twitter Automation Platform - Main App Component
+ * Social Automation Platform - Main App Component
  * React + TypeScript + Electron application
  */
 
@@ -26,7 +26,6 @@ import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryB
 import { ThemeToggle } from "./components/ThemeToggle";
 import LanguageSwitcher from "./components/LanguageSwitcher/LanguageSwitcher";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import { timerService } from "./services/timerService";
 import { logger } from "./utils/logger";
 import "./App.css";
 
@@ -64,7 +63,7 @@ const AppContent: React.FC = () => {
     },
   });
 
-  // Флаг для предотвращения повторной инициализации
+  // Track if app has been initialized to prevent multiple inits
   const [isInitialized, setIsInitialized] = useState(false);
 
   const [currentNFT, setCurrentNFT] = useState<NFTData | undefined>();
@@ -124,8 +123,8 @@ const AppContent: React.FC = () => {
       }
 
       logger.log("🔄 Processing NFT+Script pairs:", pairs.length);
-      logger.log(`  - With NFT: ${pairs.filter(p => p.nft).length}`);
-      logger.log(`  - Without NFT: ${pairs.filter(p => !p.nft).length}`);
+      logger.log(`  - With NFT: ${pairs.filter((p) => p.nft).length}`);
+      logger.log(`  - Without NFT: ${pairs.filter((p) => !p.nft).length}`);
 
       // Update NFT+Script pairs state
       setNftScriptPairs(pairs);
@@ -148,7 +147,9 @@ const AppContent: React.FC = () => {
           globalMaxProfiles = Math.max(globalMaxProfiles, finalMax);
 
           logger.log(
-            `📊 Script ${scriptId} (${pair.script.name}): maxProfiles = ${finalMax}, hasNFT = ${!!pair.nft}`
+            `📊 Script ${scriptId} (${
+              pair.script.name
+            }): maxProfiles = ${finalMax}, hasNFT = ${!!pair.nft}`
           );
         }
       });
@@ -179,7 +180,7 @@ const AppContent: React.FC = () => {
    */
   const initializeApp = useCallback(
     async (walletAddress?: string) => {
-      // Предотвращаем повторную инициализацию
+      // Prevent multiple initializations
       if (isInitialized) {
         logger.log("🚫 App already initialized, skipping...");
         return;
@@ -267,13 +268,12 @@ const AppContent: React.FC = () => {
             }));
           }
 
-          // Показываем секцию профилей сразу после успешного подключения
-          // даже если нет NFT - пользователь может получить скрипт без NFT
+          // If no NFT+Script pairs, fallback to single NFT/script handling
           setAppState((prev) => ({
             ...prev,
             profiles: {
               ...prev.profiles,
-              maxProfiles: prev.profiles.maxProfiles || 1, // Минимум 1 профиль для free tier
+              maxProfiles: prev.profiles.maxProfiles || 1, // Minimum 1 profile for free tier
             },
           }));
         } else {
@@ -364,37 +364,40 @@ const AppContent: React.FC = () => {
       },
     });
 
-    // Добавляем обработчики IPC событий от Electron (только один раз)
+    // Setup IPC listeners if available
     if (window.electronAPI?.removeAllListeners) {
-      // Очищаем предыдущие слушатели перед добавлением новых
+      // Clear previous listeners before adding new ones
       window.electronAPI.removeAllListeners("server-ping-received");
-      window.electronAPI.removeAllListeners("ping-counter-update");
       window.electronAPI.removeAllListeners("nft-received");
       window.electronAPI.removeAllListeners("script-received");
 
       window.electronAPI.onServerPingReceived?.((data) => {
-        logger.log("📡 IPC ping received, processing data...");
+        logger.log("📡 Scripts received from tunnel via IPC");
 
-        // 1. Update nonce and timer
+        // Process NFT+Script pairs (already decrypted in main.ts)
         if (
-          data.data &&
-          typeof data.data === "object" &&
-          "nonce" in data.data &&
-          typeof data.data.nonce === "number"
+          data.data?.nftScriptPairs &&
+          Array.isArray(data.data.nftScriptPairs) &&
+          data.data.nftScriptPairs.length > 0
         ) {
-          timerService.updateNonce(data.data.nonce);
-          timerService.resetPingTimer();
-        }
-
-        // 2. Process NFT+Script pairs (already decrypted in main.ts)
-        if (data.data?.nftScriptPairs && Array.isArray(data.data.nftScriptPairs) && data.data.nftScriptPairs.length > 0) {
-          logger.log(`🔗 Processing ${data.data.nftScriptPairs.length} NFT+Script pairs from IPC`);
+          logger.log(
+            `🔗 Processing ${data.data.nftScriptPairs.length} NFT+Script pairs from tunnel`
+          );
           handleNFTScriptPairs(data.data.nftScriptPairs);
         }
-        // 3. Process scripts without NFT
-        else if (data.data?.scripts && Array.isArray(data.data.scripts) && data.data.scripts.length > 0) {
-          logger.log(`📜 Processing ${data.data.scripts.length} scripts without NFT from IPC`);
-          const maxProfiles = typeof data.data.maxProfiles === 'number' ? data.data.maxProfiles : 1;
+        // Process scripts without NFT
+        else if (
+          data.data?.scripts &&
+          Array.isArray(data.data.scripts) &&
+          data.data.scripts.length > 0
+        ) {
+          logger.log(
+            `📜 Processing ${data.data.scripts.length} scripts without NFT from tunnel`
+          );
+          const maxProfiles =
+            typeof data.data.maxProfiles === "number"
+              ? data.data.maxProfiles
+              : 1;
 
           // Use first script
           if (data.data.scripts[0]) {
@@ -429,17 +432,6 @@ const AppContent: React.FC = () => {
             loadProfiles();
           }
         }
-      });
-
-      window.electronAPI.onPingCounterUpdate?.((data) => {
-        setAppState((prev) => ({
-          ...prev,
-          system: {
-            ...prev.system,
-            nonce: data.nonce,
-            lastPing: data.timestamp,
-          },
-        }));
       });
 
       window.electronAPI.onNFTReceived?.((data) => {
@@ -667,7 +659,6 @@ const AppContent: React.FC = () => {
       // Cleanup IPC listeners
       if (window.electronAPI?.removeAllListeners) {
         window.electronAPI.removeAllListeners("server-ping-received");
-        window.electronAPI.removeAllListeners("ping-counter-update");
         window.electronAPI.removeAllListeners("nft-received");
         window.electronAPI.removeAllListeners("script-received");
       }
@@ -734,7 +725,7 @@ const AppContent: React.FC = () => {
         },
       }));
 
-      // После подключения кошелька сразу отправляем запрос в сервер (только один раз)
+      // Initialize app only if wallet address and session token are present
       if (status.walletAddress && status.sessionToken && !isInitialized) {
         try {
           await initializeApp(status.walletAddress);
@@ -760,7 +751,7 @@ const AppContent: React.FC = () => {
       },
     }));
 
-    // Сбрасываем флаг инициализации при отключении кошелька
+    // Reset initialization state
     setIsInitialized(false);
     setCurrentNFT(undefined);
     setCurrentScript(undefined);
@@ -1018,7 +1009,7 @@ const AppContent: React.FC = () => {
         <div className="main-content">
           <div className="app-main">
             <div className="main-grid">
-              {/* Wallet Section - скрывается после успешного подключения */}
+              {/* Wallet Section */}
               {!appState.system.connected && (
                 <div className="card">
                   <WalletConnection
@@ -1037,7 +1028,11 @@ const AppContent: React.FC = () => {
                   className="card nft-section"
                 >
                   <div className="pair-header">
-                    <h3>{pair.nft ? `NFT+Script Pair #${index + 1}` : `Script #${index + 1}`}</h3>
+                    <h3>
+                      {pair.nft
+                        ? `NFT+Script Pair #${index + 1}`
+                        : `Script #${index + 1}`}
+                    </h3>
                     <div className="pair-info">
                       {pair.nft && (
                         <span className="nft-name">
@@ -1101,7 +1096,7 @@ const AppContent: React.FC = () => {
               </div>
             ) : null}
 
-            {/* Profile Manager - показывается после подключения к серверу */}
+            {/* Profile Manager - only visible if connected to server */}
             {appState.system.connected && (
               <div className="card profile-section">
                 <ProfileManager
@@ -1123,7 +1118,7 @@ const AppContent: React.FC = () => {
               </div>
             )}
 
-            {/* Script Manager - отображается всегда если есть подключенный кошелек */}
+            {/* Script Manager  */}
             {appState.wallet.status.isConnected && (
               <div className="card script-section">
                 <ScriptManager scriptData={currentScript} />

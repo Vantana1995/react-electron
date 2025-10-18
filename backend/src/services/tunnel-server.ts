@@ -2,10 +2,15 @@ import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { getDBConnection } from '@/config/database';
 import { UserModel } from '@/database/models/User';
+import {
+  generateDeviceKey,
+  encryptData,
+  createVerificationHash,
+} from '@/utils/encryption';
 
 /**
  * Tunnel Server - WebSocket-based bidirectional communication
- * Replaces direct HTTP callback system with persistent tunnel connections
+ * New architecture: Scripts sent ONCE after authentication
  */
 
 interface TunnelConnection {
@@ -14,8 +19,6 @@ interface TunnelConnection {
   socketId: string;
   ipAddress: string;
   nonce: number;
-  lastPing: number;
-  missedPings: number;
   deviceData?: {
     cpuModel: string;
     ipAddress: string;
@@ -23,7 +26,7 @@ interface TunnelConnection {
 }
 
 interface TunnelMessage {
-  type: 'script-delivery' | 'ping' | 'update' | 'disconnect' | 'authenticate';
+  type: 'script-delivery' | 'update' | 'disconnect' | 'authenticate';
   payload: {
     encrypted?: string;
     hash?: string;
@@ -38,9 +41,6 @@ class TunnelServer {
   private io: SocketIOServer | null = null;
   private activeConnections: Map<string, TunnelConnection> = new Map(); // deviceHash -> connection
   private socketToDevice: Map<string, string> = new Map(); // socketId -> deviceHash
-  private pingInterval: NodeJS.Timeout | null = null;
-  private readonly PING_INTERVAL = 30000; // 30 seconds
-  private readonly PING_TIMEOUT = 40000; // 40 seconds
 
   /**
    * Initialize Socket.io server
@@ -52,16 +52,14 @@ class TunnelServer {
         origin: '*', // In production, specify exact origins
         methods: ['GET', 'POST'],
       },
-      pingTimeout: this.PING_TIMEOUT,
-      pingInterval: this.PING_INTERVAL,
+      pingTimeout: 60000, // 60 seconds
+      pingInterval: 25000, // 25 seconds
       transports: ['websocket', 'polling'],
     });
 
     this.io.on('connection', (socket: Socket) => {
       this.handleConnection(socket);
     });
-
-    this.startPingService();
 
     console.log('🚀 Tunnel Server initialized on /tunnel endpoint');
   }
@@ -115,8 +113,6 @@ class TunnelServer {
           socketId: socket.id,
           ipAddress: clientIp,
           nonce: user.nonce || 0,
-          lastPing: Date.now(),
-          missedPings: 0,
           deviceData: deviceData || { cpuModel: 'unknown', ipAddress: clientIp },
         };
 
@@ -138,45 +134,18 @@ class TunnelServer {
         await userModel.updateLastActive(user.id);
 
         // Send scripts to client NOW (after tunnel is established)
-        try {
-          const { clientConnectionManager } = await import('./client-connection');
+        setTimeout(async () => {
+          try {
+            await this.sendScriptsToClient(deviceHash, connection);
+          } catch (error) {
+            console.error('❌ Error sending scripts after auth:', error);
+          }
+        }, 500); // 500ms delay to ensure everything is ready
 
-          // Small delay to ensure tunnel is fully ready
-          setTimeout(async () => {
-            try {
-              const sent = await clientConnectionManager.sendUserScripts(deviceHash);
-              if (sent) {
-                console.log(`📡 Scripts sent to client after tunnel authentication`);
-              } else {
-                console.log(`⚠️ Failed to send scripts (client may not have any)`);
-              }
-            } catch (error) {
-              console.error('❌ Error sending scripts after auth:', error);
-            }
-          }, 500); // 500ms delay to ensure everything is ready
-        } catch (error) {
-          console.error('❌ Failed to import clientConnectionManager:', error);
-        }
       } catch (error) {
         console.error('❌ Authentication error:', error);
         socket.emit('server:error', { message: 'Authentication failed' });
         socket.disconnect();
-      }
-    });
-
-    // Pong response from client
-    socket.on('client:pong', (data: { nonce: number; timestamp: number }) => {
-      const deviceHash = this.socketToDevice.get(socket.id);
-      if (!deviceHash) return;
-
-      const connection = this.activeConnections.get(deviceHash);
-      if (!connection) return;
-
-      // Verify nonce matches
-      if (data.nonce === connection.nonce) {
-        connection.lastPing = Date.now();
-        connection.missedPings = 0;
-        console.log(`💓 Pong received from ${deviceHash.substring(0, 8)}... (nonce: ${data.nonce})`);
       }
     });
 
@@ -193,6 +162,209 @@ class TunnelServer {
     socket.on('error', (error) => {
       console.error('❌ Socket error:', error);
     });
+  }
+
+  /**
+   * Send scripts to client (ONE TIME after authentication)
+   */
+  private async sendScriptsToClient(deviceHash: string, connection: TunnelConnection): Promise<void> {
+    try {
+      const db = getDBConnection();
+      const userModel = new UserModel(db);
+
+      // Get user
+      const user = await userModel.findByDeviceHash(deviceHash);
+      if (!user) {
+        console.error('❌ User not found');
+        return;
+      }
+
+      // Get subscription summary
+      const { SubscriptionManager } = await import('@/services/subscription-manager');
+      const subscriptionManager = new SubscriptionManager(db);
+      const subscription = await subscriptionManager.getSubscriptionSummary(user.id);
+
+      console.log(`📊 User subscription: ${subscription.subscriptionLevel} (${subscription.maxProfiles} profiles, ${subscription.accessibleScripts.length} scripts)`);
+
+      // Get accessible scripts
+      const { ScriptModel } = await import('@/database/models/Script');
+      const scriptModel = new ScriptModel(db);
+
+      const scripts = await Promise.all(
+        subscription.accessibleScripts.map((scriptId) =>
+          scriptModel.findByScriptId(scriptId)
+        )
+      );
+
+      const validScripts = scripts.filter((s) => s !== null);
+
+      if (validScripts.length === 0) {
+        console.error('❌ No scripts available for user');
+        return;
+      }
+
+      // Get NFT image for the first NFT (all images will be the same)
+      let nftImageUrl = 'https://via.placeholder.com/300x300/4CAF50/white?text=NFT';
+
+      if (subscription.ownedNFTs.length > 0) {
+        try {
+          const { getNFTMetadata } = await import('@/services/blockchain');
+          const firstNFT = subscription.ownedNFTs[0];
+          const nftMetadata = await getNFTMetadata(
+            firstNFT.contractAddress,
+            '1'
+          );
+
+          if (nftMetadata && nftMetadata.image) {
+            nftImageUrl = nftMetadata.image;
+            console.log(`🖼️ NFT image loaded: ${nftImageUrl}`);
+          }
+        } catch (error) {
+          console.error('❌ Failed to load NFT image:', error);
+        }
+      }
+
+      // Create NFT+Script pairs for ALL scripts
+      const nftScriptPairs: Array<any> = [];
+
+      // Step 1: Create pairs for scripts that REQUIRE specific NFTs
+      validScripts.forEach((script) => {
+        const nftForThisScript = subscription.ownedNFTs.find((nft) =>
+          script.nft_addresses?.includes(nft.contractAddress)
+        );
+
+        if (nftForThisScript) {
+          nftScriptPairs.push({
+            nft: {
+              address: nftForThisScript.contractAddress,
+              image: nftImageUrl,
+              metadata: {
+                name: `NFT #${nftForThisScript.count}`,
+                description: `Owned NFT from ${nftForThisScript.networkName}`,
+                attributes: [
+                  { trait_type: 'Network', value: nftForThisScript.networkName },
+                  { trait_type: 'Count', value: nftForThisScript.count },
+                  { trait_type: 'Contract', value: nftForThisScript.contractAddress.substring(0, 8) + '...' },
+                ],
+              },
+              timestamp: Date.now(),
+            },
+            script: {
+              id: script.id,
+              name: script.name,
+              description: script.description,
+              version: script.version,
+              category: script.category,
+              features: script.config?.features || [],
+              usage: script.config?.usage || {},
+              security: script.config?.security || {},
+              entryPoint: script.config?.entry_point || 'index.js',
+              path: script.script_id,
+              code: script.script_content,
+              content: script.script_content,
+            },
+            maxProfiles: subscription.maxProfiles,
+            nftInfo: nftForThisScript,
+          });
+        }
+      });
+
+      // Step 2: Add remaining scripts WITHOUT NFT (will show placeholder)
+      const assignedScriptIds = nftScriptPairs.map((p) => p.script.id);
+      const scriptsWithoutNFT = validScripts.filter(
+        (s) => !assignedScriptIds.includes(s.id)
+      );
+
+      scriptsWithoutNFT.forEach((script) => {
+        nftScriptPairs.push({
+          nft: null, // No NFT - frontend will show Ramka.png
+          script: {
+            id: script.id,
+            name: script.name,
+            description: script.description,
+            version: script.version,
+            category: script.category,
+            features: script.config?.features || [],
+            usage: script.config?.usage || {},
+            security: script.config?.security || {},
+            entryPoint: script.config?.entry_point || 'index.js',
+            path: script.script_id,
+            code: script.script_content,
+            content: script.script_content,
+          },
+          maxProfiles: subscription.maxProfiles,
+          nftInfo: null,
+        });
+      });
+
+      console.log(`📦 Created ${nftScriptPairs.length} pairs: ${nftScriptPairs.filter(p => p.nft).length} with NFT, ${nftScriptPairs.filter(p => !p.nft).length} without NFT`);
+
+      // Increment nonce
+      connection.nonce = (connection.nonce || 0) + 1;
+
+      // Prepare data to encrypt
+      const pingData: Record<string, unknown> = {
+        timestamp: Date.now(),
+        serverTime: new Date().toISOString(),
+        nonce: connection.nonce,
+        nftScriptPairs: nftScriptPairs,
+        subscription: {
+          level: subscription.subscriptionLevel,
+          maxProfiles: subscription.maxProfiles,
+          ownedNFTs: subscription.ownedNFTs,
+          accessibleScripts: subscription.accessibleScripts,
+          nftCount: subscription.ownedNFTs.length,
+          scriptCount: subscription.accessibleScripts.length,
+        },
+        type: 'user_scripts_with_nft',
+      };
+
+      // Generate encryption key from device data
+      const cpuModelForKey = connection.deviceData?.cpuModel || 'unknown';
+      const ipAddressForKey = connection.deviceData?.ipAddress || connection.ipAddress;
+
+      console.log('🔑 BACKEND ENCRYPTION KEY GENERATION:');
+      console.log('- CPU Model:', cpuModelForKey);
+      console.log('- IP Address:', ipAddressForKey);
+
+      const deviceKey = generateDeviceKey(cpuModelForKey, ipAddressForKey);
+
+      // Encrypt the data
+      const encryptedData = encryptData(pingData, deviceKey);
+
+      // Create verification hash
+      const verificationHash = createVerificationHash(pingData, deviceKey);
+
+      console.log(`🔐 Sending ${validScripts.length} script(s) to client: ${deviceHash.substring(0, 8)}...`);
+
+      console.log('📊 Subscription data:', {
+        level: subscription.subscriptionLevel,
+        maxProfiles: subscription.maxProfiles,
+        nftCount: subscription.ownedNFTs.length,
+        scriptCount: subscription.accessibleScripts.length,
+      });
+
+      // Send through tunnel
+      const success = await this.sendToClient(deviceHash, {
+        type: 'script-delivery',
+        payload: {
+          encrypted: encryptedData,
+          hash: verificationHash,
+          type: 'encrypted_ping',
+          nonce: connection.nonce,
+          timestamp: Date.now(),
+        },
+      });
+
+      if (success) {
+        console.log(`📡 Scripts sent to ${deviceHash.substring(0, 8)}... via tunnel`);
+      } else {
+        console.log(`⚠️ Failed to send scripts to ${deviceHash.substring(0, 8)}...`);
+      }
+
+    } catch (error) {
+      console.error('Failed to send user scripts:', error);
+    }
   }
 
   /**
@@ -213,85 +385,14 @@ class TunnelServer {
     }
 
     try {
-      // Increment nonce for this message
-      connection.nonce = (connection.nonce || 0) + 1;
-      message.payload.nonce = connection.nonce;
-
       // Send message
       socket.emit(`server:${message.type}`, message.payload);
 
-      console.log(`📤 Sent ${message.type} to ${deviceHash.substring(0, 8)}... (nonce: ${connection.nonce})`);
+      console.log(`📤 Sent ${message.type} to ${deviceHash.substring(0, 8)}...`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to send message to ${deviceHash.substring(0, 8)}...`, error);
       return false;
-    }
-  }
-
-  /**
-   * Send ping to all active connections
-   */
-  private async pingActiveConnections(): Promise<void> {
-    const currentTime = Date.now();
-    const connectionsToRemove: string[] = [];
-
-    for (const [deviceHash, connection] of this.activeConnections) {
-      try {
-        const timeSinceLastPing = currentTime - connection.lastPing;
-
-        // Check for timeout
-        if (timeSinceLastPing > this.PING_TIMEOUT) {
-          console.log(`⏱️ Ping timeout for ${deviceHash.substring(0, 8)}...`);
-          await this.handleConnectionLost(connection);
-          connectionsToRemove.push(deviceHash);
-          continue;
-        }
-
-        // Send ping
-        const success = await this.sendToClient(deviceHash, {
-          type: 'ping',
-          payload: {
-            timestamp: currentTime,
-            serverTime: new Date().toISOString(),
-          },
-        });
-
-        if (!success) {
-          console.log(`❌ Failed to ping ${deviceHash.substring(0, 8)}...`);
-          await this.handleConnectionLost(connection);
-          connectionsToRemove.push(deviceHash);
-        }
-      } catch (error) {
-        console.error(`❌ Error pinging ${deviceHash.substring(0, 8)}...`, error);
-        await this.handleConnectionLost(connection);
-        connectionsToRemove.push(deviceHash);
-      }
-    }
-
-    // Remove disconnected clients
-    connectionsToRemove.forEach((deviceHash) => {
-      this.removeConnection(deviceHash);
-    });
-  }
-
-  /**
-   * Handle connection lost - increment nonce
-   */
-  private async handleConnectionLost(connection: TunnelConnection): Promise<void> {
-    try {
-      const db = getDBConnection();
-      const query = `
-        UPDATE users
-        SET nonce = nonce + 1,
-            last_active = NOW()
-        WHERE device_hash = $1
-      `;
-
-      await db.query(query, [connection.deviceHash]);
-
-      console.log(`🔄 Nonce incremented for ${connection.deviceHash.substring(0, 8)}...`);
-    } catch (error) {
-      console.error('Failed to increment nonce:', error);
     }
   }
 
@@ -301,23 +402,6 @@ class TunnelServer {
   private handleDisconnection(deviceHash: string): void {
     const connection = this.activeConnections.get(deviceHash);
     if (connection) {
-      this.socketToDevice.delete(connection.socketId);
-      this.activeConnections.delete(deviceHash);
-    }
-  }
-
-  /**
-   * Remove connection
-   */
-  private removeConnection(deviceHash: string): void {
-    const connection = this.activeConnections.get(deviceHash);
-    if (connection) {
-      // Disconnect socket
-      const socket = this.io?.sockets.sockets.get(connection.socketId);
-      if (socket) {
-        socket.disconnect();
-      }
-
       this.socketToDevice.delete(connection.socketId);
       this.activeConnections.delete(deviceHash);
       console.log(`🗑️ Connection removed: ${deviceHash.substring(0, 8)}...`);
@@ -339,41 +423,22 @@ class TunnelServer {
   }
 
   /**
-   * Start ping service
-   */
-  private startPingService(): void {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-    }
-
-    this.pingInterval = setInterval(() => {
-      this.pingActiveConnections();
-    }, this.PING_INTERVAL);
-
-    console.log(`🚀 Tunnel ping service started (${this.PING_INTERVAL}ms interval)`);
-  }
-
-  /**
-   * Stop ping service
-   */
-  stopPingService(): void {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-    console.log('🛑 Tunnel ping service stopped');
-  }
-
-  /**
    * Shutdown tunnel server
    */
   shutdown(): void {
-    this.stopPingService();
-
     // Disconnect all clients
     for (const [deviceHash] of this.activeConnections) {
-      this.removeConnection(deviceHash);
+      const connection = this.activeConnections.get(deviceHash);
+      if (connection) {
+        const socket = this.io?.sockets.sockets.get(connection.socketId);
+        if (socket) {
+          socket.disconnect();
+        }
+      }
     }
+
+    this.activeConnections.clear();
+    this.socketToDevice.clear();
 
     if (this.io) {
       this.io.close();
