@@ -9,7 +9,6 @@ import { UserModel } from "@/database/models/User";
 import { ScriptModel } from "@/database/models/Script";
 import { NFTCacheManager } from "@/utils/nft-cache";
 import { SubscriptionManager } from "@/services/subscription-manager";
-import { clientConnectionManager } from "@/services/client-connection";
 
 /**
  * Handle NFT mint event
@@ -117,37 +116,9 @@ export async function handleNFTMint(
       console.log(`   - ${script.name} (v${script.version})`);
     });
 
-    // Step 4: Check if user is online
-    console.log("\n🌐 Step 4: Checking user online status...");
-    const connection = clientConnectionManager.getConnectionInfo(user.device_hash);
-
-    if (!connection) {
-      console.log("❌ User is offline");
-      console.log("💡 Scripts will be delivered when user connects");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-      return;
-    }
-
-    console.log("✅ User is online!");
-    console.log(`📡 IP Address: ${connection.ipAddress}`);
-    console.log(`🔢 Current Nonce: ${connection.nonce}`);
-
-    // Step 5: Send updated scripts to user via WebSocket
-    console.log("\n📤 Step 5: Sending updated scripts to user...");
-    try {
-      const success = await clientConnectionManager.sendUserScripts(user.device_hash);
-
-      if (success) {
-        console.log("✅ Scripts delivered successfully!");
-        console.log("🎉 User can now execute their accessible scripts");
-      } else {
-        console.log("❌ Failed to deliver scripts");
-        console.log("💡 User may need to reconnect");
-      }
-    } catch (error) {
-      console.error("❌ Error sending scripts:", error);
-    }
-
+    // Step 4: Subscription updated - scripts will be delivered on next connection
+    console.log("\n✅ Step 4: Subscription updated in database");
+    console.log("💡 User will receive updated scripts on next tunnel connection");
     console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("✅ NFT MINT EVENT PROCESSING COMPLETE\n");
 
