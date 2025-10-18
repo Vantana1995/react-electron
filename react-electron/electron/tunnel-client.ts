@@ -42,6 +42,19 @@ export class TunnelClient {
    * Connect to tunnel server
    */
   async connect(config: TunnelConfig): Promise<boolean> {
+    // Prevent multiple simultaneous connections
+    if (this.socket && this.socket.connected) {
+      logger.log("[TUNNEL-CLIENT-ELECTRON] Already connected, skipping...");
+      return true;
+    }
+
+    // Disconnect existing socket before creating a new one
+    if (this.socket) {
+      logger.log("[TUNNEL-CLIENT-ELECTRON] Disconnecting existing socket before reconnect...");
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
     this.config = config;
 
     try {
@@ -60,9 +73,9 @@ export class TunnelClient {
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
         reconnectionDelayMax: this.maxReconnectDelay,
-        timeout: 10000,
+        timeout: 20000, // Increased from 10s to 20s for stability
         autoConnect: false,
-        forceNew: true,
+        forceNew: false, // Changed from true to false - reuse connection when possible
         upgrade: true,
       });
 
@@ -226,7 +239,13 @@ export class TunnelClient {
 
     // Authentication success
     this.socket.on("server:authenticated", (data: any) => {
-      logger.log("✅ Tunnel authenticated:", data);
+      const timestamp = new Date().toISOString();
+      logger.log(`✅ [${timestamp}] Tunnel authenticated:`, data);
+      logger.log(`  - Socket ID: ${this.socket?.id}`);
+      logger.log(`  - User ID: ${data.userId}`);
+      logger.log(`  - Device Hash: ${data.deviceHash?.substring(0, 16)}...`);
+      logger.log(`  - Nonce: ${data.nonce}`);
+
       this.isAuthenticated = true;
 
       // Process queued messages
@@ -316,7 +335,12 @@ export class TunnelClient {
 
     // Disconnected
     this.socket.on("disconnect", (reason) => {
-      logger.log(`  [TUNNEL-CLIENT-ELECTRON] Tunnel disconnected: ${reason}`);
+      const timestamp = new Date().toISOString();
+      logger.log(`❌ [${timestamp}] [TUNNEL-CLIENT-ELECTRON] Tunnel disconnected: ${reason}`);
+      logger.log(`  - Socket ID: ${this.socket?.id || 'unknown'}`);
+      logger.log(`  - Was authenticated: ${this.isAuthenticated}`);
+      logger.log(`  - Reconnect attempts: ${this.reconnectAttempts}`);
+
       this.isAuthenticated = false;
 
       // Notify renderer

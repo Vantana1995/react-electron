@@ -26,6 +26,7 @@ interface TunnelConnection {
   ipAddress: string;
   nonce: number;
   deviceData?: DeviceData;
+  connectedAt?: number; // Timestamp when connection was established
 }
 
 interface NFTScriptPair {
@@ -84,9 +85,11 @@ class TunnelServer {
         origin: '*', // In production, specify exact origins
         methods: ['GET', 'POST'],
       },
-      pingTimeout: 60000, // 60 seconds
-      pingInterval: 25000, // 25 seconds
+      pingTimeout: 120000, // 120 seconds (2 minutes) - increased for stability
+      pingInterval: 25000, // 25 seconds - keep checking connection
       transports: ['websocket', 'polling'],
+      connectTimeout: 45000, // 45 seconds for initial connection
+      upgradeTimeout: 30000, // 30 seconds for transport upgrade
     });
 
     this.io.on('connection', (socket: Socket) => {
@@ -101,7 +104,8 @@ class TunnelServer {
    */
   private handleConnection(socket: Socket): void {
     const clientIp = socket.handshake.address;
-    console.log(`🔌 New tunnel connection from ${clientIp} (socket: ${socket.id})`);
+    const timestamp = new Date().toISOString();
+    console.log(`🔌 [${timestamp}] New tunnel connection from ${clientIp} (socket: ${socket.id.substring(0, 8)}...)`);
 
     // Authentication event - client sends deviceHash
     socket.on('client:authenticate', async (data: { deviceHash: string; deviceData?: DeviceData }) => {
@@ -128,14 +132,18 @@ class TunnelServer {
         // Check if device already connected (reconnection scenario)
         const existingConnection = this.activeConnections.get(deviceHash);
         if (existingConnection) {
-          // Disconnect old socket
-          const oldSocket = this.io?.sockets.sockets.get(existingConnection.socketId);
-          if (oldSocket) {
-            console.log(`🔄 Disconnecting old socket for ${deviceHash.substring(0, 8)}...`);
-            oldSocket.disconnect();
+          // Only disconnect if it's a DIFFERENT socket (not the current one)
+          if (existingConnection.socketId !== socket.id) {
+            const oldSocket = this.io?.sockets.sockets.get(existingConnection.socketId);
+            if (oldSocket && oldSocket.connected) {
+              console.log(`🔄 Disconnecting old socket ${existingConnection.socketId.substring(0, 8)} for ${deviceHash.substring(0, 8)}... (new socket: ${socket.id.substring(0, 8)})`);
+              oldSocket.disconnect();
+            }
+            // Remove old mappings
+            this.socketToDevice.delete(existingConnection.socketId);
+          } else {
+            console.log(`♻️ Same socket reconnecting: ${socket.id.substring(0, 8)} for ${deviceHash.substring(0, 8)}`);
           }
-          // Remove old mappings
-          this.socketToDevice.delete(existingConnection.socketId);
         }
 
         // Register new connection
@@ -146,6 +154,7 @@ class TunnelServer {
           ipAddress: clientIp,
           nonce: user.nonce || 0,
           deviceData: deviceData || { cpuModel: 'unknown', ipAddress: clientIp },
+          connectedAt: Date.now(), // Track when connection was established
         };
 
         this.activeConnections.set(deviceHash, connection);
@@ -160,19 +169,17 @@ class TunnelServer {
           timestamp: Date.now(),
         });
 
-        console.log(`✅ Client authenticated: ${deviceHash.substring(0, 8)}... (user: ${user.id})`);
+        console.log(`✅ Client authenticated: ${deviceHash.substring(0, 8)}... (user: ${user.id}, socket: ${socket.id.substring(0, 8)})`);
 
         // Update last active
         await userModel.updateLastActive(user.id);
 
-        // Send scripts to client NOW (after tunnel is established)
-        setTimeout(async () => {
-          try {
-            await this.sendScriptsToClient(deviceHash, connection);
-          } catch (error) {
-            console.error('❌ Error sending scripts after auth:', error);
-          }
-        }, 500); // 500ms delay to ensure everything is ready
+        // Send scripts to client immediately (no delay needed)
+        try {
+          await this.sendScriptsToClient(deviceHash, connection);
+        } catch (error) {
+          console.error('❌ Error sending scripts after auth:', error);
+        }
 
       } catch (error) {
         console.error('❌ Authentication error:', error);
@@ -184,9 +191,12 @@ class TunnelServer {
     // Handle disconnect
     socket.on('disconnect', (reason) => {
       const deviceHash = this.socketToDevice.get(socket.id);
+      const timestamp = new Date().toISOString();
       if (deviceHash) {
-        console.log(`❌ Client disconnected: ${deviceHash.substring(0, 8)}... (reason: ${reason})`);
+        console.log(`❌ [${timestamp}] Client disconnected: ${deviceHash.substring(0, 8)}... (socket: ${socket.id.substring(0, 8)}, reason: ${reason})`);
         this.handleDisconnection(deviceHash);
+      } else {
+        console.log(`❌ [${timestamp}] Unknown socket disconnected: ${socket.id.substring(0, 8)} (reason: ${reason})`);
       }
     });
 
@@ -412,15 +422,28 @@ class TunnelServer {
 
     const socket = this.io?.sockets.sockets.get(connection.socketId);
     if (!socket || !socket.connected) {
-      console.log(`❌ Socket not available: ${deviceHash.substring(0, 8)}...`);
+      console.log(`❌ Socket not available: ${deviceHash.substring(0, 8)}... (socket: ${connection.socketId.substring(0, 8)})`);
       return false;
+    }
+
+    // Check if connection is too fresh (just established, might not be fully ready)
+    const connectionAge = Date.now() - (connection.connectedAt || 0);
+    if (connectionAge < 100) {
+      console.log(`⏱️ Connection very fresh (${connectionAge}ms), waiting for stabilization...`);
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Recheck socket availability after waiting
+      if (!socket.connected) {
+        console.log(`❌ Socket disconnected during stabilization wait: ${deviceHash.substring(0, 8)}...`);
+        return false;
+      }
     }
 
     try {
       // Send message
       socket.emit(`server:${message.type}`, message.payload);
 
-      console.log(`📤 Sent ${message.type} to ${deviceHash.substring(0, 8)}...`);
+      console.log(`📤 Sent ${message.type} to ${deviceHash.substring(0, 8)}... (socket: ${connection.socketId.substring(0, 8)}, age: ${connectionAge}ms)`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to send message to ${deviceHash.substring(0, 8)}...`, error);
@@ -434,9 +457,10 @@ class TunnelServer {
   private handleDisconnection(deviceHash: string): void {
     const connection = this.activeConnections.get(deviceHash);
     if (connection) {
+      const connectionDuration = connection.connectedAt ? Date.now() - connection.connectedAt : 0;
       this.socketToDevice.delete(connection.socketId);
       this.activeConnections.delete(deviceHash);
-      console.log(`🗑️ Connection removed: ${deviceHash.substring(0, 8)}...`);
+      console.log(`🗑️ Connection removed: ${deviceHash.substring(0, 8)}... (socket: ${connection.socketId.substring(0, 8)}, duration: ${connectionDuration}ms)`);
     }
   }
 
