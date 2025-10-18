@@ -267,6 +267,7 @@ export async function POST(request: NextRequest) {
     const sessionToken = generateSessionToken(deviceHash);
 
     // Register connection with client connection manager
+    // NOTE: Scripts will be sent AFTER tunnel authentication (not here)
     try {
       await clientConnectionManager.registerConnection(
         deviceHash,
@@ -278,18 +279,7 @@ export async function POST(request: NextRequest) {
         }
       );
       console.log("✅ Connection registered with client manager");
-
-      // Send accessible scripts to user
-      if (accessibleScripts.length > 0) {
-        try {
-          await clientConnectionManager.sendUserScripts(deviceHash);
-          console.log(
-            `📡 Sent ${accessibleScripts.length} script(s) to client`
-          );
-        } catch (error) {
-          console.error("❌ Failed to send scripts:", error);
-        }
-      }
+      console.log("⏳ Waiting for tunnel connection to send scripts...");
     } catch (error) {
       console.error("❌ Failed to register connection:", error);
       // Don't fail the request, just log the error

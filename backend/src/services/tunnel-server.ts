@@ -136,6 +136,27 @@ class TunnelServer {
 
         // Update last active
         await userModel.updateLastActive(user.id);
+
+        // Send scripts to client NOW (after tunnel is established)
+        try {
+          const { clientConnectionManager } = await import('./client-connection');
+
+          // Small delay to ensure tunnel is fully ready
+          setTimeout(async () => {
+            try {
+              const sent = await clientConnectionManager.sendUserScripts(deviceHash);
+              if (sent) {
+                console.log(`📡 Scripts sent to client after tunnel authentication`);
+              } else {
+                console.log(`⚠️ Failed to send scripts (client may not have any)`);
+              }
+            } catch (error) {
+              console.error('❌ Error sending scripts after auth:', error);
+            }
+          }, 500); // 500ms delay to ensure everything is ready
+        } catch (error) {
+          console.error('❌ Failed to import clientConnectionManager:', error);
+        }
       } catch (error) {
         console.error('❌ Authentication error:', error);
         socket.emit('server:error', { message: 'Authentication failed' });
