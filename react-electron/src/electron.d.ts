@@ -173,25 +173,6 @@ interface ElectronAPI {
   // Application control
   closeApp: () => Promise<any>;
 
-  // Browser management
-  createBrowser: (config: {
-    profile: any;
-    headless: boolean;
-    active: boolean;
-  }) => Promise<any>;
-
-  closeBrowser: (browserId: string) => Promise<any>;
-
-  executeBrowserScript: (params: {
-    browserId: string;
-    script: any;
-    executeParams?: Record<string, unknown>;
-  }) => Promise<any>;
-
-  navigateBrowser: (params: { browserId: string; url: string }) => Promise<any>;
-
-  getBrowserStatus: (browserId: string) => Promise<any>;
-
   // File system operations
   selectFolder: () => Promise<string | null>;
 

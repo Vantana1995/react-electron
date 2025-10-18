@@ -91,6 +91,7 @@ export class TunnelClient {
         logger.log(" [TUNNEL-CLIENT-ELECTRON] Socket.IO PING sent");
       });
 
+      // @ts-ignore - Socket.IO internal event
       this.socket.io.on("pong", (ms: number) => {
         logger.log(
           ` [TUNNEL-CLIENT-ELECTRON] Socket.IO PONG received (${ms}ms)`

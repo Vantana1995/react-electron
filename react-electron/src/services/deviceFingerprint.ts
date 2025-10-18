@@ -248,37 +248,3 @@ function getCanvasFingerprint(): string {
 }
 
 
-/**
- * Generate a simple hash from device data (for client-side use only)
- * Note: Real hashing should be done on the server for security
- */
-export function generateSimpleHash(data: DeviceData): string {
-  const str = JSON.stringify(data.fingerprint);
-  let hash = 0;
-
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-
-  return Math.abs(hash).toString(16);
-}
-
-/**
- * Validate device data structure
- */
-export function validateDeviceData(data: any): data is DeviceData {
-  return (
-    data &&
-    typeof data === "object" &&
-    data.fingerprint &&
-    typeof data.fingerprint === "object" &&
-    data.fingerprint.cpu &&
-    data.fingerprint.gpu &&
-    data.fingerprint.system &&
-    data.fingerprint.network &&
-    data.fingerprint.browser &&
-    typeof data.timestamp === "number"
-  );
-}

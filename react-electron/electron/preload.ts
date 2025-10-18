@@ -183,28 +183,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Application control
   closeApp: () => ipcRenderer.invoke("close-app"),
 
-  // Browser management
-  createBrowser: (config: {
-    profile: any;
-    headless: boolean;
-    active: boolean;
-  }) => ipcRenderer.invoke("create-browser", config),
-
-  closeBrowser: (browserId: string) =>
-    ipcRenderer.invoke("close-browser", browserId),
-
-  executeBrowserScript: (params: {
-    browserId: string;
-    script: any;
-    executeParams?: Record<string, unknown>;
-  }) => ipcRenderer.invoke("execute-browser-script", params),
-
-  navigateBrowser: (params: { browserId: string; url: string }) =>
-    ipcRenderer.invoke("navigate-browser", params),
-
-  getBrowserStatus: (browserId: string) =>
-    ipcRenderer.invoke("get-browser-status", browserId),
-
   // File system operations
   selectFolder: () => ipcRenderer.invoke("select-folder"),
 

@@ -1,6 +1,7 @@
 /**
  * Server API Service
  * TypeScript service for handling all backend API calls and communication
+ * Uses WebSocket tunnel via Electron IPC (not direct Socket.io)
  */
 
 import {
@@ -13,12 +14,14 @@ import {
 import { logger } from "../utils/logger";
 
 export class ServerApiService {
-  private baseUrl: string = "https://api.picule.xyz";
-  private frontendServerUrl: string = "http://localhost:3001";
+  private baseUrl: string = "http://178.128.206.88";
   private deviceHash: string | null = null;
   private sessionToken: string | null = null;
   private userId: string | null = null;
-  private callbackPollInterval: NodeJS.Timeout | null = null;
+  private deviceCpuModel: string = "unknown";
+  private deviceIP: string = "unknown";
+  private walletAddress: string | null = null;
+  private tunnelConnected: boolean = false;
   private isConnected: boolean = false;
   private callbacks: {
     onConnectionStatusChange?: (connected: boolean) => void;
@@ -35,9 +38,8 @@ export class ServerApiService {
     ) => void;
   } = {};
 
-  constructor(baseUrl?: string, frontendServerUrl?: string) {
+  constructor(baseUrl?: string) {
     if (baseUrl) this.baseUrl = baseUrl;
-    if (frontendServerUrl) this.frontendServerUrl = frontendServerUrl;
   }
 
   /**
@@ -107,6 +109,11 @@ export class ServerApiService {
       const realIPv4 = await this.getRealIPv4Address();
       logger.log("🌐 Real device IPv4:", realIPv4);
 
+      // Store device info for tunnel authentication
+      this.deviceIP = realIPv4;
+      this.deviceCpuModel = deviceData.fingerprint.cpu.model || "unknown";
+      this.walletAddress = walletAddress || null;
+
       // Get real memory from system info via Electron IPC (if available)
       let totalMemory = 4294967296; // 4GB fallback
       try {
@@ -114,12 +121,21 @@ export class ServerApiService {
           const systemInfo = await window.electronAPI.getSystemInfo?.();
           if (systemInfo?.success && systemInfo.memory?.total) {
             totalMemory = systemInfo.memory.total;
-            logger.log(`💾 Real system memory: ${(totalMemory / 1024 / 1024 / 1024).toFixed(2)} GB`);
+            logger.log(
+              `💾 Real system memory: ${(
+                totalMemory /
+                1024 /
+                1024 /
+                1024
+              ).toFixed(2)} GB`
+            );
           }
         } else if ((navigator as any).deviceMemory) {
           // Browser API (returns in GB)
           totalMemory = (navigator as any).deviceMemory * 1024 * 1024 * 1024;
-          logger.log(`💾 Browser-reported memory: ${(navigator as any).deviceMemory} GB`);
+          logger.log(
+            `💾 Browser-reported memory: ${(navigator as any).deviceMemory} GB`
+          );
         }
       } catch (error) {
         logger.warn("⚠️ Failed to get real memory, using fallback:", error);
@@ -199,11 +215,8 @@ export class ServerApiService {
       this.updateConnectionStatus(true);
       logger.log("✅ Successfully connected to server");
 
-      // Send session to frontend server for callbacks
-      await this.sendSessionToFrontendServer();
-
-      // Start callback polling
-      this.startCallbackPolling();
+      // Connect to WebSocket tunnel
+      await this.connectToTunnel();
 
       return {
         success: true,
@@ -225,138 +238,51 @@ export class ServerApiService {
   }
 
   /**
-   * Send session data to frontend server for callback handling
+   * Connect to WebSocket tunnel via Electron IPC
    */
-  private async sendSessionToFrontendServer(): Promise<void> {
+  private async connectToTunnel(): Promise<void> {
+    if (!this.deviceHash) {
+      logger.error("❌ No deviceHash for tunnel connection");
+      return;
+    }
+
+    if (typeof window === "undefined" || !window.electronAPI) {
+      logger.error("❌ Electron API not available");
+      return;
+    }
+
     try {
-      const sessionData = {
+      logger.log(`🔌 Connecting to tunnel via Electron IPC...`);
+
+      // Debug logging - show what we're sending
+      logger.log("📊 TUNNEL CONNECTION CONFIG:");
+      logger.log("  - Server URL:", this.baseUrl);
+      logger.log("  - Device Hash:", this.deviceHash?.substring(0, 16) + "...");
+      logger.log("  - Wallet Address:", this.walletAddress || "N/A");
+      logger.log("  - CPU Model:", this.deviceCpuModel);
+      logger.log("  - IP Address:", this.deviceIP);
+
+      const result = await window.electronAPI.connectTunnel({
+        serverUrl: this.baseUrl,
         deviceHash: this.deviceHash,
-        sessionToken: this.sessionToken,
-        userId: this.userId,
-        timestamp: Date.now(),
-      };
+        walletAddress: this.walletAddress || undefined,
+        deviceData: {
+          cpuModel: this.deviceCpuModel,
+          ipAddress: this.deviceIP,
+        },
+      });
 
-      const response = await fetch(
-        `${this.frontendServerUrl}/api/set-session`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(sessionData),
-        }
-      );
+      logger.log("📡 Tunnel connection result:", result);
 
-      if (response.ok) {
-        logger.log("📡 Session data sent to frontend server");
+      if (result.success) {
+        this.tunnelConnected = true;
+        logger.log("✅ Tunnel connected successfully via IPC");
       } else {
-        logger.warn("⚠️ Failed to send session to frontend server");
+        throw new Error(result.error || "Failed to connect to tunnel");
       }
     } catch (error) {
-      logger.warn("⚠️ Frontend server communication error:", error);
-    }
-  }
-
-  /**
-   * Start polling for server callbacks
-   */
-  private startCallbackPolling(): void {
-    // Clear existing interval
-    if (this.callbackPollInterval) {
-      clearInterval(this.callbackPollInterval);
-    }
-
-    logger.log("🔄 Starting callback polling...");
-
-    // HTTP polling for server callbacks
-    this.callbackPollInterval = setInterval(async () => {
-      try {
-        // Check for counter updates first
-        await this.checkCounterUpdates();
-
-        // Then check for callback data
-        await this.checkCallbacks();
-      } catch (error) {
-        // Silently handle polling errors to avoid spam
-        console.debug("Polling error:", error);
-      }
-    }, 5000); // Poll every 5 seconds
-  }
-
-  /**
-   * Check for counter updates
-   */
-  private async checkCounterUpdates(): Promise<void> {
-    try {
-      const response = await fetch(
-        `${this.frontendServerUrl}/api/counter-status`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-
-        if (data.hasCounterUpdate && data.lastCounterUpdate) {
-          logger.log(
-            `🔢 Counter update received: ${data.lastCounterUpdate.nonce}`
-          );
-
-          // Handle counter update (this would trigger timer reset)
-          // The actual timer logic is handled by TimerService
-
-          // Clear the counter update flag
-          await fetch(`${this.frontendServerUrl}/api/clear-counter`, {
-            method: "POST",
-          });
-        }
-      }
-    } catch (error) {
-      console.debug("Counter update check error:", error);
-    }
-  }
-
-  /**
-   * Check for server callbacks
-   */
-  private async checkCallbacks(): Promise<void> {
-    try {
-      const response = await fetch(
-        `${this.frontendServerUrl}/api/callback-status`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-
-        if (data.hasNewCallback && data.lastCallback) {
-          this.handleServerCallback(data.lastCallback);
-
-          // Clear the callback flag
-          await fetch(`${this.frontendServerUrl}/api/clear-callback`, {
-            method: "POST",
-          });
-        }
-      }
-    } catch (error) {
-      console.debug("Callback check error:", error);
-    }
-  }
-
-  /**
-   * Handle server callback
-   */
-  private handleServerCallback(callback: ServerCallback): void {
-    logger.log(`📞 Server Callback: ${callback.instruction.action}`);
-
-    // Notify callback listeners
-    this.callbacks.onServerPing?.(callback);
-
-    // Handle different types of callbacks
-    if (callback.instruction.action === "verify_connection") {
-      logger.log("📡 Connection verification ping received");
-
-      // Handle ping data if present
-      if (callback.instruction.data) {
-        this.processPingData(callback.instruction.data);
-      }
+      logger.error("❌ Failed to connect to tunnel:", error);
+      throw error;
     }
   }
 
@@ -378,8 +304,13 @@ export class ServerApiService {
 
     // NEW STRUCTURED LOGIC
     // Case 1: NFT+Script pairs (user has NFTs)
-    if (Array.isArray(dataObj.nftScriptPairs) && dataObj.nftScriptPairs.length > 0) {
-      logger.log(`🖼️ Processing ${dataObj.nftScriptPairs.length} NFT+Script pairs`);
+    if (
+      Array.isArray(dataObj.nftScriptPairs) &&
+      dataObj.nftScriptPairs.length > 0
+    ) {
+      logger.log(
+        `🖼️ Processing ${dataObj.nftScriptPairs.length} NFT+Script pairs`
+      );
 
       const processedPairs: Array<{
         nft: NFTData;
@@ -391,7 +322,11 @@ export class ServerApiService {
       dataObj.nftScriptPairs.forEach((pair: any, index: number) => {
         // Full pair: NFT + Script
         if (pair.nft && pair.script) {
-          logger.log(`📦 Pair ${index + 1}: ${pair.script.name} with NFT ${pair.nft.metadata?.name || 'Unknown'}`);
+          logger.log(
+            `📦 Pair ${index + 1}: ${pair.script.name} with NFT ${
+              pair.nft.metadata?.name || "Unknown"
+            }`
+          );
 
           const nftData: NFTData = {
             address: pair.nft.address || "",
@@ -435,7 +370,9 @@ export class ServerApiService {
         }
         // NFT only (no script) - just update maxProfiles
         else if (pair.nft && !pair.script) {
-          logger.log(`ℹ️ Pair ${index + 1}: NFT without script (maxProfiles update only)`);
+          logger.log(
+            `ℹ️ Pair ${index + 1}: NFT without script (maxProfiles update only)`
+          );
           // Don't display, just track maxProfiles increase
         }
       });
@@ -450,13 +387,16 @@ export class ServerApiService {
         this.callbacks.onNFTScriptPairs?.(processedPairs);
       }
 
-      logger.log(`✅ Processed ${processedPairs.length} displayable NFT+Script pairs`);
+      logger.log(
+        `✅ Processed ${processedPairs.length} displayable NFT+Script pairs`
+      );
     }
     // Case 2: Scripts without NFT (free tier or no NFT holder)
     else if (Array.isArray(dataObj.scripts) && dataObj.scripts.length > 0) {
       logger.log(`📜 Processing ${dataObj.scripts.length} scripts without NFT`);
 
-      const maxProfiles = typeof dataObj.maxProfiles === "number" ? dataObj.maxProfiles : 1;
+      const maxProfiles =
+        typeof dataObj.maxProfiles === "number" ? dataObj.maxProfiles : 1;
 
       dataObj.scripts.forEach((scriptObj: any, index: number) => {
         const scriptData: ScriptData = {
@@ -474,7 +414,11 @@ export class ServerApiService {
           },
         };
 
-        logger.log(`📜 Script ${index + 1}: ${scriptData.name} (maxProfiles: ${maxProfiles})`);
+        logger.log(
+          `📜 Script ${index + 1}: ${
+            scriptData.name
+          } (maxProfiles: ${maxProfiles})`
+        );
 
         // Trigger callback for first script
         if (index === 0) {
@@ -549,16 +493,23 @@ export class ServerApiService {
    * Disconnect from server
    */
   disconnect(): void {
-    // Clear callback polling interval
-    if (this.callbackPollInterval) {
-      clearInterval(this.callbackPollInterval);
-      this.callbackPollInterval = null;
+    // Disconnect from tunnel via IPC
+    if (
+      this.tunnelConnected &&
+      typeof window !== "undefined" &&
+      window.electronAPI
+    ) {
+      window.electronAPI.disconnectTunnel();
+      this.tunnelConnected = false;
+      logger.log("🔌 Disconnected from tunnel via IPC");
     }
 
     // Reset session state
     this.deviceHash = null;
     this.sessionToken = null;
     this.userId = null;
+    this.deviceCpuModel = "unknown";
+    this.deviceIP = "unknown";
     this.updateConnectionStatus(false);
 
     logger.log("🔌 Disconnected from server");

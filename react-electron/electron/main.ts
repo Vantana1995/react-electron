@@ -3,7 +3,7 @@
  * TypeScript version with Puppeteer script execution support
  */
 
-import { app, BrowserWindow, ipcMain, shell, dialog } from "electron";
+import electron from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import express, { Request, Response, NextFunction } from "express";
@@ -15,6 +15,8 @@ import fs from "fs";
 import os from "os";
 import { logger } from "./logger";
 import { TunnelClient } from "./tunnel-client";
+
+const { app, BrowserWindow, ipcMain, shell, dialog } = electron;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,7 +40,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
 
-let win: BrowserWindow | null;
+let win: Electron.BrowserWindow | null;
 let authFlow: AuthFlow | null = null;
 let tunnelClient: TunnelClient | null = null;
 
@@ -301,8 +303,7 @@ class AuthFlow {
   }
 }
 
-// Callback Server removed - replaced with TunnelClient
-
+//  TunnelClient
 function createWindow() {
   win = new BrowserWindow({
     width: 1200,
@@ -314,12 +315,12 @@ function createWindow() {
       webSecurity: true,
       preload: path.join(__dirname, "preload.mjs"),
       partition: "persist:main",
-      devTools: process.env.NODE_ENV === "development",
+      devTools: true,
       experimentalFeatures: false,
       allowRunningInsecureContent: false,
       sandbox: false,
       webviewTag: false,
-      plugins: false,
+      plugins: true,
       backgroundThrottling: false,
     },
     icon: path.join(__dirname, "..", "src", "assets", "logo.png"),
@@ -353,8 +354,6 @@ function createWindow() {
   });
 }
 
-// UPnP and Windows Firewall setup removed - no longer needed with tunnel architecture
-
 // App initialization
 app.whenReady().then(async () => {
   createWindow();
@@ -363,7 +362,7 @@ app.whenReady().then(async () => {
   authFlow = new AuthFlow();
   if (win) {
     tunnelClient = new TunnelClient(win);
-    logger.log("✅ Tunnel client initialized");
+    logger.log("[MAIN-ELECTRON] Tunnel client initialized");
   }
 
   app.on("activate", () => {
@@ -429,14 +428,14 @@ ipcMain.handle("get-system-info", async () => {
       },
     };
 
-    logger.log("💻 Real system info:", systemInfo);
+    logger.log("[MAIN-ELECTRON] Real system info:", systemInfo);
 
     return {
       success: true,
       ...systemInfo,
     };
   } catch (error) {
-    logger.error("Failed to get system info:", error);
+    logger.error("[MAIN-ELECTRON] Failed to get system info:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -457,7 +456,7 @@ ipcMain.handle("start-wallet-auth", async () => {
     const result = await authFlow.startAuth();
     return result;
   } catch (error) {
-    logger.error("❌ Wallet auth failed:", error);
+    logger.error("[MAIN-ELECTRON] Wallet auth failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -478,7 +477,7 @@ ipcMain.handle("get-wallet-status", async (_event, sessionToken) => {
       sessionToken,
     };
   } catch (error) {
-    logger.error("❌ Get wallet status failed:", error);
+    logger.error("[MAIN-ELECTRON] Get wallet status failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -495,41 +494,84 @@ ipcMain.handle("disconnect-wallet", async (_event, sessionToken) => {
     // Clear global device data
     globalDeviceData = null;
 
-    logger.log("🧹 Wallet disconnected and all cache cleared");
+    logger.log("[MAIN-ELECTRON] Wallet disconnected and all cache cleared");
 
     return { success: true, message: "Wallet disconnected and cache cleared" };
   } catch (error) {
-    logger.error("❌ Disconnect wallet failed:", error);
+    logger.error("[MAIN-ELECTRON] Disconnect wallet failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
 
 // Tunnel client IPC handlers
-ipcMain.handle("connect-tunnel", async (_event, config: { serverUrl: string; deviceHash: string; deviceData?: any }) => {
-  try {
-    if (!tunnelClient) {
-      return { success: false, error: "Tunnel client not initialized" };
+ipcMain.handle(
+  "connect-tunnel",
+  async (
+    _event,
+    config: {
+      serverUrl: string;
+      deviceHash: string;
+      walletAddress?: string;
+      deviceData?: any;
     }
+  ) => {
+    try {
+      if (!tunnelClient) {
+        return { success: false, error: "Tunnel client not initialized" };
+      }
 
-    const success = await tunnelClient.connect(config);
-    return {
-      success,
-      message: success ? "Connected to tunnel" : "Failed to connect to tunnel",
-    };
-  } catch (error) {
-    logger.error("❌ Tunnel connect failed:", error);
-    return { success: false, error: (error as Error).message };
+      // Log incoming connection request
+      logger.log(" [IPC] connect-tunnel request received");
+      logger.log(" [IPC] Connection config:");
+      logger.log(`  - Server URL: ${config.serverUrl}`);
+      logger.log(`  - Device Hash: ${config.deviceHash?.substring(0, 16)}...`);
+      if (config.walletAddress) {
+        logger.log(
+          `  - Wallet Address: ${config.walletAddress.substring(
+            0,
+            10
+          )}...${config.walletAddress.substring(
+            config.walletAddress.length - 8
+          )}`
+        );
+      } else {
+        logger.log(`  - Wallet Address: N/A`);
+      }
+      logger.log(`  - CPU Model: ${config.deviceData?.cpuModel || "N/A"}`);
+      logger.log(`  - IP Address: ${config.deviceData?.ipAddress || "N/A"}`);
+
+      const success = await tunnelClient.connect(config);
+
+      logger.log(
+        ` [IPC] Tunnel connection result: ${
+          success ? "[MAIN-ELECTRON] SUCCESS" : "[MAIN-ELECTRON] FAILED"
+        }`
+      );
+
+      return {
+        success,
+        message: success
+          ? "Connected to tunnel"
+          : "Failed to connect to tunnel",
+      };
+    } catch (error) {
+      logger.error("[MAIN-ELECTRON] Tunnel connect failed:", error);
+      return { success: false, error: (error as Error).message };
+    }
   }
-});
+);
 
 ipcMain.handle("disconnect-tunnel", async () => {
   try {
     if (tunnelClient) {
       tunnelClient.disconnect();
     }
-    return { success: true, message: "Disconnected from tunnel" };
+    return {
+      success: true,
+      message: "[MAIN-ELECTRON] Disconnected from tunnel",
+    };
   } catch (error) {
-    logger.error("❌ Tunnel disconnect failed:", error);
+    logger.error("[MAIN-ELECTRON] Tunnel disconnect failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -537,7 +579,10 @@ ipcMain.handle("disconnect-tunnel", async () => {
 ipcMain.handle("get-tunnel-status", async () => {
   try {
     if (!tunnelClient) {
-      return { success: false, error: "Tunnel client not initialized" };
+      return {
+        success: false,
+        error: "[MAIN-ELECTRON] Tunnel client not initialized",
+      };
     }
 
     const status = tunnelClient.getStatus();
@@ -546,7 +591,7 @@ ipcMain.handle("get-tunnel-status", async () => {
       ...status,
     };
   } catch (error) {
-    logger.error("❌ Get tunnel status failed:", error);
+    logger.error("[MAIN-ELECTRON] Get tunnel status failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -555,7 +600,7 @@ ipcMain.handle("get-tunnel-status", async () => {
 ipcMain.handle("close-app", async () => {
   try {
     logger.log(
-      "🔒 Closing application due to ping timeout or security violation"
+      "[MAIN-ELECTRON] Closing application due to ping timeout or security violation"
     );
 
     // Close all windows
@@ -576,7 +621,7 @@ ipcMain.handle("close-app", async () => {
 
     return { success: true, message: "Application closed" };
   } catch (error) {
-    logger.error("❌ Close app failed:", error);
+    logger.error("[MAIN-ELECTRON] Close app failed:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -584,7 +629,7 @@ ipcMain.handle("close-app", async () => {
 ipcMain.handle("execute-script", async (_event, params) => {
   try {
     logger.log(
-      "🚀 Executing Puppeteer script:",
+      "[MAIN-ELECTRON] Executing Puppeteer script:",
       params.script?.name || "Unknown"
     );
 
@@ -598,7 +643,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
       .toString(36)
       .substr(2, 9)}`;
     const scriptPath = path.join(scriptsDir, `${scriptId}.js`);
-    logger.log("📄 Script path:", scriptPath);
+    logger.log("[MAIN-ELECTRON] Script path:", scriptPath);
 
     const scriptContent = params.script?.content || params.script?.code || "";
     const profile = params.settings?.profile || {};
@@ -611,7 +656,9 @@ ipcMain.handle("execute-script", async (_event, params) => {
         parsedCustomData = JSON.parse(customData);
       }
     } catch (e) {
-      logger.warn("⚠️ Failed to parse customData as JSON, using as string");
+      logger.warn(
+        "[MAIN-ELECTRON] Failed to parse customData as JSON, using as string"
+      );
     }
 
     const puppeteerScript = `
@@ -743,7 +790,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
       }
 
       // ============================================
-      // SCRIPT CONFIG NFTDISPLAY
+      // SCRIPT CONFIG NFT DISPLAY
       // ============================================
       const config = {
         // URL to navigate
@@ -933,13 +980,16 @@ ipcMain.handle("execute-script", async (_event, params) => {
           fs.unlinkSync(scriptPath);
         }
       } catch (cleanupError) {
-        logger.error("⚠️ Failed to cleanup script file:", cleanupError);
+        logger.error(
+          "[MAIN-ELECTRON] Failed to cleanup script file:",
+          cleanupError
+        );
       }
     }, 10000);
 
     return { success: true, result, scriptId };
   } catch (error) {
-    logger.error("❌ Script execution failed:", error);
+    logger.error("[MAIN-ELECTRON] Script execution failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Script execution failed",
@@ -1100,13 +1150,13 @@ function executePuppeteerScript(
       setTimeout(() => {
         if (child.pid && !child.killed) {
           logger.log(
-            `✅ Script ${scriptName} started successfully (PID: ${child.pid})`
+            `[MAIN-ELECTRON] Script ${scriptName} started successfully (PID: ${child.pid})`
           );
           resolve(`Script started successfully with PID: ${child.pid}`);
         }
       }, 5000);
     } catch (error) {
-      logger.error("❌ Failed to start script process:", error);
+      logger.error("[MAIN-ELECTRON] Failed to start script process:", error);
       reject(error);
     }
   });
@@ -1125,7 +1175,7 @@ ipcMain.handle("get-active-scripts", async () => {
 
     return { success: true, scripts };
   } catch (error) {
-    logger.error("❌ Failed to get active scripts:", error);
+    logger.error("[MAIN-ELECTRON] Failed to get active scripts:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -1140,7 +1190,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
 
     if (script.process && !script.process.killed) {
       logger.log(
-        `🛑 Stopping script ${script.name} (PID: ${script.process.pid})...`
+        `[MAIN-ELECTRON] Stopping script ${script.name} (PID: ${script.process.pid})...`
       );
 
       if (process.platform === "win32") {
@@ -1148,9 +1198,14 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
           execSync(`taskkill /pid ${script.process.pid} /T /F`, {
             windowsHide: true,
           });
-          logger.log(`✅ Killed process tree for PID ${script.process.pid}`);
+          logger.log(
+            `[MAIN-ELECTRON] Killed process tree for PID ${script.process.pid}`
+          );
         } catch (killError) {
-          logger.error(`⚠️ taskkill failed, using fallback method:`, killError);
+          logger.error(
+            `[MAIN-ELECTRON] taskkill failed, using fallback method:`,
+            killError
+          );
           script.process.kill("SIGKILL");
         }
       } else {
@@ -1165,10 +1220,12 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
       script.status = "completed";
       activeScripts.set(scriptId, script);
 
-      logger.log(`🛑 Script ${script.name} stopped`);
+      logger.log(`[MAIN-ELECTRON] Script ${script.name} stopped`);
       setTimeout(() => {
         activeScripts.delete(scriptId);
-        logger.log(`🧹 Cleaned up script ${scriptId} from active scripts`);
+        logger.log(
+          `[MAIN-ELECTRON] Cleaned up script ${scriptId} from active scripts`
+        );
       }, 1000);
 
       if (win) {
@@ -1185,7 +1242,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
       return { success: false, error: "Script is not running" };
     }
   } catch (error) {
-    logger.error("❌ Failed to stop script:", error);
+    logger.error("[MAIN-ELECTRON] Failed to stop script:", error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -1198,7 +1255,7 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
  */
 ipcMain.handle("telegram-test-connection", async (_event, httpApi: string) => {
   try {
-    logger.log("🤖 Testing Telegram bot connection...");
+    logger.log("[MAIN-ELECTRON] Testing Telegram bot connection...");
 
     // Validate token format
     const tokenPattern = /^bot\d+:[A-Za-z0-9_-]+$/;
@@ -1262,7 +1319,7 @@ ipcMain.handle("telegram-test-connection", async (_event, httpApi: string) => {
       username: botInfoData.result.username,
     };
   } catch (error) {
-    logger.error("❌ Telegram connection test failed:", error);
+    logger.error("[MAIN-ELECTRON] Telegram connection test failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -1277,7 +1334,9 @@ ipcMain.handle(
   "telegram-send-message",
   async (_event, httpApi: string, chatId: string, text: string) => {
     try {
-      logger.log(`📤 Sending Telegram message to chat ${chatId}...`);
+      logger.log(
+        `[MAIN-ELECTRON] Sending Telegram message to chat ${chatId}...`
+      );
 
       const response = await fetch(
         `https://api.telegram.org/${httpApi}/sendMessage`,
@@ -1309,13 +1368,13 @@ ipcMain.handle(
         };
       }
 
-      logger.log("✅ Telegram message sent successfully");
+      logger.log("[MAIN-ELECTRON] Telegram message sent successfully");
 
       return {
         success: true,
       };
     } catch (error) {
-      logger.error("❌ Failed to send Telegram message:", error);
+      logger.error("[MAIN-ELECTRON] Failed to send Telegram message:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -1329,7 +1388,7 @@ ipcMain.handle(
  */
 ipcMain.handle("telegram-get-chat-id", async (_event, httpApi: string) => {
   try {
-    logger.log("🔍 Fetching Telegram chat ID...");
+    logger.log("[MAIN-ELECTRON] Fetching Telegram chat ID...");
 
     const response = await fetch(
       `https://api.telegram.org/${httpApi}/getUpdates`,
@@ -1371,14 +1430,14 @@ ipcMain.handle("telegram-get-chat-id", async (_event, httpApi: string) => {
 
     const chatId = firstMessage.message.chat.id.toString();
 
-    logger.log(`✅ Found chat ID: ${chatId}`);
+    logger.log(`[MAIN-ELECTRON] Found chat ID: ${chatId}`);
 
     return {
       success: true,
       chatId,
     };
   } catch (error) {
-    logger.error("❌ Failed to get chat ID:", error);
+    logger.error("[MAIN-ELECTRON] Failed to get chat ID:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -1403,11 +1462,11 @@ ipcMain.handle("select-folder", async () => {
     }
 
     const selectedPath = result.filePaths[0];
-    logger.log("📁 Folder selected:", selectedPath);
+    logger.log("[MAIN-ELECTRON] Folder selected:", selectedPath);
 
     return selectedPath;
   } catch (error) {
-    logger.error("❌ Folder selection failed:", error);
+    logger.error("[MAIN-ELECTRON] Folder selection failed:", error);
     return null;
   }
 });
@@ -1431,13 +1490,15 @@ ipcMain.handle(
 
       if (fs.existsSync(tweetsFile)) {
         fs.unlinkSync(tweetsFile);
-        logger.log(`✅ Deleted processed tweets file: ${tweetsFile}`);
+        logger.log(
+          `[MAIN-ELECTRON] Deleted processed tweets file: ${tweetsFile}`
+        );
         return { success: true, message: "History cleared successfully" };
       }
 
       return { success: true, message: "No history file found" };
     } catch (error) {
-      logger.error("❌ Error clearing profile history:", error);
+      logger.error("[MAIN-ELECTRON] Error clearing profile history:", error);
       return { success: false, message: (error as Error).message };
     }
   }

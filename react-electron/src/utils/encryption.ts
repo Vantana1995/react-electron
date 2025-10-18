@@ -5,10 +5,6 @@
 
 import CryptoJS from "crypto-js";
 
-// Simple encryption key for testing (should match backend)
-// const ENCRYPTION_KEY =
-//   "1111111111111111111111111111111111111111111111111111111111111111";
-
 /**
  * Generate device key from CPU model and IP address
  * @param cpuModel - CPU model from device fingerprint
@@ -80,22 +76,3 @@ export function decryptData(encryptedData: string, key: string): any {
   }
 }
 
-/**
- * Verify data integrity using HMAC
- * @param data - Data to verify
- * @param hash - Expected hash
- * @param key - Key for HMAC
- * @returns boolean - True if verification successful
- */
-export function verifyData(data: any, hash: string, key: string): boolean {
-  try {
-    const jsonData = JSON.stringify(data);
-    const keyWordArray = CryptoJS.enc.Hex.parse(key);
-    const expectedHash = CryptoJS.HmacSHA256(jsonData, keyWordArray).toString();
-
-    return expectedHash === hash;
-  } catch (error) {
-    console.error("Verification error:", error);
-    return false;
-  }
-}

@@ -4,7 +4,6 @@
  */
 
 import { WalletConnectionStatus, AuthResult, ElectronAPI } from "../types";
-import { clearCacheAndClose } from "./timerService";
 
 declare global {
   interface Window {
@@ -94,7 +93,6 @@ export class WalletService {
 
       if (result.success) {
         this.resetWalletState();
-        await clearCacheAndClose();
         console.log("✅ Wallet disconnected successfully");
       }
 
@@ -255,7 +253,7 @@ export class WalletService {
    * Event handler for wallet disconnection (can be overridden)
    */
   onWalletDisconnected?: () => void = async () => {
-    await clearCacheAndClose();
+    // Wallet disconnected - cleanup can be added here if needed
   };
 
   /**

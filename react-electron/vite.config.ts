@@ -23,6 +23,10 @@ export default defineConfig({
                 'electron/main',
                 'electron/renderer',
                 'electron/common',
+                'socket.io-client',
+                'ws',
+                'bufferutil',
+                'utf-8-validate',
               ],
             },
           },
@@ -85,7 +89,7 @@ export default defineConfig({
   },
   // Optimize dependencies for better performance
   optimizeDeps: {
-    include: ["react", "react-dom", "socket.io-client", "web3"],
-    exclude: ["electron"],
+    include: ["react", "react-dom", "web3"],
+    exclude: ["electron", "socket.io-client"],
   },
 });
