@@ -4,6 +4,7 @@ dist/
 build/
 instructions/
 .z
+nul
 
 # Electron build files
 react-electron/dist-electron/
@@ -17,5 +18,6 @@ backend/nul
 
 SCRIPT_UPLOAD_GUIDE.md
 SCRIPT_JSON_TEMPLATE.md
+SERVER_SETUP_GUIDE.md
 
 react-electron/release/

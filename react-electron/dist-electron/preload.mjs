@@ -1,1 +1,92 @@
-import{contextBridge as i,ipcRenderer as n}from"electron";i.exposeInMainWorld("electronAPI",{getSystemInfo:()=>n.invoke("get-system-info"),setDeviceData:e=>n.invoke("set-device-data",e),startWalletAuth:()=>n.invoke("start-wallet-auth"),getWalletStatus:e=>n.invoke("get-wallet-status",e),disconnectWallet:e=>n.invoke("disconnect-wallet",e),connectTunnel:e=>n.invoke("connect-tunnel",e),disconnectTunnel:()=>n.invoke("disconnect-tunnel"),getTunnelStatus:()=>n.invoke("get-tunnel-status"),executeScript:e=>n.invoke("execute-script",e),getActiveScripts:()=>n.invoke("get-active-scripts"),stopScript:e=>n.invoke("stop-script",e),onWalletConnected:e=>{n.on("wallet-connected",(o,t)=>e(t))},onAuthReady:e=>{n.on("auth-ready",(o,t)=>e(t))},onServerPingReceived:e=>{n.on("server-ping-received",(o,t)=>e(t))},onNFTReceived:e=>{n.on("nft-received",(o,t)=>e(t))},onScriptReceived:e=>{n.on("script-received",(o,t)=>e(t))},onScriptOutput:e=>{n.on("script-output",(o,t)=>e(t))},onScriptFinished:e=>{n.on("script-finished",(o,t)=>e(t))},onScriptError:e=>{n.on("script-error",(o,t)=>e(t))},onScriptStopped:e=>{n.on("script-stopped",(o,t)=>e(t))},onTunnelConnected:e=>{n.on("tunnel-connected",(o,t)=>e(t))},onTunnelDisconnected:e=>{n.on("tunnel-disconnected",(o,t)=>e(t))},onTunnelError:e=>{n.on("tunnel-error",(o,t)=>e(t))},removeAllListeners:e=>{n.removeAllListeners(e)},closeApp:()=>n.invoke("close-app"),selectFolder:()=>n.invoke("select-folder"),clearProfileHistory:(e,o)=>n.invoke("clear-profile-history",e,o),testTelegramConnection:e=>n.invoke("telegram-test-connection",e),sendTelegramMessage:(e,o,t)=>n.invoke("telegram-send-message",e,o,t),getTelegramChatId:e=>n.invoke("telegram-get-chat-id",e)});i.exposeInMainWorld("ipcRenderer",{on(...e){const[o,t]=e;return n.on(o,(r,...c)=>t(r,...c))},off(...e){const[o,...t]=e;return n.off(o,...t)},send(...e){const[o,...t]=e;return n.send(o,...t)},invoke(...e){const[o,...t]=e;return n.invoke(o,...t)}});
+import { contextBridge, ipcRenderer } from "electron";
+contextBridge.exposeInMainWorld("electronAPI", {
+  // Device data
+  getSystemInfo: () => ipcRenderer.invoke("get-system-info"),
+  setDeviceData: (deviceData) => ipcRenderer.invoke("set-device-data", deviceData),
+  // Wallet authentication
+  startWalletAuth: () => ipcRenderer.invoke("start-wallet-auth"),
+  getWalletStatus: (sessionToken) => ipcRenderer.invoke("get-wallet-status", sessionToken),
+  disconnectWallet: (sessionToken) => ipcRenderer.invoke("disconnect-wallet", sessionToken),
+  // Tunnel management (WebSocket connection via Electron main process)
+  connectTunnel: (config) => ipcRenderer.invoke("connect-tunnel", config),
+  disconnectTunnel: () => ipcRenderer.invoke("disconnect-tunnel"),
+  getTunnelStatus: () => ipcRenderer.invoke("get-tunnel-status"),
+  // Script execution and management
+  executeScript: (params) => ipcRenderer.invoke("execute-script", params),
+  getActiveScripts: () => ipcRenderer.invoke("get-active-scripts"),
+  stopScript: (scriptId) => ipcRenderer.invoke("stop-script", scriptId),
+  // Event listeners
+  onWalletConnected: (callback) => {
+    ipcRenderer.on("wallet-connected", (_event, data) => callback(data));
+  },
+  onAuthReady: (callback) => {
+    ipcRenderer.on("auth-ready", (_event, data) => callback(data));
+  },
+  onServerPingReceived: (callback) => {
+    ipcRenderer.on("server-ping-received", (_event, data) => callback(data));
+  },
+  onNFTReceived: (callback) => {
+    ipcRenderer.on("nft-received", (_event, data) => callback(data));
+  },
+  onScriptReceived: (callback) => {
+    ipcRenderer.on("script-received", (_event, data) => callback(data));
+  },
+  // Script execution event listeners
+  onScriptOutput: (callback) => {
+    ipcRenderer.on("script-output", (_event, data) => callback(data));
+  },
+  onScriptFinished: (callback) => {
+    ipcRenderer.on("script-finished", (_event, data) => callback(data));
+  },
+  onScriptError: (callback) => {
+    ipcRenderer.on("script-error", (_event, data) => callback(data));
+  },
+  onScriptStopped: (callback) => {
+    ipcRenderer.on("script-stopped", (_event, data) => callback(data));
+  },
+  // Tunnel event listeners
+  onTunnelConnected: (callback) => {
+    ipcRenderer.on("tunnel-connected", (_event, data) => callback(data));
+  },
+  onTunnelDisconnected: (callback) => {
+    ipcRenderer.on("tunnel-disconnected", (_event, data) => callback(data));
+  },
+  onTunnelError: (callback) => {
+    ipcRenderer.on("tunnel-error", (_event, data) => callback(data));
+  },
+  // Remove listeners
+  removeAllListeners: (channel) => {
+    ipcRenderer.removeAllListeners(channel);
+  },
+  // Application control
+  closeApp: () => ipcRenderer.invoke("close-app"),
+  // File system operations
+  selectFolder: () => ipcRenderer.invoke("select-folder"),
+  // Profile history management
+  clearProfileHistory: (profileId, saveImagesFolder) => ipcRenderer.invoke("clear-profile-history", profileId, saveImagesFolder),
+  // Telegram bot operations
+  testTelegramConnection: (httpApi) => ipcRenderer.invoke("telegram-test-connection", httpApi),
+  sendTelegramMessage: (httpApi, chatId, text) => ipcRenderer.invoke("telegram-send-message", httpApi, chatId, text),
+  getTelegramChatId: (httpApi) => ipcRenderer.invoke("telegram-get-chat-id", httpApi)
+});
+contextBridge.exposeInMainWorld("ipcRenderer", {
+  on(...args) {
+    const [channel, listener] = args;
+    return ipcRenderer.on(
+      channel,
+      (event, ...args2) => listener(event, ...args2)
+    );
+  },
+  off(...args) {
+    const [channel, ...omit] = args;
+    return ipcRenderer.off(channel, ...omit);
+  },
+  send(...args) {
+    const [channel, ...omit] = args;
+    return ipcRenderer.send(channel, ...omit);
+  },
+  invoke(...args) {
+    const [channel, ...omit] = args;
+    return ipcRenderer.invoke(channel, ...omit);
+  }
+});
