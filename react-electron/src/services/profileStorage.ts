@@ -116,14 +116,6 @@ class ProfileStorageService {
   }
 
   /**
-   * Get profile by name
-   */
-  async getProfileByName(name: string): Promise<UserProfile | null> {
-    const profiles = await this.getProfiles();
-    return profiles.find(p => p.name.toLowerCase() === name.toLowerCase()) || null;
-  }
-
-  /**
    * Parse AdsPower cookies JSON format and convert to ProfileCookie format
    */
   parseAdsPowerCookies(cookiesJson: string): ProfileCookie[] {
@@ -264,76 +256,6 @@ class ProfileStorageService {
     });
 
     return { valid, invalid };
-  }
-
-  /**
-   * Clear all profiles (for testing/reset purposes)
-   */
-  async clearAllProfiles(): Promise<void> {
-    localStorage.removeItem(this.storageKey);
-  }
-
-  /**
-   * Export profiles for backup
-   */
-  async exportProfiles(): Promise<string> {
-    const profiles = await this.getProfiles();
-    return JSON.stringify(profiles, null, 2);
-  }
-
-  /**
-   * Import profiles from backup
-   */
-  async importProfiles(profilesJson: string, overwrite: boolean = false): Promise<number> {
-    try {
-      const importedProfiles: UserProfile[] = JSON.parse(profilesJson);
-
-      if (!Array.isArray(importedProfiles)) {
-        throw new Error("Invalid profiles format");
-      }
-
-      let existingProfiles = overwrite ? [] : await this.getProfiles();
-      let importedCount = 0;
-
-      for (const profile of importedProfiles) {
-        // Validate profile structure
-        if (!profile.name || !profile.proxy || !Array.isArray(profile.cookies)) {
-          continue;
-        }
-
-        // Check for duplicates
-        if (existingProfiles.some(p => p.name.toLowerCase() === profile.name.toLowerCase())) {
-          continue;
-        }
-
-
-        // Add profile with new ID and timestamps
-        const newProfile: UserProfile = {
-          ...profile,
-          id: uuidv4(),
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          isActive: false // Imported profiles start as inactive
-        };
-
-        existingProfiles.push(newProfile);
-        importedCount++;
-      }
-
-      await this.saveProfiles(existingProfiles);
-      return importedCount;
-    } catch (error) {
-      console.error("Error importing profiles:", error);
-      throw new Error("Failed to import profiles. Please check the file format.");
-    }
-  }
-
-  /**
-   * Get active profiles (profiles that are currently usable)
-   */
-  async getActiveProfiles(): Promise<UserProfile[]> {
-    const profiles = await this.getProfiles();
-    return profiles.filter(p => p.isActive).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   /**

@@ -170,13 +170,6 @@ export interface ScriptOutput {
   timestamp: number;
 }
 
-export interface ScriptEvent {
-  scriptId: string;
-  type: "started" | "output" | "error" | "finished" | "stopped";
-  data?: string;
-  timestamp: number;
-  exitCode?: number;
-}
 
 // ===== NFT & SUBSCRIPTION =====
 
@@ -207,14 +200,6 @@ export interface SubscriptionStatus {
   nftAddress?: string;
 }
 
-export interface PaymentData {
-  transactionHash: string;
-  walletAddress: string;
-  amount: string;
-  currency: string;
-  timestamp: number;
-  subscriptionType: string;
-}
 
 // ===== UI STATE MANAGEMENT =====
 
@@ -288,19 +273,6 @@ export interface ElectronAPI {
     sessionToken: string
   ) => Promise<{ success: boolean; message: string }>;
 
-  // Callback server management
-  getCallbackServerStatus: () => Promise<{
-    success: boolean;
-    isRunning: boolean;
-    port?: number;
-  }>;
-  startCallbackServer: () => Promise<{
-    success: boolean;
-    message: string;
-    port?: number;
-  }>;
-  stopCallbackServer: () => Promise<{ success: boolean; message: string }>;
-
   // Event listeners
   onWalletConnected: (
     callback: (data: { address: string; sessionToken?: string }) => void
@@ -309,9 +281,6 @@ export interface ElectronAPI {
     callback: (data: { success: boolean; message?: string }) => void
   ) => void;
   onServerPingReceived: (callback: (data: PingData) => void) => void;
-  onPingCounterUpdate: (
-    callback: (data: { nonce: number; timestamp: number }) => void
-  ) => void;
   onNFTReceived: (
     callback: (data: NFTData & { action: string }) => void
   ) => void;
@@ -379,27 +348,6 @@ export interface ElectronAPI {
 
 // ===== COMPONENT PROPS =====
 
-export interface WalletComponentProps {
-  wallet: WalletState;
-  onConnect: () => void;
-  onDisconnect: () => void;
-}
-
-export interface LogComponentProps {
-  logs: LogEntry[];
-  maxEntries?: number;
-}
-
-export interface NFTDisplayProps {
-  nft: NFTState;
-  onImageClick?: (nftData: NFTData) => void;
-}
-
-export interface TimerDisplayProps {
-  timer: TimerState;
-  onTimeout?: () => void;
-}
-
 export interface ScriptManagerProps {
   scriptData?: ScriptData;
   walletAddress?: string;
@@ -451,114 +399,6 @@ export interface TagInputProps {
   allowDuplicates?: boolean;
   className?: string;
 }
-
-// ===== API ENDPOINTS =====
-
-export interface APIEndpoints {
-  fingerprint: "/api/auth/fingerprint";
-  verify: "/api/auth/verify";
-  backupEmails: "/api/auth/backup-emails";
-  deliverScripts: "/api/scripts/deliver";
-  verifyPayment: "/api/payments/verify-payment";
-  subscription: "/api/payments/subscription";
-  activity: "/api/analytics/activity";
-  keepAlive: "/api/websocket/keepalive";
-}
-
-// ===== CONFIGURATION =====
-
-export interface AppConfig {
-  api: {
-    baseUrl: string;
-    timeout: number;
-    retries: number;
-  };
-  security: {
-    pingInterval: number; // seconds
-    timeoutThreshold: number; // seconds
-    maxRetries: number;
-  };
-  ui: {
-    logMaxEntries: number;
-    animationDuration: number;
-  };
-  development: {
-    enableDevTools: boolean;
-    logLevel: "debug" | "info" | "warn" | "error";
-  };
-}
-
-// ===== UTILITY TYPES =====
-
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-export type RequiredKeys<T, K extends keyof T> = T & Required<Pick<T, K>>;
-
-export type OptionalKeys<T, K extends keyof T> = Omit<T, K> &
-  Partial<Pick<T, K>>;
-
-// ===== ERROR TYPES =====
-
-export interface AppError {
-  code: string;
-  message: string;
-  stack?: string;
-  timestamp: number;
-  context?: unknown;
-}
-
-export interface ValidationError extends AppError {
-  code: "VALIDATION_ERROR";
-  field?: string;
-  value?: unknown;
-}
-
-export interface NetworkError extends AppError {
-  code: "NETWORK_ERROR";
-  status?: number;
-  url?: string;
-}
-
-export interface SecurityError extends AppError {
-  code: "SECURITY_ERROR";
-  reason:
-    | "debugging_detected"
-    | "timeout"
-    | "invalid_fingerprint"
-    | "unauthorized";
-}
-
-// ===== CONSTANTS =====
-
-export const WALLET_STATES = {
-  DISCONNECTED: "disconnected",
-  CONNECTING: "connecting",
-  CONNECTED: "connected",
-  ERROR: "error",
-} as const;
-
-export const SYSTEM_STATES = {
-  INITIALIZING: "initializing",
-  READY: "ready",
-  ERROR: "error",
-  DISCONNECTED: "disconnected",
-} as const;
-
-export const LOG_LEVELS = {
-  INFO: "info",
-  SUCCESS: "success",
-  ERROR: "error",
-  WARNING: "warning",
-} as const;
-
-export const PING_ACTIONS = {
-  VERIFY_CONNECTION: "verify_connection",
-  PING_DATA: "ping_data",
-  COUNTER_UPDATE: "counter_update",
-  NFT_DATA: "nft_data",
-} as const;
 
 // ===== PROFILE MANAGEMENT =====
 

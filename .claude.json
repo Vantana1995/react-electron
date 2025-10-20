@@ -585,11 +585,7 @@
       "node-cron",
       "tsx 4.x"
     ],
-    "development": [
-      "ESLint",
-      "TypeScript ESLint",
-      "Nodemon"
-    ]
+    "development": ["ESLint", "TypeScript ESLint", "Nodemon"]
   },
 
   "excludeFromContext": [
