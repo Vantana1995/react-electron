@@ -781,19 +781,16 @@ ipcMain.handle("execute-script", async (_event, params) => {
       // ============================================
       async function launchBrowserWithProfile() {
         const browserArgs = [
+          // Security (обязательные)
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
 
-          // ANTI-DETECT (CRITICAL!)
+          // ANTI-DETECT (критично!)
           "--disable-blink-features=AutomationControlled",
           "--disable-automation",
-          "--disable-features=IsolateOrigins,site-per-process",
-          "--disable-site-isolation-trials",
-          "--disable-infobars",
-          "--disable-extensions",
 
-          // WebGL support (вместо --disable-gpu)
+          // WebGL support
           "--use-gl=swiftshader",
           "--enable-webgl",
 
@@ -810,12 +807,12 @@ ipcMain.handle("execute-script", async (_event, params) => {
           logger.log(\`[PROXY] Proxy server: \${proxyServer}\`);
         }
 
-        // If not headless start maximized
+        // Window mode
         if (!headlessMode) {
           browserArgs.push("--start-maximized");
         }
 
-        logger.log('[BROWSER] Launching browser with args:', browserArgs);
+        logger.log('[BROWSER] Launching browser...');
 
         const browser = await puppeteer.launch({
           headless: headlessMode,
@@ -823,7 +820,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
           userDataDir: \`./puppeteer_profile_\${profile.id}\`,
           ignoreHTTPSErrors: true,
           defaultViewport: null,
-          ignoreDefaultArgs: ['--enable-automation'], // Для rebrowser
+          ignoreDefaultArgs: ['--enable-automation'],
           env: {
             ...process.env,
             TZ: fp.timezone // Timezone из fingerprint
@@ -833,15 +830,15 @@ ipcMain.handle("execute-script", async (_event, params) => {
         const page = await browser.newPage();
 
         // ============================================
-        // INJECT FINGERPRINT
+        // MINIMAL ANTI-DETECT INJECTIONS
         // ============================================
 
-        // WebDriver removal
+        // WebDriver removal (CRITICAL!)
         await page.evaluateOnNewDocument(() => {
           delete Object.getPrototypeOf(navigator).webdriver;
         });
 
-        // Chrome object
+        // Chrome object (для некоторых сайтов)
         await page.evaluateOnNewDocument(() => {
           window.chrome = {
             runtime: {},
@@ -851,32 +848,19 @@ ipcMain.handle("execute-script", async (_event, params) => {
           };
         });
 
-        // Permissions API
-        await page.evaluateOnNewDocument(() => {
-          const originalQuery = window.navigator.permissions.query;
-          window.navigator.permissions.query = (parameters) => (
-            parameters.name === 'notifications' ?
-              Promise.resolve({ state: Notification.permission }) :
-              originalQuery(parameters)
-          );
-        });
-
-        // Inject full fingerprint
+        // WebGL spoofing + Hardware spoofing
         await page.evaluateOnNewDocument((fingerprint) => {
-          // Languages
-          Object.defineProperty(navigator, 'languages', {
-            get: () => fingerprint.languages
-          });
-
           // Platform
           Object.defineProperty(navigator, 'platform', {
             get: () => fingerprint.platform
           });
 
-          // Hardware
+          // Hardware (CPU cores)
           Object.defineProperty(navigator, 'hardwareConcurrency', {
             get: () => fingerprint.hardwareConcurrency
           });
+
+          // Device Memory (RAM in GB)
           Object.defineProperty(navigator, 'deviceMemory', {
             get: () => fingerprint.deviceMemory
           });
@@ -889,103 +873,36 @@ ipcMain.handle("execute-script", async (_event, params) => {
             return getParameter.call(this, parameter);
           };
 
-          // Screen
-          Object.defineProperty(screen, 'colorDepth', {
-            get: () => fingerprint.screen.colorDepth
-          });
-          Object.defineProperty(screen, 'pixelDepth', {
-            get: () => fingerprint.screen.pixelDepth
-          });
-
-          // Canvas noise
-          const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
-          HTMLCanvasElement.prototype.toDataURL = function(type) {
-            const context = this.getContext('2d');
-            if (context) {
-              const imageData = context.getImageData(0, 0, this.width, this.height);
-              for (let i = 0; i < imageData.data.length; i += 4) {
-                imageData.data[i] += Math.floor(fingerprint.canvasNoise * 255);
-              }
-              context.putImageData(imageData, 0, 0);
-            }
-            return originalToDataURL.apply(this, arguments);
+          // WebGL2
+          const getParameterGL2 = WebGL2RenderingContext.prototype.getParameter;
+          WebGL2RenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === 37445) return fingerprint.webgl.vendor;
+            if (parameter === 37446) return fingerprint.webgl.renderer;
+            return getParameterGL2.call(this, parameter);
           };
-
-          // Battery
-          if (navigator.getBattery) {
-            const originalGetBattery = navigator.getBattery;
-            navigator.getBattery = async () => {
-              const battery = await originalGetBattery.call(navigator);
-              Object.defineProperty(battery, 'charging', {
-                get: () => fingerprint.battery.charging
-              });
-              Object.defineProperty(battery, 'level', {
-                get: () => fingerprint.battery.level
-              });
-              return battery;
-            };
-          }
-
-          // Audio noise
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (AudioContext) {
-            const originalCreateOscillator = AudioContext.prototype.createOscillator;
-            AudioContext.prototype.createOscillator = function() {
-              const oscillator = originalCreateOscillator.call(this);
-              const originalStart = oscillator.start;
-              oscillator.start = function(when) {
-                oscillator.frequency.value += fingerprint.audioNoise;
-                return originalStart.call(this, when);
-              };
-              return oscillator;
-            };
-          }
-
-          // Plugins
-          Object.defineProperty(navigator, 'plugins', {
-            get: () => [
-              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Chrome PDF Plugin" },
-              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Chrome PDF Viewer" },
-              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Chromium PDF Viewer" },
-              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Microsoft Edge PDF Viewer" },
-              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "WebKit built-in PDF" }
-            ]
-          });
         }, fp);
 
-        // Timezone emulation (rebrowser feature)
-        await page.emulateTimezone(fp.timezone);
-
-        // User Agent из fingerprint
+        // User-Agent
         await page.setUserAgent(fp.userAgent);
 
-        // HTTP Headers
-        await page.setExtraHTTPHeaders({
-          'Accept-Language': fp.languages.map((l, i) => i === 0 ? l : \`\${l};q=0.\${9-i}\`).join(','),
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1'
-        });
+        // Timezone
+        await page.emulateTimezone(fp.timezone);
 
         logger.log('[FINGERPRINT] Injected into page');
 
-        // Auth for proxy
+        // Proxy auth
         if (profile.proxy && profile.proxy.login && profile.proxy.password) {
           await page.authenticate({
             username: profile.proxy.login,
             password: profile.proxy.password
           });
-          logger.log(\`[AUTH] Proxy auth: \${profile.proxy.login}\`);
+          logger.log('[AUTH] Proxy authenticated');
         }
 
         // Cache cleaning
         const client = await page.createCDPSession();
         await client.send("Network.clearBrowserCache");
-        logger.log('[CACHE] Browser cache cleared');
+        logger.log('[CACHE] Cleared');
 
         // Viewport из fingerprint
         const viewport = profile.fingerprint?.screen || profile.viewport || {
@@ -996,15 +913,15 @@ ipcMain.handle("execute-script", async (_event, params) => {
           width: viewport.width,
           height: viewport.height
         });
-        logger.log(\`[VIEWPORT] Set to \${viewport.width}x\${viewport.height}\`);
+        logger.log(\`[VIEWPORT] \${viewport.width}x\${viewport.height}\`);
 
-        // Cookie
+        // Cookies
         if (profile.cookies && profile.cookies.length > 0) {
           try {
             await page.setCookie(...profile.cookies);
-            logger.log(\`[COOKIES] Set \${profile.cookies.length} cookies from profile\`);
+            logger.log(\`[COOKIES] Set \${profile.cookies.length} cookies\`);
           } catch (error) {
-            logger.warn('[COOKIES] Failed to set some cookies:', error.message);
+            logger.warn('[COOKIES] Failed:', error.message);
           }
         }
 
