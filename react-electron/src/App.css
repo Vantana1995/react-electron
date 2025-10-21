@@ -116,27 +116,7 @@ body {
   width: 100%;
 }
 
-/* Script section */
-.script-section {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  width: 100%;
-}
-
-.script-section .card {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
-  backdrop-filter: none;
-}
-
-.script-section .card:hover {
-  transform: none;
-  box-shadow: none;
-}
-
-/* Legacy script display (deprecated, use ScriptManager instead) */
+/* Legacy script display (deprecated) */
 .script-display {
   text-align: center;
   padding: 20px;

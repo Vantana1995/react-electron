@@ -348,21 +348,6 @@ export interface ElectronAPI {
 
 // ===== COMPONENT PROPS =====
 
-export interface ScriptManagerProps {
-  scriptData?: ScriptData;
-  walletAddress?: string;
-  deviceHash?: string;
-  onScriptStart?: (scriptId: string) => void;
-  onScriptStop?: (scriptId: string) => void;
-  onScriptOutput?: (output: ScriptOutput) => void;
-}
-
-export interface ScriptNFTMapping {
-  scriptId: string;
-  image: string;
-  associatedAt: number;
-}
-
 export interface SearchQueryBuilderProps {
   onUseInScript?: (url: string) => void;
   profileContext?: {

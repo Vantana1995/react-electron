@@ -40,7 +40,6 @@
     "closeSettings": "Close Settings"
   },
   "script": {
-    "memory": "Script Memory",
     "name": "Name",
     "version": "Version",
     "features": "Features",

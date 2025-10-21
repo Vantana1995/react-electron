@@ -20,7 +20,6 @@ import {
 import { profileStorage } from "./services/profileStorage";
 import { WalletConnection } from "./components/WalletConnection/WalletConnection";
 import { NFTDisplay } from "./components/NFTDisplay/NFTDisplay";
-import { ScriptManager } from "./components/ScriptManager/ScriptManager";
 import { ProfileManager } from "./components/ProfileManager";
 import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryBuilder";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -603,7 +602,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     setupServerCallbacks();
 
-    // Listen for custom script-started event from ScriptManager
+    // Listen for custom script-started event
     const handleScriptStarted = (event: CustomEvent) => {
       const { proxyAddress, scriptId } = event.detail;
       logger.log(
@@ -1118,12 +1117,6 @@ const AppContent: React.FC = () => {
               </div>
             )}
 
-            {/* Script Manager  */}
-            {appState.wallet.status.isConnected && (
-              <div className="card script-section">
-                <ScriptManager scriptData={currentScript} />
-              </div>
-            )}
           </div>
         </div>
       ) : (

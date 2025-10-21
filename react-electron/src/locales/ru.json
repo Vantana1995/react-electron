@@ -40,7 +40,6 @@
     "closeSettings": "Закрыть Настройки"
   },
   "script": {
-    "memory": "Память Скриптов",
     "name": "Название",
     "version": "Версия",
     "features": "Функции",
