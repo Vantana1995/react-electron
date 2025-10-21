@@ -4,7 +4,7 @@
  * Stores profiles with proxy settings, cookies, and other configuration
  */
 
-import { UserProfile, ProfileCookie, PROFILE_STORAGE_KEY } from "../types";
+import { UserProfile, ProfileCookie, PROFILE_STORAGE_KEY, Fingerprint } from "../types";
 import { v4 as uuidv4 } from "uuid";
 
 class ProfileStorageService {
@@ -48,13 +48,37 @@ class ProfileStorageService {
       id: uuidv4(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      isActive: false // New profiles start as inactive - must be explicitly activated
+      isActive: false, // New profiles start as inactive - must be explicitly activated
+      fingerprint: profileData.fingerprint // Include fingerprint
     };
+
+    // Save fingerprint to file if it exists
+    if (newProfile.fingerprint) {
+      await this.saveFingerprintToFile(newProfile.id, newProfile.fingerprint);
+    }
 
     const updatedProfiles = [...profiles, newProfile];
     await this.saveProfiles(updatedProfiles);
 
     return newProfile;
+  }
+
+  /**
+   * Save fingerprint to file via IPC
+   */
+  private async saveFingerprintToFile(profileId: string, fingerprint: Fingerprint): Promise<void> {
+    try {
+      console.log(`[PROFILE STORAGE] Saving fingerprint for profile ${profileId} to file...`);
+      const result = await window.electronAPI.saveFingerprint(profileId, fingerprint);
+
+      if (result.success) {
+        console.log(`[PROFILE STORAGE] ✅ Fingerprint saved to file for profile ${profileId}`);
+      } else {
+        console.error(`[PROFILE STORAGE] ❌ Failed to save fingerprint to file:`, result.error);
+      }
+    } catch (error) {
+      console.error('[PROFILE STORAGE] Error saving fingerprint to file:', error);
+    }
   }
 
   /**

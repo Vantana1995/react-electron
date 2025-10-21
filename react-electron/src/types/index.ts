@@ -392,6 +392,8 @@ export interface ProfileProxy {
   password: string;
   ip: string;
   port: number;
+  country?: string;    // Auto-detected country code (US, GB, DE, etc.)
+  timezone?: string;   // Auto-detected timezone (America/New_York, Europe/London)
 }
 
 export interface ProfileCookie {
@@ -417,6 +419,33 @@ export interface TelegramBotConfig {
   connectedAt?: number; // Timestamp when bot was connected
 }
 
+/**
+ * Browser Fingerprint for anti-detection
+ * Each profile has unique fingerprint stored in file and localStorage
+ */
+export interface Fingerprint {
+  webgl: { vendor: string; renderer: string };
+  platform: string;
+  hardwareConcurrency: number;
+  deviceMemory: number;
+  screen: { width: number; height: number; colorDepth: number; pixelDepth: number };
+  languages: string[];
+  timezone: string;
+  userAgent: string;
+  canvasNoise: number;
+  audioNoise: number;
+  battery: { charging: boolean; level: number };
+}
+
+/**
+ * Proxy location data (detected by IP)
+ */
+export interface ProxyLocation {
+  country: string;      // US, GB, DE, etc.
+  timezone: string;     // America/New_York, Europe/London
+  countryName: string;  // United States, United Kingdom
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -425,6 +454,7 @@ export interface UserProfile {
   navigationUrl?: string; // Search query URL configured for this profile
   telegram?: TelegramBotConfig; // Optional Telegram bot configuration
   viewport?: { width: number; height: number }; // Browser viewport size
+  fingerprint?: Fingerprint; // Browser fingerprint for anti-detection
   createdAt: number;
   updatedAt: number;
   isActive: boolean;

@@ -667,10 +667,66 @@ ipcMain.handle("execute-script", async (_event, params) => {
 
       puppeteer.use(StealthPlugin());
 
+      const fs = require('fs');
+      const path = require('path');
+
+      // Simple logger (fallback if user script doesn't provide one)
+      const logger = {
+        log: (...args) => console.log(...args),
+        error: (...args) => console.error(...args),
+        warn: (...args) => console.warn(...args)
+      };
+
       const profile = ${JSON.stringify(profile)};
       const customData = ${JSON.stringify(parsedCustomData)};
       const headlessMode = ${headless};
       const telegramConfig = ${JSON.stringify(profile.telegram || null)};
+
+      // ============================================
+      // LOAD FINGERPRINT (FROM PROFILE OR FILE)
+      // ============================================
+
+      /**
+       * Load fingerprint from profile or file
+       * @returns {object|null} Fingerprint object or null
+       */
+      function getOrCreateFingerprint() {
+        // 1. Check if profile has fingerprint in memory
+        if (profile.fingerprint) {
+          logger.log('[FINGERPRINT] ✅ Loaded from profile (localStorage)');
+          return profile.fingerprint;
+        }
+
+        // 2. Try to load from file
+        const profileDir = \`./puppeteer_profile_\${profile.id}\`;
+        const fingerprintPath = path.join(profileDir, 'fingerprint.json');
+
+        if (fs.existsSync(fingerprintPath)) {
+          try {
+            const fingerprintData = fs.readFileSync(fingerprintPath, 'utf8');
+            const fingerprint = JSON.parse(fingerprintData);
+            logger.log('[FINGERPRINT] ✅ Loaded from file:', fingerprintPath);
+            return fingerprint;
+          } catch (error) {
+            logger.error('[FINGERPRINT] ❌ Failed to load from file:', error.message);
+          }
+        }
+
+        // 3. No fingerprint found - ERROR
+        logger.error('[FINGERPRINT] ❌ Profile missing fingerprint!');
+        logger.error('[FINGERPRINT] ❌ Please recreate this profile in the UI to generate a fingerprint.');
+        throw new Error('Profile missing fingerprint! Please recreate profile.');
+      }
+
+      const fp = getOrCreateFingerprint();
+
+      logger.log('[FINGERPRINT] Active fingerprint:', JSON.stringify({
+        webgl: fp.webgl.renderer,
+        platform: fp.platform,
+        timezone: fp.timezone,
+        screen: \`\${fp.screen.width}x\${fp.screen.height}\`,
+        languages: fp.languages
+      }));
 
       logger.log('[SCRIPT] Starting Puppeteer script execution...');
       logger.log('[SCRIPT] Profile:', profile.name);
@@ -728,7 +784,22 @@ ipcMain.handle("execute-script", async (_event, params) => {
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
-          "--disable-gpu",
+
+          // ANTI-DETECT (CRITICAL!)
+          "--disable-blink-features=AutomationControlled",
+          "--disable-automation",
+          "--disable-features=IsolateOrigins,site-per-process",
+          "--disable-site-isolation-trials",
+          "--disable-infobars",
+          "--disable-extensions",
+
+          // WebGL support (вместо --disable-gpu)
+          "--use-gl=swiftshader",
+          "--enable-webgl",
+
+          // Locale из fingerprint
+          \`--lang=\${fp.languages.join(',')}\`,
+          \`--accept-lang=\${fp.languages.map((l, i) => i === 0 ? l : \`\${l};q=0.\${9-i}\`).join(',')}\`,
         ];
 
         // ADDING PROXY
@@ -750,9 +821,157 @@ ipcMain.handle("execute-script", async (_event, params) => {
           headless: headlessMode,
           args: browserArgs,
           userDataDir: \`./puppeteer_profile_\${profile.id}\`,
+          ignoreHTTPSErrors: true,
+          defaultViewport: null,
+          ignoreDefaultArgs: ['--enable-automation'], // Для rebrowser
+          env: {
+            ...process.env,
+            TZ: fp.timezone // Timezone из fingerprint
+          }
         });
 
         const page = await browser.newPage();
+
+        // ============================================
+        // INJECT FINGERPRINT
+        // ============================================
+
+        // WebDriver removal
+        await page.evaluateOnNewDocument(() => {
+          delete Object.getPrototypeOf(navigator).webdriver;
+        });
+
+        // Chrome object
+        await page.evaluateOnNewDocument(() => {
+          window.chrome = {
+            runtime: {},
+            loadTimes: function() {},
+            csi: function() {},
+            app: {}
+          };
+        });
+
+        // Permissions API
+        await page.evaluateOnNewDocument(() => {
+          const originalQuery = window.navigator.permissions.query;
+          window.navigator.permissions.query = (parameters) => (
+            parameters.name === 'notifications' ?
+              Promise.resolve({ state: Notification.permission }) :
+              originalQuery(parameters)
+          );
+        });
+
+        // Inject full fingerprint
+        await page.evaluateOnNewDocument((fingerprint) => {
+          // Languages
+          Object.defineProperty(navigator, 'languages', {
+            get: () => fingerprint.languages
+          });
+
+          // Platform
+          Object.defineProperty(navigator, 'platform', {
+            get: () => fingerprint.platform
+          });
+
+          // Hardware
+          Object.defineProperty(navigator, 'hardwareConcurrency', {
+            get: () => fingerprint.hardwareConcurrency
+          });
+          Object.defineProperty(navigator, 'deviceMemory', {
+            get: () => fingerprint.deviceMemory
+          });
+
+          // WebGL
+          const getParameter = WebGLRenderingContext.prototype.getParameter;
+          WebGLRenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === 37445) return fingerprint.webgl.vendor;
+            if (parameter === 37446) return fingerprint.webgl.renderer;
+            return getParameter.call(this, parameter);
+          };
+
+          // Screen
+          Object.defineProperty(screen, 'colorDepth', {
+            get: () => fingerprint.screen.colorDepth
+          });
+          Object.defineProperty(screen, 'pixelDepth', {
+            get: () => fingerprint.screen.pixelDepth
+          });
+
+          // Canvas noise
+          const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+          HTMLCanvasElement.prototype.toDataURL = function(type) {
+            const context = this.getContext('2d');
+            if (context) {
+              const imageData = context.getImageData(0, 0, this.width, this.height);
+              for (let i = 0; i < imageData.data.length; i += 4) {
+                imageData.data[i] += Math.floor(fingerprint.canvasNoise * 255);
+              }
+              context.putImageData(imageData, 0, 0);
+            }
+            return originalToDataURL.apply(this, arguments);
+          };
+
+          // Battery
+          if (navigator.getBattery) {
+            const originalGetBattery = navigator.getBattery;
+            navigator.getBattery = async () => {
+              const battery = await originalGetBattery.call(navigator);
+              Object.defineProperty(battery, 'charging', {
+                get: () => fingerprint.battery.charging
+              });
+              Object.defineProperty(battery, 'level', {
+                get: () => fingerprint.battery.level
+              });
+              return battery;
+            };
+          }
+
+          // Audio noise
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            const originalCreateOscillator = AudioContext.prototype.createOscillator;
+            AudioContext.prototype.createOscillator = function() {
+              const oscillator = originalCreateOscillator.call(this);
+              const originalStart = oscillator.start;
+              oscillator.start = function(when) {
+                oscillator.frequency.value += fingerprint.audioNoise;
+                return originalStart.call(this, when);
+              };
+              return oscillator;
+            };
+          }
+
+          // Plugins
+          Object.defineProperty(navigator, 'plugins', {
+            get: () => [
+              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Chrome PDF Plugin" },
+              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Chrome PDF Viewer" },
+              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Chromium PDF Viewer" },
+              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Microsoft Edge PDF Viewer" },
+              { 0: {type: "application/pdf"}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "WebKit built-in PDF" }
+            ]
+          });
+        }, fp);
+
+        // Timezone emulation (rebrowser feature)
+        await page.emulateTimezone(fp.timezone);
+
+        // User Agent из fingerprint
+        await page.setUserAgent(fp.userAgent);
+
+        // HTTP Headers
+        await page.setExtraHTTPHeaders({
+          'Accept-Language': fp.languages.map((l, i) => i === 0 ? l : \`\${l};q=0.\${9-i}\`).join(','),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1'
+        });
+
+        logger.log('[FINGERPRINT] Injected into page');
 
         // Auth for proxy
         if (profile.proxy && profile.proxy.login && profile.proxy.password) {
@@ -768,15 +987,18 @@ ipcMain.handle("execute-script", async (_event, params) => {
         await client.send("Network.clearBrowserCache");
         logger.log('[CACHE] Browser cache cleared');
 
-        // Viewport setting - auto-detect from profile or use defaults
-        const viewport = profile.viewport || {
+        // Viewport из fingerprint
+        const viewport = profile.fingerprint?.screen || profile.viewport || {
           width: 1920,
           height: 1080
         };
-        await page.setViewport(viewport);
+        await page.setViewport({
+          width: viewport.width,
+          height: viewport.height
+        });
         logger.log(\`[VIEWPORT] Set to \${viewport.width}x\${viewport.height}\`);
 
-        // Cookie 
+        // Cookie
         if (profile.cookies && profile.cookies.length > 0) {
           try {
             await page.setCookie(...profile.cookies);
@@ -1244,6 +1466,75 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
   } catch (error) {
     logger.error("[MAIN-ELECTRON] Failed to stop script:", error);
     return { success: false, error: (error as Error).message };
+  }
+});
+
+// ===== FINGERPRINT IPC HANDLERS =====
+
+/**
+ * Save fingerprint to file
+ * Creates profile directory and saves fingerprint.json
+ */
+ipcMain.handle("save-fingerprint", async (_event, { profileId, fingerprint }) => {
+  try {
+    logger.log(`[MAIN-ELECTRON] Saving fingerprint for profile ${profileId}...`);
+
+    const profileDir = `./puppeteer_profile_${profileId}`;
+    const fingerprintPath = path.join(profileDir, 'fingerprint.json');
+
+    // Create profile directory if doesn't exist
+    if (!fs.existsSync(profileDir)) {
+      fs.mkdirSync(profileDir, { recursive: true });
+      logger.log(`[MAIN-ELECTRON] Created profile directory: ${profileDir}`);
+    }
+
+    // Save fingerprint to file
+    fs.writeFileSync(fingerprintPath, JSON.stringify(fingerprint, null, 2));
+    logger.log(`[MAIN-ELECTRON] ✅ Fingerprint saved to: ${fingerprintPath}`);
+
+    return { success: true };
+  } catch (error) {
+    logger.error('[MAIN-ELECTRON] ❌ Failed to save fingerprint:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+/**
+ * Detect proxy location by IP address
+ * Uses ip-api.com free API
+ */
+ipcMain.handle("detect-proxy-location", async (_event, proxyIp: string) => {
+  try {
+    logger.log(`[MAIN-ELECTRON] Detecting location for IP: ${proxyIp}`);
+
+    // Call ip-api.com (FREE, 45 requests/minute)
+    const response = await fetch(
+      `http://ip-api.com/json/${proxyIp}?fields=status,country,countryCode,timezone`
+    );
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      logger.log(`[MAIN-ELECTRON] ✅ Detected: ${data.country} (${data.countryCode}), Timezone: ${data.timezone}`);
+      return {
+        success: true,
+        country: data.countryCode,
+        timezone: data.timezone,
+        countryName: data.country
+      };
+    }
+
+    throw new Error('API returned error status');
+  } catch (error) {
+    logger.error(`[MAIN-ELECTRON] ❌ Location detection failed:`, error);
+    logger.warn(`[MAIN-ELECTRON] Using fallback: US / America/New_York`);
+
+    // Fallback to default values
+    return {
+      success: true,
+      country: 'US',
+      timezone: 'America/New_York',
+      countryName: 'United States (fallback)'
+    };
   }
 });
 

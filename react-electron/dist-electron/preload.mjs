@@ -67,7 +67,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Telegram bot operations
   testTelegramConnection: (httpApi) => ipcRenderer.invoke("telegram-test-connection", httpApi),
   sendTelegramMessage: (httpApi, chatId, text) => ipcRenderer.invoke("telegram-send-message", httpApi, chatId, text),
-  getTelegramChatId: (httpApi) => ipcRenderer.invoke("telegram-get-chat-id", httpApi)
+  getTelegramChatId: (httpApi) => ipcRenderer.invoke("telegram-get-chat-id", httpApi),
+  // Fingerprint operations
+  saveFingerprint: (profileId, fingerprint) => ipcRenderer.invoke("save-fingerprint", { profileId, fingerprint }),
+  detectProxyLocation: (proxyIp) => ipcRenderer.invoke("detect-proxy-location", proxyIp)
 });
 contextBridge.exposeInMainWorld("ipcRenderer", {
   on(...args) {

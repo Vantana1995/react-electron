@@ -199,6 +199,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   getTelegramChatId: (httpApi: string) =>
     ipcRenderer.invoke("telegram-get-chat-id", httpApi),
+
+  // Fingerprint operations
+  saveFingerprint: (profileId: string, fingerprint: any) =>
+    ipcRenderer.invoke("save-fingerprint", { profileId, fingerprint }),
+
+  detectProxyLocation: (proxyIp: string) =>
+    ipcRenderer.invoke("detect-proxy-location", proxyIp),
 });
 
 // Legacy ipcRenderer API for compatibility (if needed)

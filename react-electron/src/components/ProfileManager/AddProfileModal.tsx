@@ -9,8 +9,10 @@ import {
   UserProfile,
   ProfileCookie,
   ProfileProxy,
+  ProxyLocation,
 } from "../../types";
 import { profileStorage } from "../../services/profileStorage";
+import { generateFingerprint, isValidIP } from "../../utils/fingerprintGenerator";
 import "./AddProfileModal.css";
 
 interface ExtendedAddProfileModalProps extends AddProfileModalProps {
@@ -31,6 +33,8 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
       password: "",
       ip: "",
       port: "",
+      country: undefined as string | undefined,
+      timezone: undefined as string | undefined,
     },
     cookiesJson: "",
   });
@@ -39,6 +43,8 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
   const [cookieErrors, setCookieErrors] = useState<string[]>([]);
   const [isValidating, setIsValidating] = useState(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [proxyLocation, setProxyLocation] = useState<ProxyLocation | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   // Reset form when modal opens/closes or editing profile changes
   useEffect(() => {
@@ -52,6 +58,8 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
             password: editingProfile.proxy.password,
             ip: editingProfile.proxy.ip,
             port: editingProfile.proxy.port.toString(),
+            country: editingProfile.proxy.country,
+            timezone: editingProfile.proxy.timezone,
           },
           cookiesJson: JSON.stringify(editingProfile.cookies, null, 2),
         });
@@ -65,6 +73,8 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
             password: "",
             ip: "",
             port: "",
+            country: undefined,
+            timezone: undefined,
           },
           cookiesJson: "",
         });
@@ -95,6 +105,55 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
     // Clear form errors when user starts typing
     if (formErrors.length > 0) {
       setFormErrors([]);
+    }
+  };
+
+  // Handle proxy IP change with auto-detection
+  const handleProxyIpChange = async (ip: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      proxy: {
+        ...prev.proxy,
+        ip,
+      },
+    }));
+
+    // Clear previous location
+    setProxyLocation(null);
+
+    // Validate IP and detect location
+    if (isValidIP(ip)) {
+      setIsDetectingLocation(true);
+
+      try {
+        const result = await window.electronAPI.detectProxyLocation(ip);
+
+        if (result.success) {
+          const location: ProxyLocation = {
+            country: result.country,
+            timezone: result.timezone,
+            countryName: result.countryName,
+          };
+
+          setProxyLocation(location);
+
+          // Update proxy with detected country and timezone
+          setFormData((prev) => ({
+            ...prev,
+            proxy: {
+              ...prev.proxy,
+              country: result.country,
+              timezone: result.timezone,
+            },
+          }));
+
+          console.log(`✅ Proxy location detected: ${result.countryName} (${result.timezone})`);
+        }
+      } catch (error) {
+        console.error('Failed to detect proxy location:', error);
+      } finally {
+        setIsDetectingLocation(false);
+      }
     }
   };
 
@@ -214,12 +273,29 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
         password: formData.proxy.password.trim(),
         ip: formData.proxy.ip.trim(),
         port: parseInt(formData.proxy.port),
+        country: formData.proxy.country,
+        timezone: formData.proxy.timezone,
       };
+
+      // Generate unique fingerprint for new profile
+      const fingerprint = generateFingerprint(
+        editingProfile?.id || crypto.randomUUID(),
+        proxy.country || 'US',
+        proxy.timezone || 'America/New_York'
+      );
+
+      console.log('[PROFILE] Generated fingerprint:', {
+        webgl: fingerprint.webgl.renderer,
+        platform: fingerprint.platform,
+        timezone: fingerprint.timezone,
+        languages: fingerprint.languages,
+      });
 
       const profileData = {
         name: formData.name.trim(),
         proxy,
         cookies: parsedCookies,
+        fingerprint, // Include fingerprint
       };
 
       onSave(profileData);
@@ -307,12 +383,20 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
                   id="proxy-ip"
                   type="text"
                   value={formData.proxy.ip}
-                  onChange={(e) =>
-                    handleInputChange("proxy.ip", e.target.value)
-                  }
+                  onChange={(e) => handleProxyIpChange(e.target.value)}
                   placeholder="192.168.1.1 or proxy.example.com"
                   disabled={isValidating}
                 />
+                {isDetectingLocation && (
+                  <div className="proxy-location-status">
+                    🔍 Detecting location...
+                  </div>
+                )}
+                {proxyLocation && !isDetectingLocation && (
+                  <div className="proxy-location-detected">
+                    ✅ Detected: {proxyLocation.countryName} | {proxyLocation.timezone}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label htmlFor="proxy-port">Port *</label>
