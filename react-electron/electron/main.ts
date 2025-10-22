@@ -848,7 +848,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
           };
         });
 
-        // WebGL spoofing + Hardware spoofing
+        // WebGL spoofing + Hardware spoofing + Languages + Canvas noise
         await page.evaluateOnNewDocument((fingerprint) => {
           // Platform
           Object.defineProperty(navigator, 'platform', {
@@ -864,6 +864,39 @@ ipcMain.handle("execute-script", async (_event, params) => {
           Object.defineProperty(navigator, 'deviceMemory', {
             get: () => fingerprint.deviceMemory
           });
+
+          // Languages (для соответствия прокси локации)
+          Object.defineProperty(navigator, 'languages', {
+            get: () => fingerprint.languages
+          });
+
+          // Canvas noise (для уникальности fingerprint)
+          const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+          const originalToBlob = HTMLCanvasElement.prototype.toBlob;
+
+          HTMLCanvasElement.prototype.toDataURL = function(type) {
+            const context = this.getContext('2d');
+            if (context && this.width > 0 && this.height > 0) {
+              const imageData = context.getImageData(0, 0, this.width, this.height);
+              for (let i = 0; i < imageData.data.length; i += 4) {
+                imageData.data[i] = imageData.data[i] + Math.floor(fingerprint.canvasNoise * 10);
+              }
+              context.putImageData(imageData, 0, 0);
+            }
+            return originalToDataURL.apply(this, arguments);
+          };
+
+          HTMLCanvasElement.prototype.toBlob = function(callback, type, quality) {
+            const context = this.getContext('2d');
+            if (context && this.width > 0 && this.height > 0) {
+              const imageData = context.getImageData(0, 0, this.width, this.height);
+              for (let i = 0; i < imageData.data.length; i += 4) {
+                imageData.data[i] = imageData.data[i] + Math.floor(fingerprint.canvasNoise * 10);
+              }
+              context.putImageData(imageData, 0, 0);
+            }
+            return originalToBlob.apply(this, arguments);
+          };
 
           // WebGL
           const getParameter = WebGLRenderingContext.prototype.getParameter;
