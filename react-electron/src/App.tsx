@@ -1021,29 +1021,22 @@ const AppContent: React.FC = () => {
 
             {/* NFT+Script Pairs Display */}
             {nftScriptPairs.length > 0 ? (
-              nftScriptPairs.map((pair, index) => (
-                <div
-                  key={`${pair.nft?.address || pair.script.id}-${index}`}
-                  className="card nft-section"
-                >
-                  <div className="pair-header">
-                    <h3>
-                      {pair.nft
-                        ? `NFT+Script Pair #${index + 1}`
-                        : `Script #${index + 1}`}
-                    </h3>
-                    <div className="pair-info">
-                      {pair.nft && (
-                        <span className="nft-name">
-                          {pair.nft.metadata?.name || "Unnamed NFT"}
+              <div className="nft-pairs-container">
+                {nftScriptPairs.map((pair, index) => (
+                  <div
+                    key={`${pair.nft?.address || pair.script.id}-${index}`}
+                    className="card nft-section"
+                  >
+                    <div className="pair-header">
+                      <h3>
+                        {pair.nft?.metadata?.name || `Script ${index + 1}`}
+                      </h3>
+                      <div className="pair-info">
+                        <span className="max-profiles">
+                          {pair.maxProfiles} profiles
                         </span>
-                      )}
-                      <span className="script-name">{pair.script.name}</span>
-                      <span className="max-profiles">
-                        {pair.maxProfiles} profiles
-                      </span>
+                      </div>
                     </div>
-                  </div>
                   <NFTDisplay
                     nft={pair.nft || undefined}
                     visible={appState.nft.visible}
@@ -1063,7 +1056,8 @@ const AppContent: React.FC = () => {
                     <p>Features: {pair.script.features.join(", ")}</p>
                   </div>
                 </div>
-              ))
+              ))}
+              </div>
             ) : currentNFT ? (
               /* Legacy single NFT display for backward compatibility */
               <div className="card nft-section">

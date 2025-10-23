@@ -324,7 +324,7 @@ function createWindow() {
       webSecurity: true,
       preload: path.join(__dirname, "preload.mjs"),
       partition: "persist:main",
-      devTools: true,
+      devTools: false,
       experimentalFeatures: false,
       allowRunningInsecureContent: false,
       sandbox: false,

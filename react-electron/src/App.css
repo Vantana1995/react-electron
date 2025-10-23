@@ -108,6 +108,15 @@ body {
   border-color: var(--border-focus);
 }
 
+/* NFT Pairs Grid Container */
+.nft-pairs-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 24px;
+  width: 100%;
+  margin-top: 20px;
+}
+
 /* NFT section */
 .nft-section {
   background-color: var(--bg-secondary);
@@ -498,49 +507,49 @@ textarea:focus {
 
 /* NFT+Script Pairs Styles */
 .pair-header {
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
   border: 1px solid var(--border-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 .pair-header h3 {
   color: var(--text-primary);
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pair-info {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  flex-wrap: nowrap;
+  gap: 8px;
   align-items: center;
 }
 
 .pair-info span {
-  background-color: var(--bg-primary);
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  border: 1px solid var(--border-primary);
-}
-
-.nft-name {
-  color: var(--accent-primary);
-  background-color: var(--accent-primary-light);
-}
-
-.script-name {
-  color: var(--success-primary);
-  background-color: var(--success-primary-light);
+  background-color: var(--accent-info);
+  color: var(--text-inverse);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: none;
+  white-space: nowrap;
 }
 
 .max-profiles {
-  color: var(--info-primary);
-  background-color: var(--info-primary-light);
+  background-color: var(--accent-success);
+  color: var(--text-inverse);
 }
 
 .script-info {
@@ -566,14 +575,24 @@ textarea:focus {
 
 /* Responsive design for pairs */
 @media (max-width: 768px) {
-  .pair-info {
-    flex-direction: column;
-    align-items: flex-start;
+  .nft-pairs-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
-  .pair-info span {
+  .pair-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .pair-header h3 {
+    white-space: normal;
+  }
+
+  .pair-info {
     width: 100%;
-    text-align: center;
+    justify-content: flex-start;
   }
 }
 
