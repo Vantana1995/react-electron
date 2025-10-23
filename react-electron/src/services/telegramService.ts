@@ -6,6 +6,8 @@
 import {
   TelegramGetUpdatesResponse,
   TelegramSendMessageResponse,
+  TelegramBotConfig,
+  CookieCollectionStats,
 } from "../types";
 
 /**
@@ -212,5 +214,54 @@ export async function sendMessage(
       success: false,
       error: error instanceof Error ? error.message : "Unknown error occurred",
     };
+  }
+}
+
+/**
+ * Sends a cookie collection completion notification to Telegram
+ *
+ * @param telegramConfig - Telegram bot configuration
+ * @param profileName - Name of the profile
+ * @param stats - Cookie collection statistics
+ * @returns Promise resolving to send result
+ */
+export async function sendCookieCollectionComplete(
+  telegramConfig: TelegramBotConfig,
+  profileName: string,
+  stats: CookieCollectionStats
+): Promise<boolean> {
+  if (!telegramConfig.connected) {
+    console.log('[TELEGRAM] Bot not connected, skipping notification');
+    return false;
+  }
+
+  try {
+    const timeMin = Math.floor(stats.timeElapsed / 60);
+    const timeSec = stats.timeElapsed % 60;
+    const errorsText = stats.errors.length > 0 ? `\n⚠️ Errors: ${stats.errors.length}` : '';
+
+    const message = `🍪 Cookie Collection Complete
+
+📝 Profile: ${profileName}
+✅ Sites visited: ${stats.sitesVisited}/${stats.totalSites}
+🍪 Cookies collected: ${stats.cookiesCollected}
+⏱️ Time elapsed: ${timeMin}m ${timeSec}s${errorsText}`;
+
+    const result = await sendMessage(
+      telegramConfig.httpApi,
+      telegramConfig.chatId,
+      message
+    );
+
+    if (result.success) {
+      console.log('[TELEGRAM] Cookie collection notification sent');
+      return true;
+    }
+
+    console.error('[TELEGRAM] Failed to send notification:', result.error);
+    return false;
+  } catch (error) {
+    console.error('[TELEGRAM] Error sending notification:', error);
+    return false;
   }
 }

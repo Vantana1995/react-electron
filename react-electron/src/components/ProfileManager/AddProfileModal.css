@@ -287,3 +287,38 @@
     width: 100%;
   }
 }
+
+/* Cookie Collection Button */
+.btn-collect-cookies {
+  width: 100%;
+  padding: 12px 20px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-collect-cookies:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.btn-collect-cookies:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-collect-cookies:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}

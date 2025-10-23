@@ -70,7 +70,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getTelegramChatId: (httpApi) => ipcRenderer.invoke("telegram-get-chat-id", httpApi),
   // Fingerprint operations
   saveFingerprint: (profileId, fingerprint) => ipcRenderer.invoke("save-fingerprint", { profileId, fingerprint }),
-  detectProxyLocation: (proxyIp) => ipcRenderer.invoke("detect-proxy-location", proxyIp)
+  detectProxyLocation: (proxyIp) => ipcRenderer.invoke("detect-proxy-location", proxyIp),
+  // Cookie collection operations
+  collectCookies: (profile, options) => ipcRenderer.invoke("collect-cookies", profile, options),
+  onCookieCollectionProgress: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on("cookie-collection-progress", listener);
+    return () => {
+      ipcRenderer.removeListener("cookie-collection-progress", listener);
+    };
+  },
+  cancelCookieCollection: (profileId) => ipcRenderer.invoke("cancel-cookie-collection", profileId)
 });
 contextBridge.exposeInMainWorld("ipcRenderer", {
   on(...args) {

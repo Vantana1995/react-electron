@@ -246,3 +246,313 @@
   background: var(--bg-secondary);
   color: var(--text-muted);
 }
+
+/* Cookie Collection Button */
+.collect-cookies-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.collect-cookies-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+}
+
+.collect-cookies-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Cookie Collection Progress */
+.cookie-collection-progress {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  border-radius: 12px;
+  margin: 16px 0;
+  border: 1px solid rgba(245, 87, 108, 0.3);
+}
+
+.cookie-collection-progress .progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cookie-collection-progress .progress-header h3 {
+  margin: 0;
+  color: #f5576c;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cookie-collection-progress .cancel-collection-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ff6b6b;
+  border: 1px solid #ff6b6b;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.cookie-collection-progress .cancel-collection-btn:hover {
+  background: rgba(255, 107, 107, 0.2);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+  transition: width 0.3s ease;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(245, 87, 108, 0.5);
+}
+
+.progress-info {
+  font-size: 13px;
+  color: #b0b0b0;
+  line-height: 1.6;
+}
+
+.progress-info p {
+  margin: 6px 0;
+}
+
+.progress-info strong {
+  color: #fff;
+}
+
+/* Collapsible Sections */
+.profile-section {
+  margin-top: 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-card);
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-section .section-header {
+  background: var(--accent-info);
+  color: var(--text-inverse);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.profile-section .section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.profile-section .section-content {
+  padding: 20px;
+  background: var(--bg-secondary);
+}
+
+.profile-section .section-description {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+/* Form Groups */
+.profile-section .form-group {
+  margin-bottom: 20px;
+}
+
+.profile-section .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.profile-section .form-group label {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.profile-section .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.profile-section .checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.profile-section .form-hint {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 6px 0 0 0;
+  font-style: italic;
+}
+
+/* Slider */
+.profile-section .sites-count-slider {
+  width: 100%;
+  margin: 8px 0;
+}
+
+.profile-section .slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+/* Custom Sites Textarea */
+.profile-section .custom-sites-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+  resize: vertical;
+}
+
+.profile-section .custom-sites-input:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Info Box */
+.profile-section .info-box {
+  padding: 12px 16px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.profile-section .info-box h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.profile-section .info-box ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.profile-section .info-box li {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+/* Section Actions */
+.profile-section .section-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.profile-section .btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-section .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profile-section .btn-primary {
+  background: var(--accent-success);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-section .btn-primary:hover:not(:disabled) {
+  background: var(--accent-success);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.1);
+}
+
+.profile-section .btn-secondary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-section .btn-secondary:hover:not(:disabled) {
+  background: var(--btn-primary-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Clear History Button */
+.clear-history-btn {
+  width: 100%;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  border: 1px solid var(--border-primary);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+}
+
+.clear-history-btn:hover:not(:disabled) {
+  background: var(--btn-secondary-hover);
+  border-color: var(--border-focus);
+}
+
+.clear-history-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

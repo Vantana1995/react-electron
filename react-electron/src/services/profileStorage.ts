@@ -338,6 +338,54 @@ class ProfileStorageService {
   }
 
   /**
+   * Merge new cookies with existing profile cookies
+   * Updates existing cookies and adds new ones
+   */
+  mergeCookies(existingCookies: ProfileCookie[], newCookies: ProfileCookie[]): ProfileCookie[] {
+    const cookieMap = new Map<string, ProfileCookie>();
+
+    // Add existing cookies to map (key: domain + name)
+    existingCookies.forEach(cookie => {
+      const key = `${cookie.domain}|${cookie.name}`;
+      cookieMap.set(key, cookie);
+    });
+
+    // Add/update with new cookies
+    newCookies.forEach(cookie => {
+      const key = `${cookie.domain}|${cookie.name}`;
+      cookieMap.set(key, cookie);
+    });
+
+    // Convert map back to array
+    return Array.from(cookieMap.values());
+  }
+
+  /**
+   * Update profile cookies with merge
+   * Combines existing cookies with new cookies
+   */
+  async updateProfileCookies(profileId: string, newCookies: ProfileCookie[]): Promise<UserProfile> {
+    const profile = await this.getProfile(profileId);
+
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+
+    // Merge cookies
+    const mergedCookies = this.mergeCookies(profile.cookies || [], newCookies);
+
+    console.log(`[PROFILE STORAGE] Merging cookies for profile ${profile.name}`);
+    console.log(`[PROFILE STORAGE] Existing cookies: ${profile.cookies?.length || 0}`);
+    console.log(`[PROFILE STORAGE] New cookies: ${newCookies.length}`);
+    console.log(`[PROFILE STORAGE] Total after merge: ${mergedCookies.length}`);
+
+    // Update profile with merged cookies
+    return await this.updateProfile(profileId, {
+      cookies: mergedCookies
+    });
+  }
+
+  /**
    * Toggle profile activation status
    */
   async toggleProfileActivation(profileId: string, maxActiveProfiles: number): Promise<UserProfile> {

@@ -206,6 +206,38 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   detectProxyLocation: (proxyIp: string) =>
     ipcRenderer.invoke("detect-proxy-location", proxyIp),
+
+  // Cookie collection operations
+  collectCookies: (profile: any, options: any) =>
+    ipcRenderer.invoke("collect-cookies", profile, options),
+
+  onCookieCollectionProgress: (
+    callback: (data: {
+      profileId: string;
+      progress: {
+        currentSite: string;
+        currentUrl: string;
+        sitesVisited: number;
+        totalSites: number;
+        cookiesCollected: number;
+        timeElapsed: number;
+        estimatedTimeRemaining: number;
+        status: 'running' | 'completed' | 'error' | 'cancelled';
+        error?: string;
+        percentage: number;
+      };
+    }) => void
+  ) => {
+    const listener = (_event: any, data: any) => callback(data);
+    ipcRenderer.on("cookie-collection-progress", listener);
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener("cookie-collection-progress", listener);
+    };
+  },
+
+  cancelCookieCollection: (profileId: string) =>
+    ipcRenderer.invoke("cancel-cookie-collection", profileId),
 });
 
 // Legacy ipcRenderer API for compatibility (if needed)

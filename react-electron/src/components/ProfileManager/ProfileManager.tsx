@@ -166,6 +166,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               onBuildQuery={handleBuildQuery}
               onClearHistory={handleClearHistory}
               onAddTelegramBot={handleAddTelegramBot}
+              onProfileUpdate={onProfileUpdate}
             />
           ))
         )}

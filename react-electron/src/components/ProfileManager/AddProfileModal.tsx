@@ -13,6 +13,7 @@ import {
 } from "../../types";
 import { profileStorage } from "../../services/profileStorage";
 import { generateFingerprint, isValidIP } from "../../utils/fingerprintGenerator";
+import { v4 as uuidv4 } from "uuid";
 import "./AddProfileModal.css";
 
 interface ExtendedAddProfileModalProps extends AddProfileModalProps {
@@ -421,8 +422,11 @@ export const AddProfileModal: React.FC<ExtendedAddProfileModalProps> = ({
             <h4>🍪 Cookie Data</h4>
             <div className="form-group">
               <label htmlFor="cookies-json">
-                AdsPower Cookies (JSON Format) *
+                AdsPower Cookies (JSON Format) - Optional
               </label>
+              <p className="cookies-hint" style={{fontSize: '0.85rem', color: 'var(--text-tertiary)', margin: '4px 0 12px'}}>
+                💡 Tip: You can save the profile without cookies and collect them automatically after creation using the 🍪 button on the profile card.
+              </p>
               <textarea
                 id="cookies-json"
                 value={formData.cookiesJson}

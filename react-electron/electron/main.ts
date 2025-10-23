@@ -55,6 +55,15 @@ interface ActiveScript {
 
 const activeScripts = new Map<string, ActiveScript>();
 
+// Active cookie collection processes
+interface ActiveCookieCollection {
+  profileId: string;
+  process: any; // ChildProcess
+  startTime: number;
+}
+
+const activeCookieCollections = new Map<string, ActiveCookieCollection>();
+
 /**
  * Wallet Authentication Flow Manager
  */
@@ -1425,29 +1434,34 @@ ipcMain.handle("stop-script", async (_event, scriptId) => {
  * Save fingerprint to file
  * Creates profile directory and saves fingerprint.json
  */
-ipcMain.handle("save-fingerprint", async (_event, { profileId, fingerprint }) => {
-  try {
-    logger.log(`[MAIN-ELECTRON] Saving fingerprint for profile ${profileId}...`);
+ipcMain.handle(
+  "save-fingerprint",
+  async (_event, { profileId, fingerprint }) => {
+    try {
+      logger.log(
+        `[MAIN-ELECTRON] Saving fingerprint for profile ${profileId}...`
+      );
 
-    const profileDir = `./puppeteer_profile_${profileId}`;
-    const fingerprintPath = path.join(profileDir, 'fingerprint.json');
+      const profileDir = `./puppeteer_profile_${profileId}`;
+      const fingerprintPath = path.join(profileDir, "fingerprint.json");
 
-    // Create profile directory if doesn't exist
-    if (!fs.existsSync(profileDir)) {
-      fs.mkdirSync(profileDir, { recursive: true });
-      logger.log(`[MAIN-ELECTRON] Created profile directory: ${profileDir}`);
+      // Create profile directory if doesn't exist
+      if (!fs.existsSync(profileDir)) {
+        fs.mkdirSync(profileDir, { recursive: true });
+        logger.log(`[MAIN-ELECTRON] Created profile directory: ${profileDir}`);
+      }
+
+      // Save fingerprint to file
+      fs.writeFileSync(fingerprintPath, JSON.stringify(fingerprint, null, 2));
+      logger.log(`[MAIN-ELECTRON] ✅ Fingerprint saved to: ${fingerprintPath}`);
+
+      return { success: true };
+    } catch (error) {
+      logger.error("[MAIN-ELECTRON] ❌ Failed to save fingerprint:", error);
+      return { success: false, error: (error as Error).message };
     }
-
-    // Save fingerprint to file
-    fs.writeFileSync(fingerprintPath, JSON.stringify(fingerprint, null, 2));
-    logger.log(`[MAIN-ELECTRON] ✅ Fingerprint saved to: ${fingerprintPath}`);
-
-    return { success: true };
-  } catch (error) {
-    logger.error('[MAIN-ELECTRON] ❌ Failed to save fingerprint:', error);
-    return { success: false, error: (error as Error).message };
   }
-});
+);
 
 /**
  * Detect proxy location by IP address
@@ -1463,17 +1477,19 @@ ipcMain.handle("detect-proxy-location", async (_event, proxyIp: string) => {
     );
     const data = await response.json();
 
-    if (data.status === 'success') {
-      logger.log(`[MAIN-ELECTRON] ✅ Detected: ${data.country} (${data.countryCode}), Timezone: ${data.timezone}`);
+    if (data.status === "success") {
+      logger.log(
+        `[MAIN-ELECTRON] ✅ Detected: ${data.country} (${data.countryCode}), Timezone: ${data.timezone}`
+      );
       return {
         success: true,
         country: data.countryCode,
         timezone: data.timezone,
-        countryName: data.country
+        countryName: data.country,
       };
     }
 
-    throw new Error('API returned error status');
+    throw new Error("API returned error status");
   } catch (error) {
     logger.error(`[MAIN-ELECTRON] ❌ Location detection failed:`, error);
     logger.warn(`[MAIN-ELECTRON] Using fallback: US / America/New_York`);
@@ -1481,9 +1497,9 @@ ipcMain.handle("detect-proxy-location", async (_event, proxyIp: string) => {
     // Fallback to default values
     return {
       success: true,
-      country: 'US',
-      timezone: 'America/New_York',
-      countryName: 'United States (fallback)'
+      country: "US",
+      timezone: "America/New_York",
+      countryName: "United States (fallback)",
     };
   }
 });
@@ -1687,6 +1703,259 @@ ipcMain.handle("telegram-get-chat-id", async (_event, httpApi: string) => {
 });
 
 // Handle folder selection
+// ===== COOKIE COLLECTION IPC HANDLERS =====
+
+/**
+ * Collect cookies automatically by visiting popular sites
+ * Uses Puppeteer with profile fingerprint and proxy settings
+ */
+ipcMain.handle("collect-cookies", async (event, profile, options) => {
+  return new Promise((resolve) => {
+    try {
+      logger.log(
+        `[COOKIE_COLLECTION] Starting collection for profile: ${profile.name}`
+      );
+      logger.log(
+        `[COOKIE_COLLECTION] Options:`,
+        JSON.stringify(options, null, 2)
+      );
+
+      // Check if collection is already running for this profile
+      if (activeCookieCollections.has(profile.id)) {
+        resolve({
+          success: false,
+          cookiesCollected: [],
+          totalCookies: 0,
+          sitesVisited: 0,
+          totalSites: options.sitesCount,
+          timeElapsed: 0,
+          errors: ["Cookie collection already running for this profile"],
+        });
+        return;
+      }
+
+      // Get Node.js command
+      const nodeCommand = process.platform === "win32" ? "node.exe" : "node";
+
+      // Path to standalone script
+      const scriptPath = path.join(
+        __dirname,
+        "..",
+        "scripts",
+        "cookieCollector.cjs"
+      );
+
+      // Check if script exists
+      if (!fs.existsSync(scriptPath)) {
+        logger.error(`[COOKIE_COLLECTION] Script not found: ${scriptPath}`);
+        resolve({
+          success: false,
+          cookiesCollected: [],
+          totalCookies: 0,
+          sitesVisited: 0,
+          totalSites: options.sitesCount,
+          timeElapsed: 0,
+          errors: ["Cookie collection script not found"],
+        });
+        return;
+      }
+
+      // Prepare input data for stdin (avoids ENAMETOOLONG error on Windows)
+      const inputData = JSON.stringify({ profile, options });
+
+      // Spawn the standalone script WITHOUT passing JSON as arguments
+      const child = spawn(nodeCommand, [scriptPath], {
+        cwd: path.join(__dirname, ".."),
+        env: {
+          ...process.env,
+          NODE_PATH: [
+            path.join(__dirname, "..", "node_modules"),
+            path.join(__dirname, "..", "..", "node_modules"),
+          ].join(process.platform === "win32" ? ";" : ":"),
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      // Send data via stdin instead of command-line arguments
+      if (child.stdin) {
+        child.stdin.write(inputData);
+        child.stdin.end();
+      }
+
+      // Store in active collections
+      activeCookieCollections.set(profile.id, {
+        profileId: profile.id,
+        process: child,
+        startTime: Date.now(),
+      });
+
+      let finalResult: any = null;
+      let errorOutput = "";
+
+      // Parse stdout for JSON messages
+      child.stdout?.on("data", (data) => {
+        const text = data.toString();
+        const lines = text.split("\n").filter((line: string) => line.trim());
+
+        for (const line of lines) {
+          try {
+            const message = JSON.parse(line);
+
+            if (message.type === "progress") {
+              // Send progress to renderer
+              event.sender.send("cookie-collection-progress", {
+                profileId: profile.id,
+                progress: message.data,
+              });
+              logger.log(
+                `[COOKIE_COLLECTION] Progress: ${message.data.currentSite} (${message.data.percentage}%)`
+              );
+            } else if (message.type === "result") {
+              // Store final result
+              finalResult = message.data;
+              logger.log(
+                `[COOKIE_COLLECTION] Result received: ${
+                  message.data.success ? "Success" : "Failed"
+                }`
+              );
+            }
+          } catch (parseError) {
+            // Not JSON, log as regular output
+            logger.log(`[COOKIE_COLLECTION] ${line}`);
+          }
+        }
+      });
+
+      // Capture stderr
+      child.stderr?.on("data", (data) => {
+        const text = data.toString();
+        errorOutput += text;
+        logger.error(`[COOKIE_COLLECTION] ERROR: ${text.trim()}`);
+      });
+
+      // Handle process exit
+      child.on("close", (code) => {
+        // Remove from active collections
+        activeCookieCollections.delete(profile.id);
+
+        if (code === 0 && finalResult) {
+          logger.log(
+            `[COOKIE_COLLECTION] ✅ Collection completed for profile: ${profile.name}`
+          );
+          logger.log(
+            `[COOKIE_COLLECTION] Total cookies collected: ${finalResult.totalCookies}`
+          );
+          resolve(finalResult);
+        } else {
+          logger.error(
+            `[COOKIE_COLLECTION] ❌ Collection failed with code ${code}`
+          );
+          resolve({
+            success: false,
+            cookiesCollected: [],
+            totalCookies: 0,
+            sitesVisited: 0,
+            totalSites: options.sitesCount,
+            timeElapsed: 0,
+            errors: [errorOutput || `Process exited with code ${code}`],
+          });
+        }
+      });
+
+      // Handle process error
+      child.on("error", (err) => {
+        logger.error(`[COOKIE_COLLECTION] ❌ Process error: ${err.message}`);
+        activeCookieCollections.delete(profile.id);
+        resolve({
+          success: false,
+          cookiesCollected: [],
+          totalCookies: 0,
+          sitesVisited: 0,
+          totalSites: options.sitesCount,
+          timeElapsed: 0,
+          errors: [err.message],
+        });
+      });
+    } catch (error) {
+      logger.error("[COOKIE_COLLECTION] ❌ Error:", error);
+      activeCookieCollections.delete(profile.id);
+      resolve({
+        success: false,
+        cookiesCollected: [],
+        totalCookies: 0,
+        sitesVisited: 0,
+        totalSites: options.sitesCount || 0,
+        timeElapsed: 0,
+        errors: [(error as Error).message],
+      });
+    }
+  });
+});
+
+/**
+ * Cancel cookie collection for a profile
+ */
+ipcMain.handle(
+  "cancel-cookie-collection",
+  async (_event, profileId: string) => {
+    try {
+      logger.log(
+        `[COOKIE_COLLECTION] Cancelling collection for profile: ${profileId}`
+      );
+
+      const activeCollection = activeCookieCollections.get(profileId);
+      if (!activeCollection) {
+        return {
+          success: false,
+          message: "No active collection found for this profile",
+        };
+      }
+
+      // Kill the process
+      if (activeCollection.process && !activeCollection.process.killed) {
+        if (process.platform === "win32") {
+          try {
+            execSync(`taskkill /pid ${activeCollection.process.pid} /T /F`, {
+              windowsHide: true,
+            });
+            logger.log(
+              `[COOKIE_COLLECTION] Killed process tree for PID ${activeCollection.process.pid}`
+            );
+          } catch (killError) {
+            logger.error(
+              "[COOKIE_COLLECTION] taskkill failed, using fallback method:",
+              killError
+            );
+            activeCollection.process.kill("SIGKILL");
+          }
+        } else {
+          activeCollection.process.kill("SIGTERM");
+          setTimeout(() => {
+            if (activeCollection.process && !activeCollection.process.killed) {
+              activeCollection.process.kill("SIGKILL");
+            }
+          }, 3000);
+        }
+      }
+
+      // Remove from active collections
+      activeCookieCollections.delete(profileId);
+
+      logger.log(
+        `[COOKIE_COLLECTION] ✅ Collection cancelled for profile: ${profileId}`
+      );
+
+      return {
+        success: true,
+        message: "Cookie collection cancelled successfully",
+      };
+    } catch (error) {
+      logger.error("[COOKIE_COLLECTION] ❌ Cancel error:", error);
+      return { success: false, message: (error as Error).message };
+    }
+  }
+);
+
 ipcMain.handle("select-folder", async () => {
   try {
     if (!win) {

@@ -344,6 +344,16 @@ export interface ElectronAPI {
       proxyAddress?: string;
     }) => void
   ) => void;
+
+  // Cookie collection
+  collectCookies: (
+    profile: UserProfile,
+    options: CookieCollectionOptions
+  ) => Promise<CookieCollectionResult>;
+  onCookieCollectionProgress: (
+    callback: (progress: CookieCollectionProgress) => void
+  ) => () => void; // Returns cleanup function
+  cancelCookieCollection: (profileId: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 // ===== COMPONENT PROPS =====
@@ -486,6 +496,8 @@ export interface ProfileCardProps {
   onBuildQuery?: (profile: UserProfile) => void;
   onClearHistory?: (profile: UserProfile) => void;
   onAddTelegramBot?: (profile: UserProfile) => void;
+  onCollectCookies?: (profile: UserProfile) => void;
+  onProfileUpdate?: (profile: UserProfile) => void;
 }
 
 export interface ProfileManagerProps {
@@ -559,6 +571,93 @@ export interface TelegramSendMessageResponse {
 }
 
 export const PROFILE_STORAGE_KEY = "twitter_automation_profiles";
+
+// ===== COOKIE COLLECTION SYSTEM =====
+
+/**
+ * Site action types for human behavior simulation
+ */
+export type SiteActionType =
+  | 'scroll'
+  | 'clickVideo'
+  | 'clickArticle'
+  | 'clickProduct'
+  | 'clickPost'
+  | 'clickQuestion'
+  | 'clickRepo'
+  | 'clickPin'
+  | 'search'
+  | 'watchPartial';
+
+/**
+ * Site action definition
+ */
+export interface SiteAction {
+  type: SiteActionType;
+  selector?: string;
+  scrollAmount?: number;
+  waitTime?: number;
+}
+
+/**
+ * Configuration for a site to visit during cookie collection
+ */
+export interface SiteConfig {
+  name: string;
+  url: string;
+  cookieSelectors: string[]; // Selectors for cookie accept buttons
+  actions: SiteAction[]; // Actions to perform on the site
+}
+
+/**
+ * Options for cookie collection
+ */
+export interface CookieCollectionOptions {
+  sitesCount: number; // Number of sites to visit (5-15)
+  headless: boolean; // Browser mode (true = headless, false = visible)
+  customSites?: string[]; // Custom site URLs to visit
+  useDefaultSites: boolean; // Whether to use default sites
+}
+
+/**
+ * Progress update during cookie collection
+ */
+export interface CookieCollectionProgress {
+  currentSite: string; // Name of current site being visited
+  currentUrl: string; // URL of current site
+  sitesVisited: number; // Number of sites visited so far
+  totalSites: number; // Total number of sites to visit
+  cookiesCollected: number; // Number of cookies collected so far
+  timeElapsed: number; // Time elapsed in seconds
+  estimatedTimeRemaining: number; // Estimated time remaining in seconds
+  status: 'running' | 'completed' | 'error' | 'cancelled';
+  error?: string; // Error message if status is 'error'
+  percentage: number; // Completion percentage (0-100)
+}
+
+/**
+ * Result of cookie collection
+ */
+export interface CookieCollectionResult {
+  success: boolean;
+  cookiesCollected: ProfileCookie[];
+  totalCookies: number;
+  sitesVisited: number;
+  totalSites: number;
+  timeElapsed: number;
+  errors: string[];
+}
+
+/**
+ * Stats for cookie collection completion
+ */
+export interface CookieCollectionStats {
+  sitesVisited: number;
+  totalSites: number;
+  cookiesCollected: number;
+  timeElapsed: number; // in seconds
+  errors: string[];
+}
 
 // ===== GLOBAL DECLARATIONS =====
 
