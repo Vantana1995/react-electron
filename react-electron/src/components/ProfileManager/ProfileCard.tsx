@@ -8,9 +8,11 @@ import {
   ProfileCardProps,
   CookieCollectionProgress,
   CookieCollectionOptions,
+  UserProfile,
 } from "../../types";
 import { profileStorage } from "../../services/profileStorage";
 import { sendCookieCollectionComplete } from "../../services/telegramService";
+import { EditProfileForm } from "./EditProfileForm";
 import "./ProfileCard.css";
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({
@@ -23,6 +25,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   onAddTelegramBot,
   onProfileUpdate,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isCollectingCookies, setIsCollectingCookies] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [cookieProgress, setCookieProgress] = useState<CookieCollectionProgress | null>(null);
@@ -151,111 +154,140 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const isCookieSectionExpanded = expandedSections.has('cookie-collection');
   const isTelegramSectionExpanded = expandedSections.has('telegram-bot');
 
+  const handleSaveProfile = (updatedProfile: UserProfile) => {
+    if (onProfileUpdate) {
+      onProfileUpdate(updatedProfile);
+    }
+    setIsExpanded(false);
+  };
+
   return (
-    <div className="profile-card">
-      <div className="profile-card-header">
-        <div className="profile-info">
-          <h4 className="profile-name">
-            {profile.name}
-            {profile.telegram?.connected && (
-              <span
-                className="telegram-badge"
-                title={`Telegram bot: ${
-                  profile.telegram.botName || "Connected"
-                }`}
+    <div className={`profile-card ${isExpanded ? 'expanded' : ''}`}>
+      {!isExpanded ? (
+        /* COMPACT VIEW */
+        <div className="profile-card-collapsed">
+          <div className="profile-card-header">
+            <h4 className="profile-name">
+              {profile.name}
+              {profile.telegram?.connected && (
+                <span
+                  className="telegram-badge"
+                  title={`Telegram bot: ${
+                    profile.telegram.botName || "Connected"
+                  }`}
+                >
+                  TG
+                </span>
+              )}
+            </h4>
+            <div className="profile-actions">
+              <button
+                className="edit-btn"
+                onClick={() => setIsExpanded(true)}
+                title="Edit Profile"
               >
-                TG
+                Edit
+              </button>
+              <button
+                className="delete-btn"
+                onClick={() => onDelete(profile.id)}
+                title="Delete Profile"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div className="profile-card-content">
+            <div className="profile-detail">
+              <label>Proxy:</label>
+              <span className="proxy-info">
+                {profile.proxy.login}:{maskProxyPassword(profile.proxy.password)}@
+                {profile.proxy.ip}:{profile.proxy.port}
               </span>
-            )}
-          </h4>
-        </div>
-        <div className="profile-actions">
-          <button
-            className="collect-cookies-btn"
-            onClick={() => toggleSection('cookie-collection')}
-            title="Collect cookies automatically"
-            disabled={isCollectingCookies}
-          >
-            Collect cookie
-          </button>
-          <button
-            className="telegram-btn"
-            onClick={() => toggleSection('telegram-bot')}
-            title={
-              profile.telegram?.connected
-                ? "Edit Telegram Bot"
-                : "Add Telegram Bot"
-            }
-          >
-            {profile.telegram?.connected ? "Telegram notis ✓" : "Telegram notis"}
-          </button>
-          <button
-            className="build-query-btn"
-            onClick={() => onBuildQuery?.(profile)}
-            title="Build Search Query"
-          >
-            Search
-          </button>
-          <button
-            className="edit-btn"
-            onClick={() => onEdit(profile)}
-            title="Edit Profile"
-          >
-            Edit
-          </button>
-          <button
-            className="delete-btn"
-            onClick={() => onDelete(profile.id)}
-            title="Delete Profile"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
+            </div>
 
-      <div className="profile-card-content">
-        <div className="profile-detail">
-          <label>Proxy:</label>
-          <span className="proxy-info">
-            {profile.proxy.login}:{maskProxyPassword(profile.proxy.password)}@
-            {profile.proxy.ip}:{profile.proxy.port}
-          </span>
-        </div>
+            <div className="profile-detail">
+              <label>Cookies:</label>
+              <span className="cookies-info">
+                {profile.cookies.length} cookie
+                {profile.cookies.length !== 1 ? "s" : ""}
+              </span>
+            </div>
 
-        <div className="profile-detail">
-          <label>Cookies:</label>
-          <span className="cookies-info">
-            {profile.cookies.length} cookie
-            {profile.cookies.length !== 1 ? "s" : ""} configured
-          </span>
-        </div>
-
-        {profile.navigationUrl && (
-          <div className="profile-detail">
-            <label>Search Query:</label>
-            <span className="url-info" title={profile.navigationUrl}>
-              {profile.navigationUrl.length > 50
-                ? `${profile.navigationUrl.substring(0, 50)}...`
-                : profile.navigationUrl}
-            </span>
+            <div className="profile-detail">
+              <label>Created:</label>
+              <span className="date-info">{formatDate(profile.createdAt)}</span>
+            </div>
           </div>
-        )}
-
-        <div className="profile-detail">
-          <label>Created:</label>
-          <span className="date-info">{formatDate(profile.createdAt)}</span>
         </div>
+      ) : (
+        /* EXPANDED VIEW */
+        <div className="profile-card-expanded">
+          <button className="close-btn" onClick={() => setIsExpanded(false)}>
+            ← Back to Compact View
+          </button>
 
-        {profile.updatedAt !== profile.createdAt && (
-          <div className="profile-detail">
-            <label>Updated:</label>
-            <span className="date-info">{formatDate(profile.updatedAt)}</span>
-          </div>
-        )}
-      </div>
+          <div className="expanded-content">
+            <div className="settings-column">
+              <h3>Edit Profile: {profile.name}</h3>
+              <EditProfileForm
+                profile={profile}
+                onSave={handleSaveProfile}
+                onCancel={() => setIsExpanded(false)}
+              />
+            </div>
 
-      {/* Cookie Collection Section */}
-      {isCookieSectionExpanded && (
+            <div className="actions-column">
+              <h3>Profile Actions</h3>
+
+              <button
+                className="action-btn collect-cookies-btn"
+                onClick={() => toggleSection('cookie-collection')}
+                title="Collect cookies automatically"
+                disabled={isCollectingCookies}
+              >
+                Collect cookie
+              </button>
+
+              <button
+                className="action-btn telegram-btn"
+                onClick={() => toggleSection('telegram-bot')}
+                title={
+                  profile.telegram?.connected
+                    ? "Edit Telegram Bot"
+                    : "Add Telegram Bot"
+                }
+              >
+                {profile.telegram?.connected ? "Telegram notis ✓" : "Telegram notis"}
+              </button>
+
+              <button
+                className="action-btn build-query-btn"
+                onClick={() => onBuildQuery?.(profile)}
+                title="Build Search Query"
+              >
+                Build Search Query
+              </button>
+
+              <button
+                className="action-btn select-profile-btn"
+                onClick={() => onSelect?.(profile)}
+                title="Select this profile"
+              >
+                Select Profile
+              </button>
+
+              <button
+                className="action-btn clear-history-btn"
+                onClick={() => onClearHistory?.(profile)}
+                title="Clear processed tweets history"
+              >
+                Clear History
+              </button>
+
+              {/* Cookie Collection Section */}
+              {isCookieSectionExpanded && (
         <div className="profile-section cookie-section">
           <div className="section-header">
             <h3>Collect Cookies Automatically</h3>
@@ -432,22 +464,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </div>
         </div>
       )}
-
-      <div className="profile-card-footer">
-        <button
-          className="select-profile-btn"
-          onClick={() => onSelect(profile)}
-        >
-          Select Profile
-        </button>
-        <button
-          className="clear-history-btn"
-          onClick={() => onClearHistory?.(profile)}
-          title="Clear processed tweets history"
-        >
-          Clear History
-        </button>
-      </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

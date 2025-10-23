@@ -102,8 +102,18 @@
 
 .profiles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+/* When a card is expanded, switch to block layout */
+.profiles-grid:has(.profile-card.expanded) {
+  display: block;
+}
+
+/* Hide other cards when one is expanded */
+.profiles-grid:has(.profile-card.expanded) .profile-card:not(.expanded) {
+  display: none;
 }
 
 .no-profiles {

@@ -9,6 +9,16 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import RamkaPlaceholder from "../../assets/Ramka.png";
 import "./NFTDisplay.css";
 
+interface RunningScript {
+  scriptId: string;
+  profileId: string;
+  profileName: string;
+  startTime: number;
+  headless: boolean;
+  nftImage?: string;
+  scriptName?: string;
+}
+
 interface NFTDisplayProps {
   nft?: NFTData;
   visible?: boolean;
@@ -29,6 +39,7 @@ interface NFTDisplayProps {
   navigationUrl?: string;
   onNavigationUrlChange?: (url: string) => void;
   onOpenSearchBuilder?: () => void;
+  onRunningScriptsUpdate?: (scripts: RunningScript[]) => void;
 }
 
 export const NFTDisplay: React.FC<NFTDisplayProps> = ({
@@ -46,6 +57,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   navigationUrl: externalNavigationUrl = "",
   onNavigationUrlChange,
   onOpenSearchBuilder,
+  onRunningScriptsUpdate,
 }) => {
   const { t } = useLanguage();
 
@@ -114,14 +126,20 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     savedState?.navigationUrl ?? ""
   );
 
-  interface RunningScript {
-    scriptId: string;
-    profileId: string;
-    profileName: string;
-    startTime: number;
-    headless: boolean;
-  }
   const [runningScripts, setRunningScripts] = useState<RunningScript[]>([]);
+
+  // Send running scripts to parent component
+  useEffect(() => {
+    if (onRunningScriptsUpdate) {
+      // Add NFT image and script name to running scripts
+      const enrichedScripts = runningScripts.map(script => ({
+        ...script,
+        nftImage: nft?.image,
+        scriptName: scriptData?.name || nft?.metadata?.name,
+      }));
+      onRunningScriptsUpdate(enrichedScripts);
+    }
+  }, [runningScripts, onRunningScriptsUpdate, nft, scriptData]);
 
   useEffect(() => {
     if (nft?.image) {
@@ -856,48 +874,6 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
               </div>
             )}
           </div>
-
-          {/* Running Scripts - Display as NFT Cards */}
-          {runningScripts.map((runningScript) => (
-            <div
-              key={runningScript.scriptId}
-              className="nft-card running-script-card"
-              onClick={() => handleStopScriptById(runningScript.scriptId)}
-            >
-              <div className="nft-card-collapsed">
-                <div className="nft-image-container">
-                  {!imageError && nft?.image ? (
-                    <img
-                      src={nft.image}
-                      alt={`Running: ${runningScript.profileName}`}
-                      className="nft-image"
-                    />
-                  ) : (
-                    <div className="script-placeholder">
-                      <div className="script-icon">Running</div>
-                      <div className="script-name">Running</div>
-                    </div>
-                  )}
-
-                  {/* STOP Overlay */}
-                  <div className="stop-overlay">
-                    <div className="stop-text">STOP</div>
-                    <div className="stop-subtitle">
-                      {runningScript.profileName}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="nft-card-title">
-                  Running: {runningScript.profileName}
-                </div>
-
-                <div className="click-hint running-hint">
-                  Click to stop script
-                </div>
-              </div>
-            </div>
-          ))}
         </>
       ) : (
         <div className="nft-placeholder">

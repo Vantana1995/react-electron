@@ -11,6 +11,7 @@ import {
   NFTData,
   ScriptData,
   UserProfile,
+  RunningScript,
 } from "./types";
 import { collectDeviceInfo } from "./services/deviceFingerprint";
 import {
@@ -22,6 +23,7 @@ import { WalletConnection } from "./components/WalletConnection/WalletConnection
 import { NFTDisplay } from "./components/NFTDisplay/NFTDisplay";
 import { ProfileManager } from "./components/ProfileManager";
 import { SearchQueryBuilder } from "./components/SearchQueryBuilder/SearchQueryBuilder";
+import { RunningScriptCard } from "./components/RunningScriptCard";
 import { ThemeToggle } from "./components/ThemeToggle";
 import LanguageSwitcher from "./components/LanguageSwitcher/LanguageSwitcher";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -88,6 +90,11 @@ const AppContent: React.FC = () => {
   const [showSearchBuilder, setShowSearchBuilder] = useState<boolean>(false);
   const [mainPageScrollPosition, setMainPageScrollPosition] =
     useState<number>(0);
+
+  // Running Scripts state - collect from all NFT displays
+  const [allRunningScripts, setAllRunningScripts] = useState<
+    Map<string, RunningScript[]>
+  >(new Map());
 
   // Expose currentNFT and currentScript to window object for component access
   useEffect(() => {
@@ -890,6 +897,41 @@ const AppContent: React.FC = () => {
   }, []);
 
   /**
+   * Handle running scripts update from NFT Display
+   */
+  const handleRunningScriptsUpdate = useCallback(
+    (scriptId: string) => (scripts: RunningScript[]) => {
+      setAllRunningScripts((prev) => {
+        const newMap = new Map(prev);
+        if (scripts.length > 0) {
+          newMap.set(scriptId, scripts);
+        } else {
+          newMap.delete(scriptId);
+        }
+        return newMap;
+      });
+    },
+    []
+  );
+
+  // Flatten all running scripts from all displays
+  const flattenedRunningScripts = Array.from(allRunningScripts.values()).flat();
+
+  /**
+   * Handle stopping a running script
+   */
+  const handleStopScript = useCallback(async (scriptId: string) => {
+    try {
+      if (window.electronAPI?.stopScript) {
+        await window.electronAPI.stopScript(scriptId);
+        logger.log(`🛑 Script ${scriptId} stop requested`);
+      }
+    } catch (error) {
+      logger.error("❌ Failed to stop script:", error);
+    }
+  }, []);
+
+  /**
    * Handle opening Search Query Builder
    */
   const handleOpenSearchBuilder = useCallback(() => {
@@ -1049,6 +1091,9 @@ const AppContent: React.FC = () => {
                     navigationUrl={navigationUrl}
                     onNavigationUrlChange={handleNavigationUrlChange}
                     onOpenSearchBuilder={handleOpenSearchBuilder}
+                    onRunningScriptsUpdate={handleRunningScriptsUpdate(
+                      pair.script.id
+                    )}
                   />
                   <div className="script-info">
                     <h4>Associated Script: {pair.script.name}</h4>
@@ -1071,6 +1116,9 @@ const AppContent: React.FC = () => {
                   navigationUrl={navigationUrl}
                   onNavigationUrlChange={handleNavigationUrlChange}
                   onOpenSearchBuilder={handleOpenSearchBuilder}
+                  onRunningScriptsUpdate={handleRunningScriptsUpdate(
+                    "legacy-nft"
+                  )}
                 />
               </div>
             ) : currentScript ? (
@@ -1085,9 +1133,30 @@ const AppContent: React.FC = () => {
                   navigationUrl={navigationUrl}
                   onNavigationUrlChange={handleNavigationUrlChange}
                   onOpenSearchBuilder={handleOpenSearchBuilder}
+                  onRunningScriptsUpdate={handleRunningScriptsUpdate(
+                    currentScript.id || "legacy-script"
+                  )}
                 />
               </div>
             ) : null}
+
+            {/* Running Scripts Section */}
+            {flattenedRunningScripts.length > 0 && (
+              <div className="card running-scripts-section">
+                <h3>
+                  Running Scripts ({flattenedRunningScripts.length})
+                </h3>
+                <div className="running-scripts-grid">
+                  {flattenedRunningScripts.map((script) => (
+                    <RunningScriptCard
+                      key={script.scriptId}
+                      script={script}
+                      onStop={handleStopScript}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Profile Manager - only visible if connected to server */}
             {appState.system.connected && (

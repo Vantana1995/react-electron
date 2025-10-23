@@ -246,6 +246,16 @@ export interface ScriptState {
   executing?: boolean;
 }
 
+export interface RunningScript {
+  scriptId: string;
+  profileId: string;
+  profileName: string;
+  startTime: number;
+  headless: boolean;
+  nftImage?: string; // Optional NFT image for display
+  scriptName?: string; // Optional script name for display
+}
+
 export interface LogEntry {
   id: string;
   timestamp: number;
