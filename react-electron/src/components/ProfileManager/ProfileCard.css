@@ -4,7 +4,7 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   border-radius: 12px;
-  padding: 16px;
+  padding: 24px;
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -37,7 +37,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
+  gap: 16px;
 }
 
 .profile-info h4 {
@@ -58,7 +59,9 @@
 
 .profile-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .telegram-badge {
@@ -66,8 +69,13 @@
   align-items: center;
   justify-content: center;
   margin-left: 8px;
-  font-size: 0.9rem;
-  opacity: 0.8;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-info);
+  color: var(--text-inverse);
+  opacity: 0.9;
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -85,28 +93,25 @@
 .build-query-btn,
 .edit-btn,
 .delete-btn {
-  background: none;
+  background: var(--btn-secondary-bg);
   border: 1px solid var(--border-primary);
-  color: var(--text-tertiary);
-  width: 28px;
-  height: 28px;
+  color: var(--btn-secondary-text);
+  padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .telegram-btn:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(102, 126, 234, 0.1) 0%,
-    rgba(118, 75, 162, 0.1) 100%
-  );
-  border-color: #667eea;
-  color: #667eea;
+  background: var(--bg-hover);
+  border-color: var(--accent-info);
+  color: var(--accent-info);
   transform: scale(1.05);
 }
 
@@ -129,15 +134,16 @@
 }
 
 .profile-card-content {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .profile-detail {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   font-size: 0.875rem;
+  gap: 16px;
 }
 
 .profile-detail:last-child {
@@ -175,10 +181,10 @@
 }
 
 .profile-card-footer {
-  padding-top: 12px;
+  padding-top: 16px;
   border-top: 1px solid var(--border-primary);
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-direction: column;
 }
 
@@ -249,19 +255,22 @@
 
 /* Cookie Collection Button */
 .collect-cookies-btn {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
-  border: none;
+  background: var(--accent-warning);
+  color: var(--text-inverse);
+  border: 1px solid var(--accent-warning);
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .collect-cookies-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.1);
 }
 
 .collect-cookies-btn:disabled {
@@ -271,11 +280,11 @@
 
 /* Cookie Collection Progress */
 .cookie-collection-progress {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-tertiary);
   padding: 20px;
   border-radius: 12px;
   margin: 16px 0;
-  border: 1px solid rgba(245, 87, 108, 0.3);
+  border: 1px solid var(--border-primary);
 }
 
 .cookie-collection-progress .progress-header {
@@ -287,46 +296,49 @@
 
 .cookie-collection-progress .progress-header h3 {
   margin: 0;
-  color: #f5576c;
+  color: var(--accent-warning);
   font-size: 16px;
   font-weight: 600;
 }
 
 .cookie-collection-progress .cancel-collection-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ff6b6b;
-  border: 1px solid #ff6b6b;
+  background: var(--btn-secondary-bg);
+  color: var(--accent-error);
+  border: 1px solid var(--accent-error);
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   transition: all 0.2s;
 }
 
 .cookie-collection-progress .cancel-collection-btn:hover {
-  background: rgba(255, 107, 107, 0.2);
+  background: var(--accent-error);
+  color: var(--text-inverse);
 }
 
 .progress-bar {
   width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  height: 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
   overflow: hidden;
   margin-bottom: 16px;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+  background: var(--accent-warning);
   transition: width 0.3s ease;
   border-radius: 4px;
-  box-shadow: 0 0 10px rgba(245, 87, 108, 0.5);
+  box-shadow: var(--shadow-sm);
 }
 
 .progress-info {
   font-size: 13px;
-  color: #b0b0b0;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -335,7 +347,8 @@
 }
 
 .progress-info strong {
-  color: #fff;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 /* Collapsible Sections */

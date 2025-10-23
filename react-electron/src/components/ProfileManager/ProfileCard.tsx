@@ -164,7 +164,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                   profile.telegram.botName || "Connected"
                 }`}
               >
-                🤖
+                TG
               </span>
             )}
           </h4>
@@ -176,7 +176,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             title="Collect cookies automatically"
             disabled={isCollectingCookies}
           >
-            🍪
+            Collect cookie
           </button>
           <button
             className="telegram-btn"
@@ -187,7 +187,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 : "Add Telegram Bot"
             }
           >
-            {profile.telegram?.connected ? "🤖✓" : "🤖+"}
+            {profile.telegram?.connected ? "Telegram notis ✓" : "Telegram notis"}
           </button>
           <button
             className="build-query-btn"
