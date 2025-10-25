@@ -1,6 +1,6 @@
-# Twitter Automation Platform
+# Social Automation Platform
 
-> **Secure platform for automated Twitter interactions with advanced anti-detection and multi-account management**
+> **Secure platform for automated interactions with advanced anti-detection and multi-account management**
 
 A full-stack application combining Electron desktop client with a secure Node.js backend server. This platform enables automated Twitter interactions through encrypted scripts that execute locally on user devices, providing scalability and security.
 
