@@ -15,12 +15,12 @@ This project consists of two main components working together:
 
 ### Key Capabilities
 
-- 🤖 **Automated Twitter Interactions** - Automatic replies to tweets with selected keywords
+- 🤖 **Automated Interactions** - Automatic replies to tweets with selected keywords
 - 🔐 **Secure Script Delivery** - Scripts encrypted and executed only in device memory
 - 🎭 **Advanced Anti-Detection System** - Browser fingerprinting, proxy rotation, and realistic behavior simulation
 - 🍪 **Automatic Cookie Collection** - Realistic browsing behavior for cookie warmup
-- 🔍 **Search Query Builder** - Visual interface for building complex Twitter search queries
-- 👥 **Multi-Account Support** - Run multiple Twitter accounts simultaneously in headless mode
+- 🔍 **Search Query Builder** - Visual interface for building complex search queries
+- 👥 **Multi-Account Support** - Run multiple accounts simultaneously in headless mode
 - 📱 **Notifications** - Real-time Discord and Telegram notifications
 - 📸 **Smart Screenshots** - Auto-adjusted height to capture full tweet content
 - 🔄 **Scalable Architecture** - Client-side execution reduces server load
@@ -59,7 +59,7 @@ Traditional automation platforms execute scripts on centralized servers, creatin
 **For Users:**
 - 🎯 Visual search query builder - no coding required
 - 🤖 Automated keyword replies
-- 👥 Unlimited Twitter accounts
+- 👥 Unlimited accounts
 - 🔒 Advanced anti-detection
 - 📸 Smart screenshots with auto-height
 - 📱 Discord/Telegram notifications
@@ -116,7 +116,7 @@ Twitter app/
 ### 🖥️ Desktop Client Features
 
 #### Profile Management
-- **Multi-Profile System** - Manage unlimited Twitter accounts with individual settings
+- **Multi-Profile System** - Manage unlimited accounts with individual settings
 - **Advanced Anti-Detection** - Browser fingerprint spoofing (Canvas, WebGL, User Agent, Screen Resolution)
 - **Proxy Support** - HTTP/HTTPS/SOCKS5 proxy with authentication per profile
 - **Cookie Management** - Import/export cookies, automatic cookie warmup
@@ -125,7 +125,7 @@ Twitter app/
 #### Automation
 - **Headless Mode** - Run multiple accounts simultaneously without UI
 - **Smart Screenshots** - Automatically adjusts viewport height to capture full tweets
-- **Search Query Builder** - Visual interface with 20+ filters for building complex Twitter searches
+- **Search Query Builder** - Visual interface with 20+ filters for building complex searches
 - **Real-Time Progress** - Live updates during script execution
 - **Error Handling** - Automatic retry and graceful failure recovery
 
@@ -157,11 +157,11 @@ Twitter app/
 - **Access Control** - NFT-based or subscription-based access
 - **Script Protection** - Proprietary logic never exposed to users
 
-#### Twitter Automation Scripts
+#### Automation Scripts
 - **Keyword Reply Bot** - Automatically reply to tweets containing selected keywords
-- **Search Monitoring** - Monitor Twitter search results in real-time
+- **Search Monitoring** - Monitor search results in real-time
 - **Tweet Interaction** - Like, retweet, quote tweet automation
-- **Rate Limiting** - Respect Twitter rate limits to avoid detection
+- **Rate Limiting** - Respect rate limits to avoid detection
 - **Context-Aware Replies** - Generate contextual responses based on tweet content
 
 #### Infrastructure
@@ -183,7 +183,7 @@ If you just want to use the platform:
 1. **Download** the latest release for your OS from the releases page
 2. **Install** the application
 3. **Run** the app and connect your wallet (if using NFT access)
-4. **Create profiles** for your Twitter accounts
+4. **Create profiles** for your accounts
 5. **Start automating!**
 
 ### For Developers
@@ -336,7 +336,7 @@ npm run build:linux
 ### Automation Workflow
 
 ```
-1. User creates Twitter profile in desktop app
+1. User creates profile in desktop app
    ↓
 2. Configures:
    - Proxy settings (optional)
@@ -345,7 +345,7 @@ npm run build:linux
    - Telegram/Discord notifications (optional)
    ↓
 3. Opens Search Query Builder
-   - Visual interface to build Twitter search queries
+   - Visual interface to build search queries
    - Selects keywords, filters, date ranges, etc.
    - Preview generated query
    ↓
@@ -357,7 +357,7 @@ npm run build:linux
 5. Starts automation script
    - Puppeteer launches browser with anti-detection
    - Applies fingerprint, proxy, cookies
-   - Executes Twitter search with built query
+   - Executes search with built query
    - Monitors results in real-time
    ↓
 6. Script performs actions
@@ -511,7 +511,7 @@ The platform delivers encrypted automation scripts that run locally on user devi
 ### Available Scripts
 
 #### Keyword Reply Bot
-Automatically monitors Twitter for tweets containing selected keywords and posts replies.
+Automatically monitors for tweets containing selected keywords and posts replies.
 
 **Features:**
 - Custom keyword lists (exact match, partial match, regex)
@@ -523,7 +523,7 @@ Automatically monitors Twitter for tweets containing selected keywords and posts
 - Discord/Telegram notifications
 
 #### Tweet Search Monitor
-Continuously monitors Twitter search results based on custom queries.
+Continuously monitors search results based on custom queries.
 
 **Features:**
 - Visual query builder with 20+ filters
@@ -548,7 +548,7 @@ Automatically collects realistic cookies for account warmup.
 
 ## 🔍 Search Query Builder
 
-Visual interface for building complex Twitter search queries without coding.
+Visual interface for building complex search queries without coding.
 
 ### Supported Filters
 
@@ -588,7 +588,7 @@ Visual interface for building complex Twitter search queries without coding.
 
 ### Query Preview
 
-Real-time preview of generated Twitter search query with syntax highlighting.
+Real-time preview of generated search query with syntax highlighting.
 
 ---
 
@@ -630,7 +630,7 @@ Real-time preview of generated Twitter search query with syntax highlighting.
 ## 💡 Use Cases
 
 ### 1. Marketing & Brand Monitoring
-- Monitor mentions of your brand on Twitter
+- Monitor mentions of your brand on 
 - Automatically respond to customer inquiries
 - Track competitor activity
 - Engage with relevant hashtags
@@ -877,7 +877,7 @@ This software is provided for educational and research purposes only. Users are 
 
 **Important Notes:**
 - Always use proxies and anti-detection features to protect your accounts
-- Respect Twitter's rate limits to avoid account suspension
+- Respect rate limits to avoid account suspension
 - Use realistic delays between actions
 - Start with cookie warmup before running automation scripts
 - Monitor your accounts regularly for any issues
