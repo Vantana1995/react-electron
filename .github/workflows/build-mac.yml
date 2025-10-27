@@ -47,8 +47,6 @@ jobs:
       # Step 3: Install dependencies
       - name: Install dependencies
         run: npm ci
-        env:
-          NODE_ENV: production
 
       # Step 4: Build application for macOS
       - name: Build Electron app for macOS
