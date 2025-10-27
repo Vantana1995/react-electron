@@ -4,4 +4,4 @@
 
 export { ProfileManager } from "./ProfileManager";
 export { ProfileCard } from "./ProfileCard";
-export { AddProfileModal } from "./AddProfileModal";
+export { ProfileFormPanel } from "./ProfileFormPanel";

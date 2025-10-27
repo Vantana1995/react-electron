@@ -36,6 +36,24 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [useDefaultSites, setUseDefaultSites] = useState(true);
   const [customSites, setCustomSites] = useState('');
 
+  // Telegram bot form state
+  const [telegramHttpApi, setTelegramHttpApi] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramBotName, setTelegramBotName] = useState('');
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramError, setTelegramError] = useState('');
+  const [telegramStep, setTelegramStep] = useState<'input' | 'connect' | 'test'>('input');
+
+  // Load existing Telegram config
+  useEffect(() => {
+    if (profile.telegram?.connected) {
+      setTelegramHttpApi(profile.telegram.httpApi);
+      setTelegramChatId(profile.telegram.chatId);
+      setTelegramBotName(profile.telegram.botName || '');
+      setTelegramStep('test');
+    }
+  }, [profile.telegram]);
+
   // Listen for cookie collection progress
   useEffect(() => {
     if (!isCollectingCookies) return;
@@ -151,6 +169,118 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     setCustomSites('');
   };
 
+  // Telegram bot handlers
+  const handleTestTelegramConnection = async () => {
+    setTelegramError('');
+    setTelegramLoading(true);
+
+    try {
+      if (!window.electronAPI?.testTelegramConnection) {
+        throw new Error('Telegram API not available');
+      }
+
+      const result = await window.electronAPI.testTelegramConnection(telegramHttpApi);
+
+      if (!result.success) {
+        setTelegramError(result.error || 'Connection test failed');
+        setTelegramLoading(false);
+        return;
+      }
+
+      if (result.botName) {
+        setTelegramBotName(result.botName);
+      }
+
+      if (result.chatId) {
+        setTelegramChatId(result.chatId);
+        setTelegramStep('test');
+      } else {
+        setTelegramError('Bot connected! Please send a message to your bot (e.g., /start), then click "Get Chat ID" below.');
+        setTelegramStep('connect');
+      }
+    } catch (err) {
+      setTelegramError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setTelegramLoading(false);
+    }
+  };
+
+  const handleGetTelegramChatId = async () => {
+    setTelegramError('');
+    setTelegramLoading(true);
+
+    try {
+      if (!window.electronAPI?.getTelegramChatId) {
+        throw new Error('Telegram API not available');
+      }
+
+      const result = await window.electronAPI.getTelegramChatId(telegramHttpApi);
+
+      if (!result.success) {
+        setTelegramError(result.error || 'Failed to get chat ID');
+        setTelegramLoading(false);
+        return;
+      }
+
+      if (result.chatId) {
+        setTelegramChatId(result.chatId);
+        setTelegramStep('test');
+      }
+    } catch (err) {
+      setTelegramError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setTelegramLoading(false);
+    }
+  };
+
+  const handleSendTelegramTest = async () => {
+    setTelegramError('');
+    setTelegramLoading(true);
+
+    try {
+      if (!window.electronAPI?.sendTelegramMessage) {
+        throw new Error('Telegram API not available');
+      }
+
+      const testMessage = `🤖 Test message from Twitter Automation Platform\nProfile: ${profile.name}\nTime: ${new Date().toLocaleString()}`;
+
+      const result = await window.electronAPI.sendTelegramMessage(telegramHttpApi, telegramChatId, testMessage);
+
+      if (!result.success) {
+        setTelegramError(result.error || 'Failed to send test message');
+      } else {
+        alert('✅ Test message sent successfully! Check your Telegram.');
+      }
+    } catch (err) {
+      setTelegramError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setTelegramLoading(false);
+    }
+  };
+
+  const handleSaveTelegramConfig = () => {
+    if (!telegramHttpApi || !telegramChatId) {
+      setTelegramError('Please complete the connection test first');
+      return;
+    }
+
+    const updatedProfile: UserProfile = {
+      ...profile,
+      telegram: {
+        httpApi: telegramHttpApi,
+        chatId: telegramChatId,
+        botName: telegramBotName,
+        connected: true,
+        connectedAt: Date.now(),
+      },
+      updatedAt: Date.now(),
+    };
+
+    onProfileUpdate?.(updatedProfile);
+    toggleSection('telegram-bot');
+    alert('✅ Telegram bot configuration saved!');
+  };
+
   const isCookieSectionExpanded = expandedSections.has('cookie-collection');
   const isTelegramSectionExpanded = expandedSections.has('telegram-bot');
 
@@ -216,6 +346,22 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             </div>
 
             <div className="profile-detail">
+              <label>Today's tweets:</label>
+              <span className={`tweets-info ${
+                profile.maxTweetsPerDay &&
+                profile.dailyStats &&
+                profile.dailyStats.tweetsProcessed >= profile.maxTweetsPerDay
+                  ? 'tweets-limit-reached'
+                  : ''
+              }`}>
+                {profile.dailyStats?.tweetsProcessed || 0}
+                {profile.maxTweetsPerDay && profile.maxTweetsPerDay > 0
+                  ? ` / ${profile.maxTweetsPerDay}`
+                  : ''}
+              </span>
+            </div>
+
+            <div className="profile-detail">
               <label>Created:</label>
               <span className="date-info">{formatDate(profile.createdAt)}</span>
             </div>
@@ -241,56 +387,29 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             <div className="actions-column">
               <h3>Profile Actions</h3>
 
-              <button
-                className="action-btn collect-cookies-btn"
-                onClick={() => toggleSection('cookie-collection')}
-                title="Collect cookies automatically"
-                disabled={isCollectingCookies}
-              >
-                Collect cookie
-              </button>
+              {/* Collect Cookies Action Item */}
+              <div className="action-item">
+                <button
+                  className="action-btn collect-cookies-btn"
+                  onClick={() => toggleSection('cookie-collection')}
+                  title="Collect cookies automatically"
+                  disabled={isCollectingCookies}
+                >
+                  Collect cookie
+                </button>
 
-              <button
-                className="action-btn telegram-btn"
-                onClick={() => toggleSection('telegram-bot')}
-                title={
-                  profile.telegram?.connected
-                    ? "Edit Telegram Bot"
-                    : "Add Telegram Bot"
-                }
-              >
-                {profile.telegram?.connected ? "Telegram notis ✓" : "Telegram notis"}
-              </button>
-
-              <button
-                className="action-btn build-query-btn"
-                onClick={() => onBuildQuery?.(profile)}
-                title="Build Search Query"
-              >
-                Build Search Query
-              </button>
-
-              <button
-                className="action-btn select-profile-btn"
-                onClick={() => onSelect?.(profile)}
-                title="Select this profile"
-              >
-                Select Profile
-              </button>
-
-              <button
-                className="action-btn clear-history-btn"
-                onClick={() => onClearHistory?.(profile)}
-                title="Clear processed tweets history"
-              >
-                Clear History
-              </button>
-
-              {/* Cookie Collection Section */}
-              {isCookieSectionExpanded && (
+                {/* Cookie Collection Section */}
+                {isCookieSectionExpanded && (
         <div className="profile-section cookie-section">
           <div className="section-header">
             <h3>Collect Cookies Automatically</h3>
+            <button
+              className="collapse-section-btn"
+              onClick={() => toggleSection('cookie-collection')}
+              title="Collapse section"
+            >
+              ✕
+            </button>
           </div>
 
           <div className="section-content">
@@ -403,67 +522,207 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         </div>
       )}
 
-      {/* Cookie Collection Progress */}
-      {isCollectingCookies && cookieProgress && (
-        <div className="cookie-collection-progress">
-          <div className="progress-header">
-            <h3>Collecting Cookies...</h3>
-            <button onClick={handleCancelCollection} className="cancel-collection-btn">
-              Cancel
-            </button>
-          </div>
+                {/* Cookie Collection Progress */}
+                {isCollectingCookies && cookieProgress && (
+                  <div className="cookie-collection-progress">
+                    <div className="progress-header">
+                      <h3>Collecting Cookies...</h3>
+                      <button onClick={handleCancelCollection} className="cancel-collection-btn">
+                        Cancel
+                      </button>
+                    </div>
 
-          <div className="progress-bar">
-            <div
-              className="progress-fill"
-              style={{ width: `${cookieProgress.percentage}%` }}
-            />
-          </div>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${cookieProgress.percentage}%` }}
+                      />
+                    </div>
 
-          <div className="progress-info">
-            <p>
-              <strong>{cookieProgress.currentSite}</strong>
-            </p>
-            <p>
-              Sites visited: {cookieProgress.sitesVisited}/{cookieProgress.totalSites}
-            </p>
-            <p>Cookies collected: <strong>{cookieProgress.cookiesCollected}</strong></p>
-            <p>
-              Estimated time: {formatTime(cookieProgress.estimatedTimeRemaining)}
-            </p>
-          </div>
-        </div>
-      )}
+                    <div className="progress-info">
+                      <p>
+                        <strong>{cookieProgress.currentSite}</strong>
+                      </p>
+                      <p>
+                        Sites visited: {cookieProgress.sitesVisited}/{cookieProgress.totalSites}
+                      </p>
+                      <p>Cookies collected: <strong>{cookieProgress.cookiesCollected}</strong></p>
+                      <p>
+                        Estimated time: {formatTime(cookieProgress.estimatedTimeRemaining)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-      {/* Telegram Bot Section */}
-      {isTelegramSectionExpanded && (
-        <div className="profile-section telegram-section">
-          <div className="section-header">
-            <h3>
-              {profile.telegram?.connected ? 'Edit Telegram Bot' : 'Add Telegram Bot'}
-            </h3>
-          </div>
+              {/* Telegram Action Item */}
+              <div className="action-item">
+                <button
+                  className="action-btn telegram-btn"
+                  onClick={() => toggleSection('telegram-bot')}
+                  title={
+                    profile.telegram?.connected
+                      ? "Edit Telegram Bot"
+                      : "Add Telegram Bot"
+                  }
+                >
+                  {profile.telegram?.connected ? "Telegram notis ✓" : "Telegram notis"}
+                </button>
 
-          <div className="section-content">
-            <p className="section-description">
-              Configure Telegram bot notifications for this profile.
-              Click the button below to open the full configuration.
-            </p>
+                {/* Telegram Bot Section */}
+                {isTelegramSectionExpanded && (
+                  <div className="profile-section telegram-section">
+                    <div className="section-header">
+                      <h3>🤖 {profile.telegram?.connected ? 'Edit Telegram Bot' : 'Add Telegram Bot'}</h3>
+                      <button
+                        className="collapse-section-btn"
+                        onClick={() => toggleSection('telegram-bot')}
+                        title="Collapse section"
+                      >
+                        ✕
+                      </button>
+                    </div>
 
-            <div className="section-actions">
+                    <div className="section-content">
+                      {/* Step 1: Input HTTP API */}
+                      {telegramStep === 'input' && (
+                        <>
+                          <div className="telegram-instructions">
+                            <p><strong>How to get your Bot Token:</strong></p>
+                            <ol>
+                              <li>Open Telegram and search for <code>@BotFather</code></li>
+                              <li>Send <code>/newbot</code> and follow instructions</li>
+                              <li>Copy the HTTP API token provided by BotFather</li>
+                            </ol>
+                          </div>
+
+                          <div className="form-group">
+                            <label htmlFor={`telegram-api-${profile.id}`}>Bot HTTP API Token</label>
+                            <input
+                              id={`telegram-api-${profile.id}`}
+                              type="text"
+                              className="telegram-input"
+                              value={telegramHttpApi}
+                              onChange={(e) => setTelegramHttpApi(e.target.value)}
+                              placeholder="bot123456:ABC-DEF1234ghIkl..."
+                              disabled={telegramLoading}
+                            />
+                            <p className="form-hint">Format: bot[numbers]:[alphanumeric]</p>
+                          </div>
+
+                          {telegramError && <div className="telegram-error">{telegramError}</div>}
+
+                          <div className="section-actions">
+                            <button
+                              className="btn btn-primary"
+                              onClick={handleTestTelegramConnection}
+                              disabled={!telegramHttpApi || telegramLoading}
+                            >
+                              {telegramLoading ? 'Testing...' : 'Test Connection →'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Step 2: Get Chat ID */}
+                      {telegramStep === 'connect' && (
+                        <>
+                          <p><strong>Bot connected: {telegramBotName}</strong></p>
+                          <div className="telegram-instructions">
+                            <p><strong>Next step:</strong></p>
+                            <ol>
+                              <li>Find your bot in Telegram: @{telegramBotName}</li>
+                              <li>Send any message (e.g., <code>/start</code>)</li>
+                              <li>Click the button below to get your Chat ID</li>
+                            </ol>
+                          </div>
+
+                          {telegramError && <div className="telegram-error">{telegramError}</div>}
+
+                          <div className="section-actions">
+                            <button
+                              className="btn btn-secondary"
+                              onClick={() => setTelegramStep('input')}
+                            >
+                              ← Back
+                            </button>
+                            <button
+                              className="btn btn-primary"
+                              onClick={handleGetTelegramChatId}
+                              disabled={telegramLoading}
+                            >
+                              {telegramLoading ? 'Fetching...' : 'Get Chat ID'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Step 3: Test & Save */}
+                      {telegramStep === 'test' && (
+                        <>
+                          <div className="telegram-config-summary">
+                            <div className="config-item">
+                              <span className="config-label">Bot Name:</span>
+                              <span className="config-value">{telegramBotName || 'Unknown'}</span>
+                            </div>
+                            <div className="config-item">
+                              <span className="config-label">Chat ID:</span>
+                              <span className="config-value">{telegramChatId}</span>
+                            </div>
+                          </div>
+
+                          <div className="telegram-test-section">
+                            <p><strong>Send a test message to verify:</strong></p>
+                            <button
+                              className="btn btn-test"
+                              onClick={handleSendTelegramTest}
+                              disabled={telegramLoading}
+                            >
+                              {telegramLoading ? 'Sending...' : 'Send Test Message'}
+                            </button>
+                          </div>
+
+                          {telegramError && <div className="telegram-error">{telegramError}</div>}
+
+                          <div className="section-actions">
+                            <button
+                              className="btn btn-secondary"
+                              onClick={() => setTelegramStep('input')}
+                            >
+                              ← Start Over
+                            </button>
+                            <button
+                              className="btn btn-primary"
+                              onClick={handleSaveTelegramConfig}
+                              disabled={telegramLoading}
+                            >
+                              Save Configuration
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Build Query Button */}
               <button
-                className="btn btn-primary"
-                onClick={() => {
-                  toggleSection('telegram-bot');
-                  onAddTelegramBot?.(profile);
-                }}
+                className="action-btn build-query-btn"
+                onClick={() => onBuildQuery?.(profile)}
+                title="Build Search Query"
               >
-                {profile.telegram?.connected ? 'Edit Bot Configuration' : 'Configure Telegram Bot'}
+                Build Search Query
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+
+              {/* Clear History Button */}
+              <button
+                className="action-btn clear-history-btn"
+                onClick={() => onClearHistory?.(profile)}
+                title="Clear processed tweets history"
+              >
+                Clear History
+              </button>
             </div>
           </div>
         </div>

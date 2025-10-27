@@ -61,11 +61,11 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     name: "Exclude words (NOT)",
     category: "basic",
     syntax: "-word",
-    description: "Exclude posts containing these words",
-    example: "-scam -spam",
+    description: "Exclude posts containing these words (minus automatically added)",
+    example: "scam spam",
     inputType: "tags",
-    placeholder: "Words to exclude...",
-    tooltip: "Posts will NOT contain any of these words",
+    placeholder: "Enter words to exclude...",
+    tooltip: "Posts will NOT contain any of these words. Just type the words, minus sign will be added automatically",
   },
 
   // ==================== ACCOUNT OPERATORS ====================

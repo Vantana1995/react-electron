@@ -466,6 +466,12 @@ export interface ProxyLocation {
   countryName: string;  // United States, United Kingdom
 }
 
+export interface DailyStats {
+  date: string; // "2025-10-26" (YYYY-MM-DD)
+  tweetsProcessed: number; // Number of tweets processed today
+  lastReset: number; // Timestamp of last reset
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -478,6 +484,10 @@ export interface UserProfile {
   createdAt: number;
   updatedAt: number;
   isActive: boolean;
+
+  // Daily statistics and limits
+  dailyStats?: DailyStats; // Statistics for today
+  maxTweetsPerDay?: number; // Maximum tweets to process per day (0 = unlimited)
 }
 
 export interface ProfileState {
@@ -486,16 +496,6 @@ export interface ProfileState {
   showAddModal: boolean;
   maxProfiles: number;
   runningScripts: string[]; // Array of profile IDs that have running scripts
-}
-
-export interface AddProfileModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (
-    profile: Omit<UserProfile, "id" | "createdAt" | "updatedAt" | "isActive">
-  ) => void;
-  existingProfiles: UserProfile[];
-  editingProfile?: UserProfile;
 }
 
 export interface ProfileCardProps {

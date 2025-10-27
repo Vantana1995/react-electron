@@ -1,12 +1,12 @@
 import "electron";
 import "node:url";
 import "node:path";
-import { M, R, V } from "./main-BT3pcwxH.js";
+import { M as _, R as D, V as I } from "./main-Cb1ib_Os.js";
 import "child_process";
 import "fs";
 import "os";
 export {
-  M as MAIN_DIST,
-  R as RENDERER_DIST,
-  V as VITE_DEV_SERVER_URL
+  _ as MAIN_DIST,
+  D as RENDERER_DIST,
+  I as VITE_DEV_SERVER_URL
 };

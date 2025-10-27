@@ -11,7 +11,7 @@ import {
   TelegramBotConfig,
 } from "../../types";
 import { ProfileCard } from "./ProfileCard";
-import { AddProfileModal } from "./AddProfileModal";
+import { ProfileFormPanel } from "./ProfileFormPanel";
 import { AddTelegramBotModal } from "./AddTelegramBotModal";
 import "./ProfileManager.css";
 
@@ -27,7 +27,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
   onClearHistory,
   onAddTelegramBot,
 }) => {
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showFormPanel, setShowFormPanel] = useState(false);
   const [editingProfile, setEditingProfile] = useState<
     UserProfile | undefined
   >();
@@ -38,12 +38,12 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
 
   const handleAddProfile = () => {
     setEditingProfile(undefined);
-    setShowAddModal(true);
+    setShowFormPanel(true);
   };
 
   const handleEditProfile = (profile: UserProfile) => {
     setEditingProfile(profile);
-    setShowAddModal(true);
+    setShowFormPanel(true);
   };
 
   const handleBuildQuery = (profile: UserProfile) => {
@@ -78,7 +78,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
       // Create new profile
       onProfileCreate(profileData);
     }
-    setShowAddModal(false);
+    setShowFormPanel(false);
     setEditingProfile(undefined);
   };
 
@@ -138,9 +138,21 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
 
       <div className="profile-manager-actions">
         <button className="add-profile-btn" onClick={handleAddProfile}>
-          + Add Profile
+          {showFormPanel ? "− Hide Form" : "+ Add Profile"}
         </button>
       </div>
+
+      {/* Profile Form Panel */}
+      <ProfileFormPanel
+        isOpen={showFormPanel}
+        onClose={() => {
+          setShowFormPanel(false);
+          setEditingProfile(undefined);
+        }}
+        onSave={handleSaveProfile}
+        existingProfiles={profiles}
+        editingProfile={editingProfile}
+      />
 
       <div className="profiles-grid">
         {profiles.length === 0 ? (
@@ -171,17 +183,6 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
           ))
         )}
       </div>
-
-      <AddProfileModal
-        isOpen={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          setEditingProfile(undefined);
-        }}
-        onSave={handleSaveProfile}
-        existingProfiles={profiles}
-        editingProfile={editingProfile}
-      />
 
       {telegramProfile && (
         <AddTelegramBotModal

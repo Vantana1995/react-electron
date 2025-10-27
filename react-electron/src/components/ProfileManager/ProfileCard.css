@@ -138,10 +138,26 @@
   }
 }
 
-.telegram-btn,
 .build-query-btn,
 .edit-btn,
 .delete-btn {
+  background: var(--btn-secondary-bg);
+  border: 1px solid var(--border-primary);
+  color: var(--btn-secondary-text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Telegram Button - same size as Collect Cookies */
+.telegram-btn {
   background: var(--btn-secondary-bg);
   border: 1px solid var(--border-primary);
   color: var(--btn-secondary-text);
@@ -224,6 +240,15 @@
   color: var(--accent-info) !important;
 }
 
+.tweets-info {
+  color: var(--accent-success) !important;
+  font-weight: 600;
+}
+
+.tweets-info.tweets-limit-reached {
+  color: var(--accent-error) !important;
+}
+
 .date-info {
   color: var(--text-tertiary) !important;
   font-size: 0.8rem !important;
@@ -282,6 +307,14 @@
   border-bottom: 2px solid var(--border-primary);
 }
 
+/* Action Items - containers for buttons with expandable sections */
+.actions-column .action-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
 /* Actions Column Buttons */
 .actions-column .action-btn {
   width: 100%;
@@ -308,13 +341,26 @@
   cursor: not-allowed;
 }
 
+/* Standalone buttons (not in action-item) also need spacing */
+.actions-column > .action-btn {
+  margin-bottom: 12px;
+}
+
 /* Expanded view sections */
 .profile-card-expanded .profile-section {
-  margin-top: 12px;
+  margin-top: 0;
   background: var(--bg-tertiary);
-  border-radius: 8px;
+  border-radius: 0 0 8px 8px;
   padding: 16px;
   border: 1px solid var(--border-primary);
+  border-top: none;
+}
+
+/* Sections inside action-item */
+.action-item .profile-section {
+  margin-top: 0;
+  border-radius: 0 0 6px 6px;
+  border-top: none;
 }
 
 .profile-card-footer {
@@ -358,37 +404,6 @@
   color: var(--text-inverse);
 }
 
-.select-profile-btn {
-  width: 100%;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  border: 1px solid var(--border-primary);
-  background: var(--btn-secondary-bg);
-  color: var(--btn-secondary-text);
-}
-
-.select-profile-btn:hover:not(:disabled) {
-  background: var(--btn-secondary-hover);
-  border-color: var(--border-focus);
-}
-
-.select-profile-btn.selected {
-  background: var(--bg-hover);
-  border-color: var(--accent-success);
-  color: var(--accent-success);
-  cursor: default;
-}
-
-.select-profile-btn:disabled {
-  cursor: default;
-  opacity: 0.5;
-  background: var(--bg-secondary);
-  color: var(--text-muted);
-}
 
 /* Cookie Collection Button */
 .collect-cookies-btn {
@@ -401,7 +416,8 @@
   font-size: 0.85rem;
   font-weight: 500;
   transition: all 0.2s ease;
-  white-space: nowrap;
+  text-align: center;
+  justify-content: center;
 }
 
 .collect-cookies-btn:hover:not(:disabled) {
@@ -514,12 +530,37 @@
   color: var(--text-inverse);
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .profile-section .section-header h3 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
+  flex: 1;
+}
+
+.profile-section .collapse-section-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-inverse);
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-section .collapse-section-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
 }
 
 .profile-section .section-content {
@@ -705,4 +746,136 @@
 .clear-history-btn:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+/* Telegram Section Styles */
+.telegram-section .telegram-instructions {
+  background: var(--bg-hover);
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.telegram-section .telegram-instructions p {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.telegram-section .telegram-instructions ol {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  list-style-type: decimal;
+}
+
+.telegram-section .telegram-instructions li {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.telegram-section .telegram-instructions code {
+  background: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+  color: var(--accent-primary);
+  font-size: 0.85rem;
+}
+
+.telegram-section .telegram-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+}
+
+.telegram-section .telegram-input:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.telegram-section .telegram-error {
+  padding: 10px 12px;
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-error);
+  border-radius: 6px;
+  color: var(--accent-error);
+  font-size: 0.85rem;
+  margin-top: 12px;
+  line-height: 1.4;
+}
+
+.telegram-section .telegram-config-summary {
+  background: var(--bg-hover);
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.telegram-section .config-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.telegram-section .config-item:last-child {
+  margin-bottom: 0;
+}
+
+.telegram-section .config-label {
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.telegram-section .config-value {
+  color: var(--text-primary);
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.telegram-section .telegram-test-section {
+  margin-bottom: 16px;
+}
+
+.telegram-section .telegram-test-section p {
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.telegram-section .btn-test {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--accent-info);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.telegram-section .btn-test:hover:not(:disabled) {
+  background: var(--accent-info);
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.telegram-section .btn-test:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

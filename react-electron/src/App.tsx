@@ -1091,6 +1091,7 @@ const AppContent: React.FC = () => {
                     navigationUrl={navigationUrl}
                     onNavigationUrlChange={handleNavigationUrlChange}
                     onOpenSearchBuilder={handleOpenSearchBuilder}
+                    onProfileUpdate={handleProfileUpdate}
                     onRunningScriptsUpdate={handleRunningScriptsUpdate(
                       pair.script.id
                     )}
@@ -1116,6 +1117,7 @@ const AppContent: React.FC = () => {
                   navigationUrl={navigationUrl}
                   onNavigationUrlChange={handleNavigationUrlChange}
                   onOpenSearchBuilder={handleOpenSearchBuilder}
+                  onProfileUpdate={handleProfileUpdate}
                   onRunningScriptsUpdate={handleRunningScriptsUpdate(
                     "legacy-nft"
                   )}
@@ -1133,6 +1135,7 @@ const AppContent: React.FC = () => {
                   navigationUrl={navigationUrl}
                   onNavigationUrlChange={handleNavigationUrlChange}
                   onOpenSearchBuilder={handleOpenSearchBuilder}
+                  onProfileUpdate={handleProfileUpdate}
                   onRunningScriptsUpdate={handleRunningScriptsUpdate(
                     currentScript.id || "legacy-script"
                   )}

@@ -36,6 +36,7 @@ interface NFTDisplayProps {
     headless: boolean
   ) => void;
   onProfileActivate?: (profileId: string) => Promise<void>;
+  onProfileUpdate?: (profile: UserProfile) => Promise<void>;
   navigationUrl?: string;
   onNavigationUrlChange?: (url: string) => void;
   onOpenSearchBuilder?: () => void;
@@ -54,6 +55,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
   runningScripts: globalRunningScripts = [],
   onScriptExecute,
   onProfileActivate,
+  onProfileUpdate,
   navigationUrl: externalNavigationUrl = "",
   onNavigationUrlChange,
   onOpenSearchBuilder,
@@ -229,7 +231,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       }
     };
 
-    const handleScriptFinished = (data: any) => {
+    const handleScriptFinished = async (data: any) => {
 
       setRunningScripts((prev) =>
         prev.filter((s) => s.scriptId !== data.scriptId)
@@ -238,7 +240,30 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
       if (data.scriptId === runningScriptId) {
         setIsExecuting(false);
         setRunningScriptId(null);
-        const message = data.success
+
+        // Update daily stats if returned from script
+        if (data.result?.dailyStats && selectedProfile) {
+          try {
+            const { profileStorage } = await import('../../services/profileStorage');
+            const updatedProfile = await profileStorage.updateDailyStats(
+              selectedProfile.id,
+              data.result.dailyStats
+            );
+            // Update local state to reflect new stats
+            setSelectedProfile(updatedProfile);
+            // Update parent component with new stats
+            if (onProfileUpdate) {
+              await onProfileUpdate(updatedProfile);
+            }
+            console.log('📊 Daily stats updated:', data.result.dailyStats);
+          } catch (error) {
+            console.error('Failed to update daily stats:', error);
+          }
+        }
+
+        const message = data.result?.limitReached
+          ? `🎯 Daily limit reached: ${data.result.dailyStats?.tweetsProcessed}/${data.result.dailyStats ? (selectedProfile?.maxTweetsPerDay || 0) : 0} tweets`
+          : data.success
           ? "✅ Script completed"
           : "❌ Script failed";
         setScriptLogs((prev) => [...prev, message]);
@@ -276,6 +301,14 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
 
   const handleExecuteScript = async () => {
     if ((!nft && !scriptData) || !selectedProfile) return;
+
+    // Check daily limit before execution
+    if (!canRunScript()) {
+      alert(
+        `Cannot start script: Daily limit of ${selectedProfile.maxTweetsPerDay} tweets has been reached. The counter will reset tomorrow.`
+      );
+      return;
+    }
 
     // Check if script is already running with this profile
     const profileAlreadyRunning = runningScripts.some(
@@ -410,6 +443,7 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
             navigationUrl: navigationUrl || externalNavigationUrl,
             commentTemplates: commentTemplatesArray,
             delayBetweenActions: delayBetweenActions * 1000, // Convert seconds to milliseconds
+            maxTweetsPerDay: selectedProfile.maxTweetsPerDay || 0, // Daily limit
           },
           nftData: nft || undefined,
         });
@@ -485,6 +519,37 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
     } catch (error) {
       console.error("❌ Failed to stop script:", error);
     }
+  };
+
+  /**
+   * Check if script can run based on daily limit
+   */
+  const canRunScript = (): boolean => {
+    if (!selectedProfile) return false;
+
+    // If no daily limit is set (0 or undefined), allow execution
+    const dailyLimit = selectedProfile.maxTweetsPerDay || 0;
+    if (dailyLimit === 0) return true;
+
+    // If no daily stats exist yet, allow execution
+    if (!selectedProfile.dailyStats) return true;
+
+    // Check if it's a new day (auto-reset happens in backend, but double-check here)
+    const today = new Date().toISOString().split('T')[0];
+    if (selectedProfile.dailyStats.date !== today) return true;
+
+    // Check if limit has been reached
+    return selectedProfile.dailyStats.tweetsProcessed < dailyLimit;
+  };
+
+  /**
+   * Get button text based on daily limit status
+   */
+  const getExecuteButtonText = (): string => {
+    if (!canRunScript() && selectedProfile?.maxTweetsPerDay) {
+      return "Daily Limit Reached";
+    }
+    return t("nft.execute");
   };
 
   const handleAddRegexTag = () => {
@@ -802,6 +867,41 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
                       />
                     </div>
 
+                    <div className="control-section">
+                      <label>Max tweets per day (0 = unlimited):</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10000"
+                        step="50"
+                        value={selectedProfile?.maxTweetsPerDay || 0}
+                        onChange={async (e) => {
+                          const newLimit = parseInt(e.target.value) || 0;
+                          if (selectedProfile) {
+                            // Update profile with new limit
+                            const updatedProfile = {
+                              ...selectedProfile,
+                              maxTweetsPerDay: newLimit,
+                              updatedAt: Date.now()
+                            };
+                            // Update local state immediately for responsive UI
+                            setSelectedProfile(updatedProfile);
+                            // Update parent component and persist to storage
+                            if (onProfileUpdate) {
+                              await onProfileUpdate(updatedProfile);
+                            }
+                          }
+                        }}
+                        className="number-input"
+                        placeholder="0 = unlimited"
+                      />
+                      {selectedProfile?.dailyStats && (
+                        <p className="limit-info">
+                          Today: {selectedProfile.dailyStats.tweetsProcessed} / {selectedProfile.maxTweetsPerDay || '∞'}
+                        </p>
+                      )}
+                    </div>
+
                     {/* Execute/Stop Buttons */}
                     <div className="control-section">
                       {!isExecuting ? (
@@ -810,11 +910,12 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
                           onClick={handleExecuteScript}
                           disabled={
                             !selectedProfile ||
+                            !canRunScript() ||
                             globalRunningScripts.length >=
                               (scriptMaxProfiles || maxProfiles || 1)
                           }
                         >
-                          {t("nft.execute")}
+                          {getExecuteButtonText()}
                         </button>
                       ) : (
                         <div className="executing-controls">

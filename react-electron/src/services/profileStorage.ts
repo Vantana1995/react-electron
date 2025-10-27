@@ -403,6 +403,44 @@ class ProfileStorageService {
   }
 
   /**
+   * Update daily statistics for a profile
+   */
+  async updateDailyStats(profileId: string, dailyStats: import("../types").DailyStats): Promise<UserProfile> {
+    const profiles = await this.getProfiles();
+    const profileIndex = profiles.findIndex(p => p.id === profileId);
+
+    if (profileIndex === -1) {
+      throw new Error("Profile not found");
+    }
+
+    const updatedProfile = {
+      ...profiles[profileIndex],
+      dailyStats,
+      updatedAt: Date.now()
+    };
+
+    profiles[profileIndex] = updatedProfile;
+    await this.saveProfiles(profiles);
+
+    console.log(`📊 Updated daily stats for ${updatedProfile.name}: ${dailyStats.tweetsProcessed} tweets on ${dailyStats.date}`);
+    return updatedProfile;
+  }
+
+  /**
+   * Reset daily counter for a profile (manual reset)
+   */
+  async resetDailyCounter(profileId: string): Promise<UserProfile> {
+    const today = new Date().toISOString().split('T')[0];
+    const dailyStats = {
+      date: today,
+      tweetsProcessed: 0,
+      lastReset: Date.now()
+    };
+
+    return await this.updateDailyStats(profileId, dailyStats);
+  }
+
+  /**
    * Save profiles array to local storage
    */
   private async saveProfiles(profiles: UserProfile[]): Promise<void> {
