@@ -1,0 +1,103 @@
+name: Build macOS Application
+
+# Triggers for workflow execution
+on:
+  # Manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      upload_release:
+        description: 'Upload to GitHub Releases'
+        required: false
+        default: false
+        type: boolean
+
+  # Auto-trigger on push to main (optional - you can comment this out)
+  push:
+    branches: [ main ]
+    paths:
+      - 'react-electron/**'
+      - '.github/workflows/build-mac.yml'
+
+# Workflow configuration
+jobs:
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-15  # Latest macOS runner
+    timeout-minutes: 30  # Prevent hanging builds
+
+    defaults:
+      run:
+        working-directory: react-electron
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # Shallow clone for speed
+
+      # Step 2: Setup Node.js
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: react-electron/package-lock.json
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_ENV: production
+
+      # Step 4: Build application for macOS
+      - name: Build Electron app for macOS
+        run: npm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
+
+      # Step 5: List built files
+      - name: Show build results
+        run: |
+          echo "Build completed successfully!"
+          echo "Files in release directory:"
+          ls -lh release/*/
+          echo ""
+          echo "DMG files:"
+          find release -name "*.dmg" -exec ls -lh {} \;
+
+      # Step 6: Upload DMG as artifact
+      - name: Upload macOS DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app-${{ github.sha }}
+          path: react-electron/release/**/*.dmg
+          retention-days: 30
+          if-no-files-found: error
+
+      # Step 7: Upload to GitHub Releases (optional)
+      - name: Upload to GitHub Releases
+        if: github.event.inputs.upload_release == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: react-electron/release/**/*.dmg
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 8: Summary
+      - name: Build summary
+        run: |
+          echo "### Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Success ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform:** macOS (x64 + arm64)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format:** DMG" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node.js:** $(node --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Electron:** $(npm list electron --depth=0 | grep electron)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the DMG from Artifacts section above." >> $GITHUB_STEP_SUMMARY
