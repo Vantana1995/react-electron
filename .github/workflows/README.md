@@ -1,8 +1,8 @@
 # GitHub Actions Workflows
 
-## Build macOS Application
+## Build EchoX for macOS
 
-Автоматическая сборка macOS версии приложения с использованием GitHub Actions.
+Автоматическая сборка macOS версии EchoX с использованием GitHub Actions.
 
 ### Как запустить сборку вручную:
 
@@ -11,7 +11,7 @@
    https://github.com/Vantana1995/react-electron/actions
    ```
 
-2. Выберите workflow "Build macOS Application" в левом меню
+2. Выберите workflow "Build EchoX for macOS" в левом меню
 
 3. Нажмите кнопку **"Run workflow"** справа
 
@@ -29,7 +29,7 @@
 
 3. Пролистайте вниз до секции **"Artifacts"**
 
-4. Скачайте `macos-app-xxxxx.zip`
+4. Скачайте `echox-macos-xxxxx.zip`
 
 5. Разархивируйте ZIP - внутри готовый `.dmg` файл
 

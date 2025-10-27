@@ -13,7 +13,6 @@ react-electron/dist-electron/
 backend/nul
 *.log
 .claude
-.cursor
 .vscode
 
 SCRIPT_UPLOAD_GUIDE.md

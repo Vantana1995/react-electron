@@ -1,8 +1,8 @@
 {
-  "name": "twitter-automation-platform-react-ts",
+  "name": "echox",
   "private": true,
   "version": "1.0.0",
-  "description": "Twitter Automation Platform - React + TypeScript + Electron",
+  "description": "EchoX - React + TypeScript + Electron",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -54,12 +54,12 @@
   },
   "main": "dist-electron/main.js",
   "homepage": "./",
-  "author": "Social Automation Platform",
+  "author": "EchoX",
   "license": "MIT",
   "build": {
-    "appId": "com.local.socialautomation",
+    "appId": "com.local.echox",
     "asar": true,
-    "productName": "Social Automation Platform",
+    "productName": "EchoX",
     "directories": {
       "output": "release/${version}",
       "buildResources": "build"

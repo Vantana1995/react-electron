@@ -1,4 +1,4 @@
-name: Build macOS Application
+name: Build EchoX for macOS
 
 # Triggers for workflow execution
 on:
@@ -6,24 +6,24 @@ on:
   workflow_dispatch:
     inputs:
       upload_release:
-        description: 'Upload to GitHub Releases'
+        description: "Upload to GitHub Releases"
         required: false
         default: false
         type: boolean
 
   # Auto-trigger on push to main (optional - you can comment this out)
-  push:
-    branches: [ main ]
-    paths:
-      - 'react-electron/**'
-      - '.github/workflows/build-mac.yml'
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'react-electron/**'
+  #     - '.github/workflows/build-mac.yml'
 
 # Workflow configuration
 jobs:
   build-macos:
-    name: Build macOS DMG
-    runs-on: macos-15  # Latest macOS runner
-    timeout-minutes: 30  # Prevent hanging builds
+    name: Build EchoX DMG
+    runs-on: macos-15 # Latest macOS runner
+    timeout-minutes: 30 # Prevent hanging builds
 
     defaults:
       run:
@@ -34,14 +34,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1  # Shallow clone for speed
+          fetch-depth: 1 # Shallow clone for speed
 
       # Step 2: Setup Node.js
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: react-electron/package-lock.json
 
       # Step 3: Install dependencies
@@ -68,10 +68,10 @@ jobs:
           find release -name "*.dmg" -exec ls -lh {} \;
 
       # Step 6: Upload DMG as artifact
-      - name: Upload macOS DMG artifact
+      - name: Upload EchoX DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-app-${{ github.sha }}
+          name: echox-macos-${{ github.sha }}
           path: react-electron/release/**/*.dmg
           retention-days: 30
           if-no-files-found: error

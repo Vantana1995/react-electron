@@ -1,5 +1,5 @@
 /**
- * Social Automation Platform - Electron Main Process
+ * EchoX - Electron Main Process
  * TypeScript version with Puppeteer script execution support
  */
 
@@ -333,7 +333,7 @@ function createWindow() {
       backgroundThrottling: false,
     },
     icon: path.join(__dirname, "..", "src", "assets", "logo.png"),
-    title: "Social manager Automation Platform",
+    title: "EchoX",
   });
 
   // Load the app
@@ -643,7 +643,7 @@ ipcMain.handle("execute-script", async (_event, params) => {
     );
 
     const tmpDir = os.tmpdir();
-    const scriptsDir = path.join(tmpDir, "twitter-app-scripts");
+    const scriptsDir = path.join(tmpDir, "echox-scripts");
     if (!fs.existsSync(scriptsDir)) {
       fs.mkdirSync(scriptsDir, { recursive: true });
     }
