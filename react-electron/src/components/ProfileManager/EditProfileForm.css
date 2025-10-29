@@ -148,3 +148,32 @@
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }
+
+/* No Proxy Info Section */
+.no-proxy-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-hover);
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+}
+
+.no-proxy-info .no-proxy-badge {
+  background-color: #4CAF50;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: inline-block;
+  width: fit-content;
+}
+
+.no-proxy-info p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}

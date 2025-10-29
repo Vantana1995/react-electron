@@ -24,6 +24,62 @@ export interface ProxyLocation {
 }
 
 /**
+ * Device parameters detected from user's real device
+ */
+export interface DeviceParams {
+  timezone: string;
+  languages: string[];
+  screenWidth: number;
+  screenHeight: number;
+  colorDepth: number;
+}
+
+/**
+ * Detects real device parameters (for no-proxy mode)
+ * Uses browser APIs to get actual device settings
+ * @returns DeviceParams object with real device data
+ */
+export function getDeviceParameters(): DeviceParams {
+  try {
+    // Get timezone from browser
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Get languages from browser
+    const languages = navigator.languages ? Array.from(navigator.languages) : ['en-US', 'en'];
+
+    // Get screen parameters
+    const screenWidth = window.screen.width;
+    const screenHeight = window.screen.height;
+    const colorDepth = window.screen.colorDepth;
+
+    console.log(`[DEVICE] Detected parameters:`, {
+      timezone,
+      languages,
+      screen: `${screenWidth}x${screenHeight}`,
+      colorDepth
+    });
+
+    return {
+      timezone,
+      languages,
+      screenWidth,
+      screenHeight,
+      colorDepth
+    };
+  } catch (error) {
+    console.error(`[DEVICE] Failed to detect parameters:`, error);
+    // Fallback to defaults
+    return {
+      timezone: 'America/New_York',
+      languages: ['en-US', 'en'],
+      screenWidth: 1920,
+      screenHeight: 1080,
+      colorDepth: 24
+    };
+  }
+}
+
+/**
  * Seeded random generator for consistent fingerprints
  * Same seed (profileId) = same "random" values every time
  */
@@ -44,17 +100,22 @@ function seededRandom(seed: string): () => number {
 /**
  * Generates unique fingerprint for a profile
  * @param profileId - Profile ID for seeded randomness (ensures consistency)
- * @param proxyCountry - Country code from proxy (US, GB, DE, etc.)
- * @param timezone - Timezone from proxy location
+ * @param proxyCountry - Country code from proxy (US, GB, DE, etc.) or null for device mode
+ * @param timezone - Timezone from proxy location or null for device mode
+ * @param deviceParams - Optional real device parameters (for no-proxy mode)
  * @returns Fingerprint object
  */
 export function generateFingerprint(
   profileId: string,
-  proxyCountry: string = 'US',
-  timezone: string = 'America/New_York'
+  proxyCountry: string | null = 'US',
+  timezone: string | null = 'America/New_York',
+  deviceParams?: DeviceParams
 ): Fingerprint {
   // Seeded random for consistency
   const random = seededRandom(profileId);
+
+  // Determine if using device parameters
+  const useDeviceParams = deviceParams !== undefined;
 
   // WebGL vendors/renderers (REAL GPU combinations)
   const webglOptions = [
@@ -131,15 +192,51 @@ export function generateFingerprint(
   const windowsVersions = ['10.0', '11.0'];
 
   // Select random values (but consistent for same profileId)
-  const webgl = webglOptions[Math.floor(random() * webglOptions.length)];
-  const selectedScreen = screens[Math.floor(random() * screens.length)];
-  const platform = platforms[Math.floor(random() * platforms.length)];
+  // Add safety checks for array access
+  const webglIndex = Math.floor(random() * webglOptions.length);
+  let webgl = webglOptions[webglIndex];
+
+  // Validate webgl was selected correctly, use fallback if needed
+  if (!webgl || !webgl.vendor || !webgl.renderer) {
+    console.warn('[FINGERPRINT] WebGL selection failed, using fallback');
+    // Fallback to a common Intel GPU
+    webgl = { vendor: 'Intel Inc.', renderer: 'Intel(R) UHD Graphics 620' };
+  }
+
+  const screenIndex = Math.floor(random() * screens.length);
+  const selectedScreen = screens[Math.min(screenIndex, screens.length - 1)];
+
+  const platformIndex = Math.floor(random() * platforms.length);
+  const platform = platforms[Math.min(platformIndex, platforms.length - 1)];
   const chromeVersion = chromeVersions[Math.floor(random() * chromeVersions.length)];
   const windowsVersion = windowsVersions[Math.floor(random() * windowsVersions.length)];
 
-  // Languages from proxy country (AUTOMATICALLY!)
-  const countryLanguages = languagesByCountry[proxyCountry] || languagesByCountry['US'];
-  const languages = countryLanguages[Math.floor(random() * countryLanguages.length)];
+  // Languages - use device languages if available, otherwise proxy country
+  let languages: string[];
+  let finalTimezone: string;
+  let finalScreen: { width: number; height: number };
+  let finalColorDepth: number;
+
+  if (useDeviceParams && deviceParams) {
+    // Use real device parameters
+    languages = deviceParams.languages;
+    finalTimezone = deviceParams.timezone;
+    finalScreen = {
+      width: deviceParams.screenWidth,
+      height: deviceParams.screenHeight
+    };
+    finalColorDepth = deviceParams.colorDepth;
+    console.log('[FINGERPRINT] Using real device parameters');
+  } else {
+    // Use proxy country languages
+    const countryCode = proxyCountry || 'US';
+    const countryLanguages = languagesByCountry[countryCode] || languagesByCountry['US'];
+    languages = countryLanguages[Math.floor(random() * countryLanguages.length)];
+    finalTimezone = timezone || 'America/New_York';
+    finalScreen = selectedScreen;
+    finalColorDepth = colorDepth;
+    console.log('[FINGERPRINT] Using proxy-based parameters');
+  }
 
   // Canvas/Audio noise (unique noise for each profile)
   const canvasNoise = random() * 0.0001; // 0.00001 - 0.0001
@@ -167,13 +264,13 @@ export function generateFingerprint(
     hardwareConcurrency,
     deviceMemory,
     screen: {
-      width: selectedScreen.width,
-      height: selectedScreen.height,
-      colorDepth,
-      pixelDepth: colorDepth,
+      width: finalScreen.width,
+      height: finalScreen.height,
+      colorDepth: finalColorDepth,
+      pixelDepth: finalColorDepth,
     },
     languages,
-    timezone,
+    timezone: finalTimezone,
     userAgent,
     canvasNoise,
     audioNoise,

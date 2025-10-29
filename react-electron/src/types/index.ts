@@ -475,7 +475,7 @@ export interface DailyStats {
 export interface UserProfile {
   id: string;
   name: string;
-  proxy: ProfileProxy;
+  proxy?: ProfileProxy; // Optional - can use device IP if not provided
   cookies: ProfileCookie[];
   navigationUrl?: string; // Search query URL configured for this profile
   telegram?: TelegramBotConfig; // Optional Telegram bot configuration

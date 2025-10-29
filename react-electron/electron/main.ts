@@ -324,7 +324,7 @@ function createWindow() {
       webSecurity: true,
       preload: path.join(__dirname, "preload.mjs"),
       partition: "persist:main",
-      devTools: false,
+      devTools: true,
       experimentalFeatures: false,
       allowRunningInsecureContent: false,
       sandbox: false,
@@ -947,10 +947,28 @@ ipcMain.handle("execute-script", async (_event, params) => {
         logger.log('[CACHE] Cleared');
 
         // Viewport из fingerprint
-        const viewport = profile.fingerprint?.screen || profile.viewport || {
-          width: 1920,
-          height: 1080
-        };
+        let viewport = { width: 1920, height: 1080 }; // Default viewport
+
+        if (profile.fingerprint?.screen && profile.fingerprint.screen.width && profile.fingerprint.screen.height) {
+          viewport = {
+            width: profile.fingerprint.screen.width,
+            height: profile.fingerprint.screen.height
+          };
+        } else if (profile.viewport && profile.viewport.width && profile.viewport.height) {
+          viewport = {
+            width: profile.viewport.width,
+            height: profile.viewport.height
+          };
+        } else {
+          logger.warn('[VIEWPORT] No valid viewport data found in profile, using default 1920x1080');
+        }
+
+        // Additional safety check
+        if (!viewport || typeof viewport.width !== 'number' || typeof viewport.height !== 'number') {
+          viewport = { width: 1920, height: 1080 };
+          logger.warn('[VIEWPORT] Invalid viewport data detected, falling back to default 1920x1080');
+        }
+
         await page.setViewport({
           width: viewport.width,
           height: viewport.height

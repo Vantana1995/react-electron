@@ -330,10 +330,16 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
           <div className="profile-card-content">
             <div className="profile-detail">
-              <label>Proxy:</label>
+              <label>Connection:</label>
               <span className="proxy-info">
-                {profile.proxy.login}:{maskProxyPassword(profile.proxy.password)}@
-                {profile.proxy.ip}:{profile.proxy.port}
+                {profile.proxy ? (
+                  <>
+                    {profile.proxy.login}:{maskProxyPassword(profile.proxy.password)}@
+                    {profile.proxy.ip}:{profile.proxy.port}
+                  </>
+                ) : (
+                  <span className="no-proxy-badge">Direct Connection (Device IP)</span>
+                )}
               </span>
             </div>
 

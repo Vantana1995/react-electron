@@ -12,7 +12,7 @@ import {
   ProxyLocation,
 } from "../../types";
 import { profileStorage } from "../../services/profileStorage";
-import { generateFingerprint, isValidIP } from "../../utils/fingerprintGenerator";
+import { generateFingerprint, isValidIP, getDeviceParameters } from "../../utils/fingerprintGenerator";
 import "./ProfileFormPanel.css";
 
 interface ProfileFormPanelProps {
@@ -54,27 +54,39 @@ export const ProfileFormPanel: React.FC<ProfileFormPanelProps> = ({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["basic", "proxy"])
   );
+  const [useProxy, setUseProxy] = useState(true); // New state for proxy toggle
 
   // Reset form when panel opens/closes or editing profile changes
   useEffect(() => {
     if (isOpen) {
       if (editingProfile) {
         // Populate form with existing profile data
+        const hasProxy = editingProfile.proxy && editingProfile.proxy.ip;
+        setUseProxy(!!hasProxy);
+
         setFormData({
           name: editingProfile.name,
-          proxy: {
+          proxy: hasProxy ? {
             login: editingProfile.proxy.login,
             password: editingProfile.proxy.password,
             ip: editingProfile.proxy.ip,
             port: editingProfile.proxy.port.toString(),
             country: editingProfile.proxy.country,
             timezone: editingProfile.proxy.timezone,
+          } : {
+            login: "",
+            password: "",
+            ip: "",
+            port: "",
+            country: undefined,
+            timezone: undefined,
           },
           cookiesJson: JSON.stringify(editingProfile.cookies, null, 2),
         });
         setParsedCookies(editingProfile.cookies);
       } else {
         // Reset form for new profile
+        setUseProxy(true); // Default to using proxy
         setFormData({
           name: "",
           proxy: {
@@ -235,38 +247,42 @@ export const ProfileFormPanel: React.FC<ProfileFormPanelProps> = ({
       errors.push("Profile name already exists");
     }
 
-    // Check for duplicate proxy address (excluding current profile if editing)
-    const proxyAddress = `${formData.proxy.ip}:${formData.proxy.port}`;
-    const proxyExists = existingProfiles.some((p) => {
-      const existingProxyAddress = `${p.proxy.ip}:${p.proxy.port}`;
-      return (
-        existingProxyAddress === proxyAddress &&
-        (!editingProfile || p.id !== editingProfile.id)
-      );
-    });
-    if (proxyExists) {
-      errors.push("Proxy address (IP:Port) already exists");
-    }
+    // Validate proxy data ONLY if useProxy is enabled
+    if (useProxy) {
+      // Check for duplicate proxy address (excluding current profile if editing)
+      const proxyAddress = `${formData.proxy.ip}:${formData.proxy.port}`;
+      const proxyExists = existingProfiles.some((p) => {
+        if (!p.proxy || !p.proxy.ip) return false; // Skip profiles without proxy
+        const existingProxyAddress = `${p.proxy.ip}:${p.proxy.port}`;
+        return (
+          existingProxyAddress === proxyAddress &&
+          (!editingProfile || p.id !== editingProfile.id)
+        );
+      });
+      if (proxyExists) {
+        errors.push("Proxy address (IP:Port) already exists");
+      }
 
-    // Validate proxy data
-    if (!formData.proxy.login.trim()) {
-      errors.push("Proxy login is required");
-    }
-    if (!formData.proxy.password.trim()) {
-      errors.push("Proxy password is required");
-    }
-    if (!formData.proxy.ip.trim()) {
-      errors.push("Proxy IP is required");
-    } else if (
-      !/^(\d{1,3}\.){3}\d{1,3}$/.test(formData.proxy.ip) &&
-      !formData.proxy.ip.includes(".")
-    ) {
-      errors.push("Invalid IP address format");
-    }
+      // Validate proxy fields
+      if (!formData.proxy.login.trim()) {
+        errors.push("Proxy login is required");
+      }
+      if (!formData.proxy.password.trim()) {
+        errors.push("Proxy password is required");
+      }
+      if (!formData.proxy.ip.trim()) {
+        errors.push("Proxy IP is required");
+      } else if (
+        !/^(\d{1,3}\.){3}\d{1,3}$/.test(formData.proxy.ip) &&
+        !formData.proxy.ip.includes(".")
+      ) {
+        errors.push("Invalid IP address format");
+      }
 
-    const port = parseInt(formData.proxy.port);
-    if (!formData.proxy.port || isNaN(port) || port < 1 || port > 65535) {
-      errors.push("Valid proxy port (1-65535) is required");
+      const port = parseInt(formData.proxy.port);
+      if (!formData.proxy.port || isNaN(port) || port < 1 || port > 65535) {
+        errors.push("Valid proxy port (1-65535) is required");
+      }
     }
 
     setFormErrors(errors);
@@ -280,29 +296,71 @@ export const ProfileFormPanel: React.FC<ProfileFormPanelProps> = ({
 
     setIsValidating(true);
 
+    // Declare fingerprint at function scope for error handling
+    let fingerprint;
+
     try {
-      const proxy: ProfileProxy = {
-        login: formData.proxy.login.trim(),
-        password: formData.proxy.password.trim(),
-        ip: formData.proxy.ip.trim(),
-        port: parseInt(formData.proxy.port),
-        country: formData.proxy.country,
-        timezone: formData.proxy.timezone,
-      };
+      // Create proxy object only if useProxy is enabled
+      let proxy: ProfileProxy | undefined = undefined;
 
-      // Generate unique fingerprint for new profile
-      const fingerprint = generateFingerprint(
-        editingProfile?.id || crypto.randomUUID(),
-        proxy.country || "US",
-        proxy.timezone || "America/New_York"
-      );
+      if (useProxy) {
+        proxy = {
+          login: formData.proxy.login.trim(),
+          password: formData.proxy.password.trim(),
+          ip: formData.proxy.ip.trim(),
+          port: parseInt(formData.proxy.port),
+          country: formData.proxy.country,
+          timezone: formData.proxy.timezone,
+        };
+      }
 
-      console.log("[PROFILE] Generated fingerprint:", {
-        webgl: fingerprint.webgl.renderer,
-        platform: fingerprint.platform,
-        timezone: fingerprint.timezone,
-        languages: fingerprint.languages,
-      });
+      // Generate or preserve fingerprint
+      // For new profiles: generate a new fingerprint
+      // For existing profiles: use existing fingerprint if available, otherwise generate new one
+      fingerprint = editingProfile?.fingerprint;
+
+      if (!fingerprint) {
+        // If no proxy, use real device parameters
+        if (!useProxy) {
+          const deviceParams = getDeviceParameters();
+          fingerprint = generateFingerprint(
+            editingProfile?.id || crypto.randomUUID(),
+            null, // No proxy country
+            null, // No proxy timezone
+            deviceParams // Use device parameters
+          );
+
+          console.log("[PROFILE] Generated fingerprint with device parameters:", {
+            webgl: fingerprint.webgl?.renderer || 'undefined',
+            platform: fingerprint.platform,
+            timezone: fingerprint.timezone,
+            languages: fingerprint.languages,
+            mode: "device"
+          });
+        } else {
+          // Use proxy-based fingerprint
+          fingerprint = generateFingerprint(
+            editingProfile?.id || crypto.randomUUID(),
+            proxy!.country || "US",
+            proxy!.timezone || "America/New_York"
+          );
+
+          console.log("[PROFILE] Generated fingerprint with proxy parameters:", {
+            webgl: fingerprint.webgl?.renderer || 'undefined',
+            platform: fingerprint.platform,
+            timezone: fingerprint.timezone,
+            languages: fingerprint.languages,
+            mode: "proxy"
+          });
+        }
+      } else {
+        console.log("[PROFILE] Using existing fingerprint for profile:", editingProfile?.id);
+      }
+
+      // Validate fingerprint before saving
+      if (!fingerprint || !fingerprint.webgl || !fingerprint.webgl.renderer) {
+        throw new Error('Failed to generate valid fingerprint. Please try again.');
+      }
 
       const profileData = {
         name: formData.name.trim(),
@@ -314,9 +372,20 @@ export const ProfileFormPanel: React.FC<ProfileFormPanelProps> = ({
       onSave(profileData);
       onClose();
     } catch (error) {
+      console.error("[PROFILE] Error saving profile:", error);
       setFormErrors([
         error instanceof Error ? error.message : "Error saving profile",
       ]);
+      // Log fingerprint state for debugging
+      if (fingerprint) {
+        console.log("[PROFILE] Fingerprint at error:", {
+          hasWebgl: !!fingerprint.webgl,
+          webglVendor: fingerprint.webgl?.vendor,
+          webglRenderer: fingerprint.webgl?.renderer,
+          platform: fingerprint.platform,
+          timezone: fingerprint.timezone
+        });
+      }
     } finally {
       setIsValidating(false);
     }
@@ -397,82 +466,113 @@ export const ProfileFormPanel: React.FC<ProfileFormPanelProps> = ({
               <span className="pfp-category-icon">
                 {expandedSections.has("proxy") ? "▼" : "▶"}
               </span>
-              <span className="pfp-category-name">Proxy Settings</span>
+              <span className="pfp-category-name">Proxy Settings (Optional)</span>
             </button>
 
             {expandedSections.has("proxy") && (
               <div className="pfp-category-content">
-                <div className="pfp-form-row">
-                  <div className="pfp-form-group">
-                    <label htmlFor="proxy-login">Login *</label>
+                {/* Use Proxy Checkbox */}
+                <div className="pfp-form-group" style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                     <input
-                      id="proxy-login"
-                      type="text"
-                      className="pfp-input"
-                      value={formData.proxy.login}
-                      onChange={(e) =>
-                        handleInputChange("proxy.login", e.target.value)
-                      }
-                      placeholder="Proxy username"
+                      type="checkbox"
+                      checked={useProxy}
+                      onChange={(e) => setUseProxy(e.target.checked)}
                       disabled={isValidating}
+                      style={{ marginRight: '8px', cursor: 'pointer' }}
                     />
-                  </div>
-                  <div className="pfp-form-group">
-                    <label htmlFor="proxy-password">Password *</label>
-                    <input
-                      id="proxy-password"
-                      type="password"
-                      className="pfp-input"
-                      value={formData.proxy.password}
-                      onChange={(e) =>
-                        handleInputChange("proxy.password", e.target.value)
-                      }
-                      placeholder="Proxy password"
-                      disabled={isValidating}
-                    />
-                  </div>
+                    <span>Use proxy (recommended for automation)</span>
+                  </label>
+                  {!useProxy && (
+                    <div className="pfp-proxy-warning" style={{
+                      marginTop: '8px',
+                      padding: '10px',
+                      backgroundColor: '#fff3cd',
+                      border: '1px solid #ffc107',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      color: '#856404'
+                    }}>
+                      ⚠️ Without proxy, your real IP address will be used. This may increase detection risk during automation.
+                    </div>
+                  )}
                 </div>
-                <div className="pfp-form-row">
-                  <div className="pfp-form-group">
-                    <label htmlFor="proxy-ip">IP Address *</label>
-                    <input
-                      id="proxy-ip"
-                      type="text"
-                      className="pfp-input"
-                      value={formData.proxy.ip}
-                      onChange={(e) => handleProxyIpChange(e.target.value)}
-                      placeholder="192.168.1.1 or proxy.example.com"
-                      disabled={isValidating}
-                    />
-                    {isDetectingLocation && (
-                      <div className="pfp-proxy-status detecting">
-                        🔍 Detecting location...
+
+                {useProxy && (
+                  <>
+                    <div className="pfp-form-row">
+                      <div className="pfp-form-group">
+                        <label htmlFor="proxy-login">Login *</label>
+                        <input
+                          id="proxy-login"
+                          type="text"
+                          className="pfp-input"
+                          value={formData.proxy.login}
+                          onChange={(e) =>
+                            handleInputChange("proxy.login", e.target.value)
+                          }
+                          placeholder="Proxy username"
+                          disabled={isValidating}
+                        />
                       </div>
-                    )}
-                    {proxyLocation && !isDetectingLocation && (
-                      <div className="pfp-proxy-status detected">
-                        ✅ Detected: {proxyLocation.countryName} |{" "}
-                        {proxyLocation.timezone}
+                      <div className="pfp-form-group">
+                        <label htmlFor="proxy-password">Password *</label>
+                        <input
+                          id="proxy-password"
+                          type="password"
+                          className="pfp-input"
+                          value={formData.proxy.password}
+                          onChange={(e) =>
+                            handleInputChange("proxy.password", e.target.value)
+                          }
+                          placeholder="Proxy password"
+                          disabled={isValidating}
+                        />
                       </div>
-                    )}
-                  </div>
-                  <div className="pfp-form-group">
-                    <label htmlFor="proxy-port">Port *</label>
-                    <input
-                      id="proxy-port"
-                      type="number"
-                      className="pfp-input"
-                      value={formData.proxy.port}
-                      onChange={(e) =>
-                        handleInputChange("proxy.port", e.target.value)
-                      }
-                      placeholder="8080"
-                      min="1"
-                      max="65535"
-                      disabled={isValidating}
-                    />
-                  </div>
-                </div>
+                    </div>
+                    <div className="pfp-form-row">
+                      <div className="pfp-form-group">
+                        <label htmlFor="proxy-ip">IP Address *</label>
+                        <input
+                          id="proxy-ip"
+                          type="text"
+                          className="pfp-input"
+                          value={formData.proxy.ip}
+                          onChange={(e) => handleProxyIpChange(e.target.value)}
+                          placeholder="192.168.1.1 or proxy.example.com"
+                          disabled={isValidating}
+                        />
+                        {isDetectingLocation && (
+                          <div className="pfp-proxy-status detecting">
+                            🔍 Detecting location...
+                          </div>
+                        )}
+                        {proxyLocation && !isDetectingLocation && (
+                          <div className="pfp-proxy-status detected">
+                            ✅ Detected: {proxyLocation.countryName} |{" "}
+                            {proxyLocation.timezone}
+                          </div>
+                        )}
+                      </div>
+                      <div className="pfp-form-group">
+                        <label htmlFor="proxy-port">Port *</label>
+                        <input
+                          id="proxy-port"
+                          type="number"
+                          className="pfp-input"
+                          value={formData.proxy.port}
+                          onChange={(e) =>
+                            handleInputChange("proxy.port", e.target.value)
+                          }
+                          placeholder="8080"
+                          min="1"
+                          max="65535"
+                          disabled={isValidating}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

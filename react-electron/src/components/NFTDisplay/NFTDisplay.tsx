@@ -40,7 +40,7 @@ interface NFTDisplayProps {
   navigationUrl?: string;
   onNavigationUrlChange?: (url: string) => void;
   onOpenSearchBuilder?: () => void;
-  onRunningScriptsUpdate?: (scripts: RunningScript[]) => void;
+  onRunningScriptsUpdate?: (scriptId: string, scripts: RunningScript[]) => void;
 }
 
 export const NFTDisplay: React.FC<NFTDisplayProps> = ({
@@ -132,16 +132,16 @@ export const NFTDisplay: React.FC<NFTDisplayProps> = ({
 
   // Send running scripts to parent component
   useEffect(() => {
-    if (onRunningScriptsUpdate) {
+    if (onRunningScriptsUpdate && scriptId) {
       // Add NFT image and script name to running scripts
       const enrichedScripts = runningScripts.map(script => ({
         ...script,
         nftImage: nft?.image,
         scriptName: scriptData?.name || nft?.metadata?.name,
       }));
-      onRunningScriptsUpdate(enrichedScripts);
+      onRunningScriptsUpdate(scriptId, enrichedScripts);
     }
-  }, [runningScripts, onRunningScriptsUpdate, nft, scriptData]);
+  }, [runningScripts, onRunningScriptsUpdate, scriptId]);
 
   useEffect(() => {
     if (nft?.image) {

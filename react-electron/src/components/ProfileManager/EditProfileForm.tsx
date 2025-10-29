@@ -23,15 +23,25 @@ export const EditProfileForm: React.FC<EditProfileFormProps> = ({
   onSave,
   onCancel,
 }) => {
+  // Determine if profile has proxy
+  const [hasProxy] = useState(!!profile.proxy);
+
   const [formData, setFormData] = useState({
     name: profile.name,
-    proxy: {
+    proxy: profile.proxy ? {
       login: profile.proxy.login,
       password: profile.proxy.password,
       ip: profile.proxy.ip,
       port: profile.proxy.port.toString(),
       country: profile.proxy.country,
       timezone: profile.proxy.timezone,
+    } : {
+      login: "",
+      password: "",
+      ip: "",
+      port: "",
+      country: undefined,
+      timezone: undefined,
     },
     cookiesJson: JSON.stringify(profile.cookies, null, 2),
     navigationUrl: profile.navigationUrl || "",
@@ -165,21 +175,24 @@ export const EditProfileForm: React.FC<EditProfileFormProps> = ({
       errors.push("Profile name is required");
     }
 
-    if (!formData.proxy.login.trim()) {
-      errors.push("Proxy login is required");
-    }
+    // Only validate proxy if profile has proxy
+    if (hasProxy) {
+      if (!formData.proxy.login.trim()) {
+        errors.push("Proxy login is required");
+      }
 
-    if (!formData.proxy.password.trim()) {
-      errors.push("Proxy password is required");
-    }
+      if (!formData.proxy.password.trim()) {
+        errors.push("Proxy password is required");
+      }
 
-    if (!isValidIP(formData.proxy.ip)) {
-      errors.push("Invalid proxy IP address");
-    }
+      if (!isValidIP(formData.proxy.ip)) {
+        errors.push("Invalid proxy IP address");
+      }
 
-    const port = parseInt(formData.proxy.port, 10);
-    if (isNaN(port) || port < 1 || port > 65535) {
-      errors.push("Invalid proxy port (must be 1-65535)");
+      const port = parseInt(formData.proxy.port, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        errors.push("Invalid proxy port (must be 1-65535)");
+      }
     }
 
     if (cookieErrors.length > 0) {
@@ -199,7 +212,7 @@ export const EditProfileForm: React.FC<EditProfileFormProps> = ({
     const updatedProfile: UserProfile = {
       ...profile,
       name: formData.name.trim(),
-      proxy: {
+      proxy: hasProxy ? {
         ...profile.proxy,
         login: formData.proxy.login.trim(),
         password: formData.proxy.password.trim(),
@@ -207,7 +220,7 @@ export const EditProfileForm: React.FC<EditProfileFormProps> = ({
         port: parseInt(formData.proxy.port, 10),
         country: formData.proxy.country,
         timezone: formData.proxy.timezone,
-      },
+      } : undefined,
       cookies: parsedCookies,
       navigationUrl: formData.navigationUrl.trim() || undefined,
       updatedAt: Date.now(),
@@ -242,63 +255,73 @@ export const EditProfileForm: React.FC<EditProfileFormProps> = ({
         </div>
       </div>
 
-      <div className="form-section">
-        <h4>Proxy Settings</h4>
+      {hasProxy ? (
+        <div className="form-section">
+          <h4>Proxy Settings</h4>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Proxy IP</label>
-            <input
-              type="text"
-              value={formData.proxy.ip}
-              onChange={(e) => handleProxyIpChange(e.target.value)}
-              placeholder="192.168.1.1"
-            />
-            {isDetectingLocation && (
-              <span className="detecting-text">Detecting location...</span>
-            )}
-            {proxyLocation && (
-              <span className="location-text">
-                📍 {proxyLocation.countryName} (UTC{proxyLocation.timezone})
-              </span>
-            )}
+          <div className="form-row">
+            <div className="form-group">
+              <label>Proxy IP</label>
+              <input
+                type="text"
+                value={formData.proxy.ip}
+                onChange={(e) => handleProxyIpChange(e.target.value)}
+                placeholder="192.168.1.1"
+              />
+              {isDetectingLocation && (
+                <span className="detecting-text">Detecting location...</span>
+              )}
+              {proxyLocation && (
+                <span className="location-text">
+                  📍 {proxyLocation.countryName} (UTC{proxyLocation.timezone})
+                </span>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Port</label>
+              <input
+                type="text"
+                value={formData.proxy.port}
+                onChange={(e) => handleInputChange("proxy.port", e.target.value)}
+                placeholder="8080"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>Port</label>
-            <input
-              type="text"
-              value={formData.proxy.port}
-              onChange={(e) => handleInputChange("proxy.port", e.target.value)}
-              placeholder="8080"
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Login</label>
+              <input
+                type="text"
+                value={formData.proxy.login}
+                onChange={(e) => handleInputChange("proxy.login", e.target.value)}
+                placeholder="username"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={formData.proxy.password}
+                onChange={(e) =>
+                  handleInputChange("proxy.password", e.target.value)
+                }
+                placeholder="password"
+              />
+            </div>
           </div>
         </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label>Login</label>
-            <input
-              type="text"
-              value={formData.proxy.login}
-              onChange={(e) => handleInputChange("proxy.login", e.target.value)}
-              placeholder="username"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={formData.proxy.password}
-              onChange={(e) =>
-                handleInputChange("proxy.password", e.target.value)
-              }
-              placeholder="password"
-            />
+      ) : (
+        <div className="form-section">
+          <h4>Connection Type</h4>
+          <div className="no-proxy-info">
+            <span className="no-proxy-badge">Direct Connection (Device IP)</span>
+            <p>This profile uses your device's direct internet connection without a proxy.</p>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="form-section">
         <h4>Cookies (JSON Format)</h4>

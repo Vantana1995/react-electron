@@ -845,7 +845,7 @@ const AppContent: React.FC = () => {
         const profile = appState.profiles.profiles.find(
           (p) => p.id === profileId
         );
-        const proxyAddress = profile
+        const proxyAddress = profile && profile.proxy
           ? `${profile.proxy.ip}:${profile.proxy.port}`
           : null;
 
@@ -900,7 +900,7 @@ const AppContent: React.FC = () => {
    * Handle running scripts update from NFT Display
    */
   const handleRunningScriptsUpdate = useCallback(
-    (scriptId: string) => (scripts: RunningScript[]) => {
+    (scriptId: string, scripts: RunningScript[]) => {
       setAllRunningScripts((prev) => {
         const newMap = new Map(prev);
         if (scripts.length > 0) {
@@ -992,7 +992,9 @@ const AppContent: React.FC = () => {
   const handleClearProfileHistory = useCallback(
     async (profile: UserProfile) => {
       try {
-        const profileId = `${profile.proxy.ip}_${profile.proxy.port}`;
+        const profileId = profile.proxy
+          ? `${profile.proxy.ip}_${profile.proxy.port}`
+          : profile.id;
 
         // Get saveImagesFolder from localStorage (same key as NFTDisplay uses)
         const savedState = localStorage.getItem("nft-display-state");
@@ -1092,9 +1094,7 @@ const AppContent: React.FC = () => {
                     onNavigationUrlChange={handleNavigationUrlChange}
                     onOpenSearchBuilder={handleOpenSearchBuilder}
                     onProfileUpdate={handleProfileUpdate}
-                    onRunningScriptsUpdate={handleRunningScriptsUpdate(
-                      pair.script.id
-                    )}
+                    onRunningScriptsUpdate={handleRunningScriptsUpdate}
                   />
                   <div className="script-info">
                     <h4>Associated Script: {pair.script.name}</h4>
@@ -1118,9 +1118,7 @@ const AppContent: React.FC = () => {
                   onNavigationUrlChange={handleNavigationUrlChange}
                   onOpenSearchBuilder={handleOpenSearchBuilder}
                   onProfileUpdate={handleProfileUpdate}
-                  onRunningScriptsUpdate={handleRunningScriptsUpdate(
-                    "legacy-nft"
-                  )}
+                  onRunningScriptsUpdate={handleRunningScriptsUpdate}
                 />
               </div>
             ) : currentScript ? (
@@ -1136,9 +1134,7 @@ const AppContent: React.FC = () => {
                   onNavigationUrlChange={handleNavigationUrlChange}
                   onOpenSearchBuilder={handleOpenSearchBuilder}
                   onProfileUpdate={handleProfileUpdate}
-                  onRunningScriptsUpdate={handleRunningScriptsUpdate(
-                    currentScript.id || "legacy-script"
-                  )}
+                  onRunningScriptsUpdate={handleRunningScriptsUpdate}
                 />
               </div>
             ) : null}

@@ -38,9 +38,12 @@ class ProfileStorageService {
     const profiles = await this.getProfiles();
 
     // Check for duplicate proxies (compare by ip:port combination)
-    const newProxyKey = `${profileData.proxy.ip}:${profileData.proxy.port}`.toLowerCase();
-    if (profiles.some(p => `${p.proxy.ip}:${p.proxy.port}`.toLowerCase() === newProxyKey)) {
-      throw new Error("Profile with this proxy (IP:PORT) already exists");
+    // Only check if proxy is defined (profiles without proxy are allowed)
+    if (profileData.proxy) {
+      const newProxyKey = `${profileData.proxy.ip}:${profileData.proxy.port}`.toLowerCase();
+      if (profiles.some(p => p.proxy && `${p.proxy.ip}:${p.proxy.port}`.toLowerCase() === newProxyKey)) {
+        throw new Error("Profile with this proxy (IP:PORT) already exists");
+      }
     }
 
     const newProfile: UserProfile = {
@@ -97,6 +100,7 @@ class ProfileStorageService {
       const updatedProxyKey = `${updates.proxy.ip}:${updates.proxy.port}`.toLowerCase();
       const proxyExists = profiles.some(p =>
         p.id !== profileId &&
+        p.proxy &&
         `${p.proxy.ip}:${p.proxy.port}`.toLowerCase() === updatedProxyKey
       );
       if (proxyExists) {
